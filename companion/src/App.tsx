@@ -107,6 +107,51 @@ export const App: React.FC = () => {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  // Disarm main-process startup watchdog once React shell mounts + install global error handlers
+  useEffect(() => {
+    try {
+      (window as any).electronAPI?.notifyAppReady?.();
+    } catch {
+      // ignore in browser mode
+    }
+
+    const onError = (event: ErrorEvent) => {
+      const msg = String(event?.message || "Unexpected runtime error").slice(0, 140);
+      try {
+        (window as any).electronAPI?.reportRendererError?.({
+          source: "window.error",
+          message: msg,
+        });
+      } catch {
+        // ignore
+      }
+      setActionToast({ message: `Notice: ${msg}`, isError: true, ts: Date.now() });
+    };
+
+    const onRejection = (event: PromiseRejectionEvent) => {
+      const reason =
+        event?.reason instanceof Error
+          ? event.reason.message
+          : String(event?.reason || "Unhandled async error");
+      const msg = reason.slice(0, 140);
+      try {
+        (window as any).electronAPI?.reportRendererError?.({
+          source: "window.unhandledrejection",
+          message: msg,
+        });
+      } catch {
+        // ignore
+      }
+    };
+
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
   // Safe navigation: redirect any unknown/removed route to Dashboard
   const setActiveScreen = useCallback((screen: ScreenId | string) => {
     if (VALID_SCREENS.has(screen as ScreenId)) {
@@ -323,7 +368,15 @@ export const App: React.FC = () => {
             const parsed = JSON.parse(evt.data);
             setFeedStatus("LIVE_SSE");
             if (parsed.type === "snapshot" && parsed.payload) {
-              setRawStatus(parsed.payload);
+              const snap = parsed.payload;
+              if (snap && typeof snap === "object" && snap.engine && snap.mt5) {
+                setRawStatus(snap);
+              } else if (snap && typeof snap === "object") {
+                // Backward-compatible merge for engine-only snapshot payloads
+                setRawStatus((prev) =>
+                  prev ? { ...prev, engine: { ...prev.engine, ...snap } } : prev
+                );
+              }
             } else if (parsed.type === "mt5_sync" && parsed.payload) {
               setRawStatus((prev) => (prev ? { ...prev, mt5: parsed.payload } : prev));
             } else if (parsed.type === "engine_state" && parsed.payload) {

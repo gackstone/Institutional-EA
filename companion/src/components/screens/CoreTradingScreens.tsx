@@ -49,6 +49,7 @@ import {
 import { getSymbolChipSpec } from "../../styles/designTokens";
 import { UI_COPY } from "../../constants/uiCopy";
 import { LiveTradingChart } from "../LiveTradingChart";
+import { PanelErrorBoundary } from "../ErrorBoundary";
 import type { EngineDrawingsFeed } from "../../utils/chartDrawingsSchema";
 
 // One-time confirmation flag per app session for demo order-placing Start
@@ -565,6 +566,7 @@ export const DashboardScreen: React.FC<
       {/* =====================================================================
           ROW 1: COMPACT TOP STATUS BAR + CONTROLS (Connect MT5 / Start / Pause-Resume / Stop | Close All)
       ====================================================================== */}
+      <PanelErrorBoundary panelName="Top Control Bar">
       <section
         aria-label="Terminal Top Status Bar"
         className="iea-glass-card relative flex flex-wrap items-center justify-between gap-2 px-3.5 py-2"
@@ -927,10 +929,12 @@ export const DashboardScreen: React.FC<
           )}
         </div>
       </section>
+      </PanelErrorBoundary>
 
       {/* =====================================================================
           ROW 2: 5 EVENLY DISTRIBUTED, EQUAL-HEIGHT KPI CARDS
       ====================================================================== */}
+      <PanelErrorBoundary panelName="KPI Summary">
       <section
         aria-label="Account and Risk Key Performance Indicators"
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3"
@@ -1097,36 +1101,40 @@ export const DashboardScreen: React.FC<
           </div>
         </div>
       </section>
+      </PanelErrorBoundary>
 
       {/* =====================================================================
           ROW 3: DOMINANT FULL-WIDTH LIVE CHART (12 COLUMNS, FLUID HEIGHT)
       ====================================================================== */}
-      <section
-        aria-label="Live Institutional Chart"
-        className="grid grid-cols-12"
-      >
-        <div
-          className="col-span-12 flex flex-col"
-          style={{ height: "clamp(480px, 56vh, 680px)" }}
+      <PanelErrorBoundary panelName="Live Chart">
+        <section
+          aria-label="Live Institutional Chart"
+          className="grid grid-cols-12"
         >
-          <LiveTradingChart
-            bundle={chartBundle}
-            selectedSymbol={selectedSymbol}
-            selectedTimeframe={selectedTimeframe}
-            feedStatus={feedStatus}
-            waitingReason={candleWaitingReason}
-            drawingsFeed={drawingsFeed}
-            drawingsError={drawingsError}
-            onSelectSymbol={setSelectedSymbol}
-            onSelectTimeframe={setSelectedTimeframe}
-            onCaptureScreenshot={handleSaveScreenshot}
-          />
-        </div>
-      </section>
+          <div
+            className="col-span-12 flex flex-col"
+            style={{ height: "clamp(480px, 56vh, 680px)" }}
+          >
+            <LiveTradingChart
+              bundle={chartBundle}
+              selectedSymbol={selectedSymbol}
+              selectedTimeframe={selectedTimeframe}
+              feedStatus={feedStatus}
+              waitingReason={candleWaitingReason}
+              drawingsFeed={drawingsFeed}
+              drawingsError={drawingsError}
+              onSelectSymbol={setSelectedSymbol}
+              onSelectTimeframe={setSelectedTimeframe}
+              onCaptureScreenshot={handleSaveScreenshot}
+            />
+          </div>
+        </section>
+      </PanelErrorBoundary>
 
       {/* =====================================================================
           ROW 4: FULL-WIDTH OPEN POSITIONS & ORDERS TABLE (STICKY HEADERS)
       ====================================================================== */}
+      <PanelErrorBoundary panelName="Positions Table">
       <section
         aria-label="Open Positions and Pending Orders"
         className="iea-glass-card p-4 md:p-5 space-y-3"
@@ -1333,6 +1341,7 @@ export const DashboardScreen: React.FC<
           </table>
         </div>
       </section>
+      </PanelErrorBoundary>
 
       {/* =====================================================================
           CONFIRMATION MODAL (Start Demo / Stop / Close All / Mobile Pause)

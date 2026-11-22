@@ -312,7 +312,7 @@ export function buildNormalizedDashboardData(
   now: Date = new Date()
 ): NormalizedDashboardData {
   const mt5Connected =
-    rawStatus !== null && rawStatus.mt5.connection_status === "CONNECTED";
+    rawStatus !== null && rawStatus?.mt5?.connection_status === "CONNECTED";
 
   const lastSyncAt = rawStatus?.mt5?.last_sync_at || null;
   const isStale =

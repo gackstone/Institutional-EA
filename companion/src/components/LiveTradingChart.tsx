@@ -50,6 +50,7 @@ import {
   ProjectedDrawing,
   projectEngineDrawings,
 } from "../utils/chartCanvasRenderer";
+import { readVersionedState, writeVersionedState } from "../utils/persistedState";
 
 export interface OverlayTogglesState {
   liquidity: boolean;
@@ -79,29 +80,43 @@ const OVERLAY_STORAGE_KEY = "iea_chart_overlay_toggles_v1";
 // Remember visible range per (symbol:timeframe) within the app session
 const sessionVisibleRanges = new Map<string, LogicalRange>();
 
+const DEFAULT_OVERLAY_TOGGLES: OverlayTogglesState = {
+  liquidity: true,
+  fvgOb: true,
+  structure: true,
+  sessions: true,
+  tradeLabels: true,
+};
+
+function isValidOverlayToggles(v: unknown): v is OverlayTogglesState {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.liquidity === "boolean" &&
+    typeof o.fvgOb === "boolean" &&
+    typeof o.structure === "boolean" &&
+    typeof o.sessions === "boolean" &&
+    typeof o.tradeLabels === "boolean"
+  );
+}
+
 function loadSavedOverlayToggles(): OverlayTogglesState {
-  try {
-    const raw = localStorage.getItem(OVERLAY_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
+  return readVersionedState<OverlayTogglesState>({
+    key: OVERLAY_STORAGE_KEY,
+    defaultValue: DEFAULT_OVERLAY_TOGGLES,
+    validate: isValidOverlayToggles,
+    migrate: (legacy) => {
+      if (!legacy || typeof legacy !== "object") return null;
+      const o = legacy as Record<string, unknown>;
       return {
-        liquidity: Boolean(parsed.liquidity ?? true),
-        fvgOb: Boolean(parsed.fvgOb ?? true),
-        structure: Boolean(parsed.structure ?? true),
-        sessions: Boolean(parsed.sessions ?? true),
-        tradeLabels: Boolean(parsed.tradeLabels ?? true),
+        liquidity: Boolean(o.liquidity ?? true),
+        fvgOb: Boolean(o.fvgOb ?? true),
+        structure: Boolean(o.structure ?? true),
+        sessions: Boolean(o.sessions ?? true),
+        tradeLabels: Boolean(o.tradeLabels ?? o.trades ?? true),
       };
-    }
-  } catch {
-    // ignore storage errors
-  }
-  return {
-    liquidity: true,
-    fvgOb: true,
-    structure: true,
-    sessions: true,
-    tradeLabels: true,
-  };
+    },
+  }).value;
 }
 
 function formatPrice(value: number | undefined | null, digits: number): string {
@@ -257,13 +272,9 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     return res;
   }, [drawingsFeed, selectedSymbol, selectedTimeframe]);
 
-  // Persist overlay toggles in localStorage
+  // Persist overlay toggles with schema version
   useEffect(() => {
-    try {
-      localStorage.setItem(OVERLAY_STORAGE_KEY, JSON.stringify(overlays));
-    } catch {
-      // ignore storage errors
-    }
+    writeVersionedState(OVERLAY_STORAGE_KEY, overlays);
   }, [overlays]);
 
   // Latest bar fallback for OHLC toolbar readout

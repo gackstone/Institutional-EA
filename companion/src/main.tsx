@@ -4,12 +4,15 @@ import "@fontsource-variable/plus-jakarta-sans";
 import "@fontsource-variable/jetbrains-mono";
 import { App } from "./App";
 import { ThemeProvider } from "./context/ThemeContext";
+import { AppErrorBoundary } from "./components/ErrorBoundary";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
+    <AppErrorBoundary>
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    </AppErrorBoundary>
   </React.StrictMode>
 );

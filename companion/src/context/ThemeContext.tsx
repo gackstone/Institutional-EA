@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { readVersionedState, writeVersionedState } from "../utils/persistedState";
 
 export type Theme = "light" | "dark";
 export type ThemeMode = "light" | "dark" | "system";
@@ -22,16 +23,17 @@ function getSystemTheme(): Theme {
   return "light";
 }
 
+function isValidThemeMode(v: unknown): v is ThemeMode {
+  return v === "light" || v === "dark" || v === "system";
+}
+
 function readSavedThemeMode(): ThemeMode {
-  try {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    if (stored === "light" || stored === "dark" || stored === "system") {
-      return stored as ThemeMode;
-    }
-  } catch (e) {
-    // Fallback
-  }
-  return "system";
+  return readVersionedState<ThemeMode>({
+    key: THEME_STORAGE_KEY,
+    defaultValue: "dark",
+    validate: isValidThemeMode,
+    migrate: (legacy) => (isValidThemeMode(legacy) ? legacy : null),
+  }).value;
 }
 
 function applyThemeToDocument(t: Theme) {
@@ -82,11 +84,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [mode]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, mode);
-    } catch (e) {
-      // ignore
-    }
+    writeVersionedState(THEME_STORAGE_KEY, mode);
   }, [mode]);
 
   const setMode = useCallback((m: ThemeMode) => {
