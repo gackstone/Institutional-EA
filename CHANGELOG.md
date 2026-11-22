@@ -302,3 +302,18 @@ All notable changes to the Institutional Multi-Timeframe Algorithmic Trading Bot
 - **Stage 6: Monitoring and Decay Detection (`src/monitoring/`)**:
   - CUSUM strategy decay guard with 3-tier sigma alerts: Warning (2.0s), Reduced Risk (2.5s), Pause (3.0s, requiring operator `/run`).
   - Feature drift detection using Population Stability Index (PSI) and Kolmogorov-Smirnov 2-sample tests over rolling 100 bars.
+
+## [1.4.0] - 2026-11-22
+
+### Added
+- **Live MT5 Market Data Feed (`src/data/market_feed.py`)**: Real-time `symbol_info_tick`, `(ask - bid) / point` spread calculation, `copy_rates` OHLC candles, per-symbol rounding, canonical-to-broker `.m` symbol mapping (`XAUUSD -> XAUUSD.m`, `USDJPY -> USDJPY.m`, `BTCUSD -> BTCUSD.m`) with strict startup validation, freshness & market-closed entry guards, and broker-to-UTC time conversion.
+- **Read-Only Live Feed Verifier (`tools/verify_market_feed.py`)** and **Hardcoded Data Guard (`tools/scan_hardcoded_data.py` + `tests/test_no_hardcoded_market_data.py`)** enforcing the REAL DATA ONLY policy across production code.
+- **Trade Replay (`TradeReplayModal.tsx` & `GET /api/trades/replay`)**: Replay any real closed trade over real MT5 historical candles with Play/Pause/Step/Speed controls, real execution events, and linked PNG chart screenshots.
+- **Chart Screenshots on Trade (`POST/GET /api/trades/screenshots`)**: Automatic and manual PNG export via `lightweight-charts` saved under gitignored `data/screenshots/`.
+- **Real-Data Analytics (`AnalyticsScreen` & `GET /api/analytics/equity`)**: Equity curve from real MT5 `balance_snapshots`, cumulative P&L, cumulative R, and drawdown charts with symbol and date-range filters and honest empty states.
+- **Live Signal Grid (`SignalsGridScreen` & `GET /api/signals`)**: Real-time bot setup table with symbol/status filters and click-to-chart navigation.
+- **Alert Centre (`AlertCentreScreen` & `/api/alerts`)**: In-app alert log, per-type event toggles, quiet hours (UTC), rate limits, deduplication, and Telegram delivery status logging.
+- **Mobile Companion View**: Responsive read-only phone layout (`< 768px`) with bottom tab navigation (`Dashboard`, `Positions`, `Signals`, `Alerts`) and two-step Pause only, plus `docs/MOBILE_REMOTE_ACCESS.md`.
+
+### Removed
+- Purged all hardcoded/mock market prices (`2668.40`, `91420`, `154.32`), fake balances (`$25,480`, `$25,728.30`, `$50,420.50`), fake tickets (`88412091`), synthetic candle noise generator (`seededNoise`), and simulated order execution fallbacks from `companion/src/services/dashboardDataAdapter.ts` and `companion/src/services/ipc.ts`.
