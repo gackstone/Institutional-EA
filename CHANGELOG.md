@@ -2,6 +2,20 @@
 
 All notable changes to the Institutional Multi-Timeframe Algorithmic Trading Bot (`Institutional EA`) are documented in this file.
 
+## [3.11.0] - 2026-11-22
+
+### Added - Companion App Institutional Trading-Terminal Dashboard Redesign (`companion/`)
+- **Left Navigation Shell (`companion/src/App.tsx`)**:
+  - Added collapsible dark trading-terminal sidebar grouping all 16 companion screens into **Monitor** (`Dashboard`, `Market Watch`, `Signals Pipeline`, `Positions & Orders`, `Trade History`, `Analytics`), **Control** (`Engine Control`, `Risk Manager`, `Instruments`, `Configuration`, `MT5 Terminal`, `Operations`), and **Diagnose** (`Error Centre`, `Event Logs`, `System Health`, `Settings`).
+  - Integrated SSE streaming (`/api/events`) with automatic polling fallback and stale/disconnected state banners.
+- **Redesigned Dashboard Screen (`companion/src/components/screens/CoreTradingScreens.tsx`)**:
+  - **Top Status Bar**: Displays MT5 connection with masked account (`****0001`), prominent `DEMO · LIVE_TRADING_ENABLED=false` locked safety badge, active schedule mode badge (`WEEKDAY_GOLD_MODE` / `WEEKEND_BTC_MODE`), active session + live 1-second UTC clock, ZMQ bridge ports (`5555/5556`), Telegram readiness button, and `Pause`, `Stop`, and `Close All` controls with two-step confirmation.
+  - **6-Card KPI Row**: Displays Balance/Equity, Today P&L (`$` + `+R`), Daily Loss Used vs Limit, Total Drawdown vs Cap, Open Exposure (`Bot` / `Manual` / `Pending`), and Next Schedule Switch countdown.
+  - **Live Institutional Chart (`companion/src/components/LiveTradingChart.tsx`)**: Built on `lightweight-charts` with symbol selector (`XAUUSD`, `USDJPY`, `BTCUSD`), timeframe selector (`M1`, `M5`, `M15`, `H1`, `H4`), shaded Risk/Reward zones, Entry line (`BUY`/`SELL`, lots, setup score), active SL (red), ghosted initial SL when tightened, `TP1`/`TP2` (green with R-multiples), live price tag with floating R, lifecycle event annotations (`BE+ Lock`, `Partial 50% @ TP1`), toggleable SMC overlays (`Liquidity PDL/PWH`, `FVG/OB`, `Structure MSS/CHoCH`, `Sessions`, `Trade Labels`), collision-aware label placement, and full-height responsive sizing.
+  - **Right Column & Analytical Panels**: Engine Control & Supervisor card (`OBSERVE`, `DRY_RUN`, `DEMO_SCALPING`, `DEMO_FAST`, `DEMO_MANUAL_ASSIST`), Open Positions & Orders card with tighten-only SL enforcement (and disabled `Widen/Remove SL`), Live Trade Timeline, Risk Manager (`DEMO` / `PROP` / `LIVE` profile limits), Gold–USDJPY Inverse Coordination, Schedule & Instruments matrix, System Health & Drift Guards (`EA Heartbeat`, `Queue Depth`, `CUSUM/PSI`, `TCA`, `Error Centre count`), Manual Position Adoption, and Recent Trades table.
+- **Pure Chart Math & Unit Tests (`companion/src/utils/tradeChartMath.ts`, `companion/src/utils/__tests__/tradeChartMath.test.ts`)**:
+  - Added pure unit-tested utilities for R-multiple math, risk/reward zone geometry, tighten-only SL validation, collision-aware vertical label layout (`resolveLabelCollisions`), account masking, and schedule/session countdown calculation.
+
 ## [3.10.0] - 2026-11-10
 
 ### Added - Manual Position Adoption & Professional Trade Management (`src/manual_mgmt/`)

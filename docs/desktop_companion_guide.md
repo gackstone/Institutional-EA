@@ -123,7 +123,17 @@ The companion application supervises six independent background services:
 
 ---
 
-## 6. Packaging & Production Builds
+## 6. Institutional Trading-Terminal Dashboard (`companion/src/`)
+
+The Companion UI features a dark trading-terminal Dashboard paired with a 16-screen Left Navigation sidebar grouped into **Monitor**, **Control**, and **Diagnose**:
+- **Top Status Bar**: Displays MT5 connection status with masked account (`****0001`), the hard-locked `DEMO · LIVE_TRADING_ENABLED=false` badge, active schedule mode (`WEEKDAY_GOLD_MODE` / `WEEKEND_BTC_MODE`), active trading session + live UTC clock, ZMQ bridge ports (`5555/5556`), Telegram readiness, and `Pause`, `Stop`, and `Close All` (two-step confirmation) controls.
+- **KPI Row**: Displays Balance/Equity, Today P&L (`$` + `+R`), Daily Loss Used vs Limit, Total Drawdown vs Cap, Open Exposure (`Bot` / `Manual` / `Pending`), and Next Schedule Switch countdown.
+- **Live Institutional Execution Chart (`LiveTradingChart.tsx`)**: Powered by `lightweight-charts` across `XAUUSD`, `USDJPY`, and `BTCUSD` (`M1`, `M5`, `M15`, `H1`, `H4`), rendering shaded Risk/Reward zones, Entry line (`BUY`/`SELL`, lots, setup score), active SL (red), ghosted initial SL when moved, `TP1`/`TP2` (green with R-multiples), live price tag with floating R, lifecycle annotations (`BE+ Lock`, `Partial 50% @ TP1`), collision-aware right-edge labels, and toggleable SMC overlays (`Liquidity PDL/PWH`, `FVG/OB`, `Structure MSS/CHoCH`, `Sessions`, `Trade Labels`).
+- **Right Column & Analytical Panels**: Engine Control & Supervisor card (`OBSERVE`, `DRY_RUN`, `DEMO_SCALPING`, `DEMO_FAST`, `DEMO_MANUAL_ASSIST`), Open Positions & Orders card with tighten-only SL enforcement (and disabled `Widen/Remove SL`), Live Trade Timeline, Risk Manager (`DEMO` / `PROP` / `LIVE` profile limits), Gold–USDJPY Inverse Coordination, Schedule & Instruments matrix, System Health & Drift Guards (`EA Heartbeat`, `Queue Depth`, `CUSUM/PSI`, `TCA`, `Error Centre count`), Manual Position Adoption, and Recent Trades table.
+
+---
+
+## 7. Packaging & Production Builds
 
 ### Build Commands
 ```powershell
