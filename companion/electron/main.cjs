@@ -1953,6 +1953,14 @@ function createWindow() {
     }
   });
 
+  // Prevent arbitrary external navigation inside the desktop shell
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  mainWindow.webContents.on("will-navigate", (event, navUrl) => {
+    if (!navUrl.startsWith("http://localhost:5173") && !navUrl.startsWith("file://")) {
+      event.preventDefault();
+    }
+  });
+
   const devUrl = "http://localhost:5173";
   const prodIndex = path.join(__dirname, "../dist/index.html");
 
@@ -2533,8 +2541,13 @@ function startControlService() {
 
 function stopControlService() {
   if (controlServiceProcess) {
+    const pid = controlServiceProcess.pid;
     try {
-      controlServiceProcess.kill();
+      if (process.platform === "win32" && pid) {
+        execSync(`taskkill /PID ${pid} /T /F`, { windowsHide: true, timeout: 3000 });
+      } else {
+        controlServiceProcess.kill("SIGTERM");
+      }
     } catch (e) {}
     controlServiceProcess = null;
   }
