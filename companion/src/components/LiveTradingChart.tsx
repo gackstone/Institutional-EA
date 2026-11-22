@@ -44,6 +44,7 @@ interface LiveTradingChartProps {
   selectedSymbol: ChartSymbol;
   selectedTimeframe: ChartTimeframe;
   feedStatus: DataFeedStatus;
+  waitingReason?: string;
   onSelectSymbol: (sym: ChartSymbol) => void;
   onSelectTimeframe: (tf: ChartTimeframe) => void;
   onCaptureScreenshot?: (ticket: number, symbol: string, stage: string, dataUrl: string) => void;
@@ -142,6 +143,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
   selectedSymbol,
   selectedTimeframe,
   feedStatus,
+  waitingReason,
   onSelectSymbol,
   onSelectTimeframe,
   onCaptureScreenshot,
@@ -936,7 +938,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
         {bundle.candles.length === 0 && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 text-center px-4">
             <div className="text-sm font-semibold text-[#1F2937]">
-              {bundle.marketClosed ? "Market Closed" : "Waiting for MT5 Candles"}
+              {waitingReason || (bundle.marketClosed ? "Market Closed" : "Waiting for MT5 Candles")}
             </div>
             <div className="text-xs font-mono text-[#6B7280] mt-1">
               {bundle.brokerSymbol} ({bundle.timeframe}) · {bundle.freshnessReason}

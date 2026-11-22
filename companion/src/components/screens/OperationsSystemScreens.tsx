@@ -5,10 +5,11 @@ import {
   RefreshCw,
   Terminal,
 } from "lucide-react";
-import { controlClient, IPC } from "../../services/ipc";
+import { controlClient, formatControlError, IPC } from "../../services/ipc";
 import {
   AllowlistedOpInfo,
   ControlStatusPayload,
+  DeployEAResult,
   MT5TerminalInfo,
   OperationAuditRecord,
 } from "../../types";
@@ -20,13 +21,15 @@ export const MT5ConnectionScreen: React.FC<{
 }> = ({ status, onRefresh, onActionMessage }) => {
   const [terminals, setTerminals] = useState<MT5TerminalInfo[]>([]);
   const [busy, setBusy] = useState(false);
+  const [deployingId, setDeployingId] = useState<string | null>(null);
+  const [deployReport, setDeployReport] = useState<DeployEAResult | null>(null);
 
   const scan = async () => {
     try {
       const list = await IPC.scanMT5Terminals();
       setTerminals(list);
     } catch (e: any) {
-      onActionMessage(`Scan failed: ${e.message}`, true);
+      onActionMessage(`Scan failed: ${formatControlError(e)}`, true);
     }
   };
 
@@ -34,16 +37,41 @@ export const MT5ConnectionScreen: React.FC<{
     scan();
   }, []);
 
-  const handleConnect = async () => {
+  const handleConnect = async (terminalPath?: string) => {
     setBusy(true);
     try {
-      const res = await controlClient.connectMT5();
-      onActionMessage(res.success ? "MT5 synced." : "MT5 connect failed.", !res.success);
+      const targetPath = terminalPath || terminals[0]?.executablePath;
+      const res = await controlClient.connectMT5(targetPath);
+      if (res.success) {
+        onActionMessage("MT5 synced.", false);
+      } else {
+        onActionMessage(`MT5 sync failed: ${res.error || "Unable to connect to MT5 terminal."}`, true);
+      }
       await onRefresh();
     } catch (e: any) {
-      onActionMessage(`MT5 error: ${e.message}`, true);
+      onActionMessage(`MT5 sync failed: ${formatControlError(e)}`, true);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleDeployEA = async (t: MT5TerminalInfo) => {
+    setDeployingId(t.id);
+    try {
+      const r = await IPC.deployEA({
+        executablePath: t.executablePath,
+        dataFolder: t.dataFolder,
+        expertsFolder: t.expertsFolder,
+        compile: true,
+      });
+      setDeployReport(r);
+      onActionMessage(r.message || (r.success ? "EA deployed." : "EA deploy failed."), !r.success);
+      await scan();
+      await onRefresh();
+    } catch (e: any) {
+      onActionMessage(`Deploy EA failed: ${formatControlError(e)}`, true);
+    } finally {
+      setDeployingId(null);
     }
   };
 
@@ -58,9 +86,17 @@ export const MT5ConnectionScreen: React.FC<{
             <span>MT5 Terminals</span>
           </h2>
           <p className="text-xs text-[#B6C5E0] mt-1">
-            Conn: <strong className="text-[#B0F648]">{status?.mt5.connection_status}</strong> · Mode:{" "}
+            Conn: <strong className="text-[#B0F648]">{status?.mt5.connection_status || "DISCONNECTED"}</strong> · Mode:{" "}
             <strong className="text-[#F4F7FF]">{acct?.trade_mode || "DEMO"}</strong> · Margin:{" "}
             <strong className="text-[#5EEAD4]">{acct?.margin_mode_str || "HEDGING"}</strong>
+            {status?.mt5.zmq_bridge && (
+              <>
+                {" "}· ZMQ 5555:{" "}
+                <strong className={status.mt5.zmq_bridge.port_5555 ? "text-[#B0F648]" : "text-[#8496B8]"}>
+                  {status.mt5.zmq_bridge.port_5555 ? "UP" : "IDLE"}
+                </strong>
+              </>
+            )}
           </p>
         </div>
         <div className="flex space-x-2.5">
@@ -69,10 +105,10 @@ export const MT5ConnectionScreen: React.FC<{
           </button>
           <button
             disabled={busy}
-            onClick={handleConnect}
-            className="px-4 py-1.5 bg-[#B0F648] hover:bg-[#C2F076] text-xs text-[#081321] font-extrabold rounded-full shadow-[0_0_16px_rgba(176,246,72,0.28)]"
+            onClick={() => handleConnect()}
+            className="px-4 py-1.5 bg-[#B0F648] hover:bg-[#C2F076] disabled:opacity-50 text-xs text-[#081321] font-extrabold rounded-full shadow-[0_0_16px_rgba(176,246,72,0.28)]"
           >
-            Sync MT5
+            {busy ? "Syncing..." : "Sync MT5"}
           </button>
         </div>
       </div>
@@ -94,20 +130,22 @@ export const MT5ConnectionScreen: React.FC<{
                   )}
                 </div>
                 <div className="font-mono text-[11px] text-[#B6C5E0] mt-0.5">{t.executablePath}</div>
+                {t.dataFolder && (
+                  <div className="font-mono text-[10px] text-[#8496B8] mt-0.5 truncate max-w-[520px]">
+                    Data: {t.dataFolder}
+                  </div>
+                )}
                 <div className="text-[11px] text-[#8496B8] mt-0.5">
-                  EA: <strong className="text-[#5EEAD4]">{t.eaInstalled ? `v${t.eaVersion}` : "None"}</strong>
+                  EA: <strong className="text-[#5EEAD4]">{t.eaInstalled ? `v${t.eaVersion || "3.10"}` : "None"}</strong>
                 </div>
               </div>
               <div className="flex space-x-2">
                 <button
-                  onClick={async () => {
-                    const r = await IPC.deployEA(t.expertsFolder);
-                    onActionMessage(r.message, !r.success);
-                    scan();
-                  }}
-                  className="iea-pill-control px-3.5 py-1.5 text-[#F4F7FF] font-semibold"
+                  disabled={deployingId !== null}
+                  onClick={() => handleDeployEA(t)}
+                  className="iea-pill-control px-3.5 py-1.5 text-[#F4F7FF] font-semibold disabled:opacity-50"
                 >
-                  Deploy EA
+                  {deployingId === t.id ? "Deploying..." : "Deploy EA"}
                 </button>
                 <button
                   onClick={async () => {
@@ -124,6 +162,40 @@ export const MT5ConnectionScreen: React.FC<{
           ))
         )}
       </div>
+
+      {deployReport && (
+        <div className="iea-glass-card p-5 space-y-2.5 text-xs">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-[#F4F7FF]">
+              EA Deployment Report —{" "}
+              <span className={deployReport.success ? "text-[#B0F648]" : "text-[#FF5A6E]"}>
+                {deployReport.success ? "VERIFIED" : "FAILED"}
+              </span>
+            </h3>
+            <button
+              onClick={() => setDeployReport(null)}
+              className="text-[11px] text-[#8496B8] hover:text-white"
+            >
+              Dismiss
+            </button>
+          </div>
+          {deployReport.steps && deployReport.steps.length > 0 && (
+            <div className="space-y-1.5">
+              {deployReport.steps.map((s, idx) => (
+                <div key={`${s.step}-${idx}`} className="iea-glass-tile px-3 py-2 flex items-start justify-between gap-2">
+                  <span className="font-mono text-[#B6C5E0]">{s.step}</span>
+                  <span className={`text-right ${s.ok ? "text-[#B0F648]" : "text-[#FF5A6E]"}`}>{s.detail}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {deployReport.chart_attachment?.note && (
+            <div className="text-[11px] text-[#B6C5E0] bg-[#071020]/70 border border-[rgba(186,214,255,0.14)] rounded-xl p-3">
+              {deployReport.chart_attachment.note}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

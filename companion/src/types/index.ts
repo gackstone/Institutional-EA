@@ -242,6 +242,14 @@ export interface ControlStatusPayload {
     last_sync_at: string | null;
     last_error: string | null;
     reconnect_attempts: number;
+    terminal_path?: string | null;
+    zmq_bridge?: {
+      port_5555: boolean;
+      port_5556: boolean;
+      connected: boolean;
+      checked_at: string | null;
+    };
+    last_candle_times?: Record<string, string>;
     account: {
       account_number: number;
       broker: string;
@@ -413,4 +421,70 @@ export interface TradeReplayPayload {
     volume: number;
   }>;
   source: string;
+}
+
+export interface ControlServiceStatus {
+  status: "STARTING" | "ONLINE" | "OFFLINE" | "ERROR";
+  host: string;
+  port: number;
+  baseUrl: string;
+  pid: number | null;
+  restarts: number;
+  lastError: string | null;
+  checkedAt: string | null;
+}
+
+export interface SelfCheckItem {
+  id: string;
+  name: string;
+  status: "PASS" | "WARN" | "FAIL";
+  detail: string;
+}
+
+export interface SelfCheckReport {
+  status: "HEALTHY" | "DEGRADED";
+  checked_at: string;
+  checks: SelfCheckItem[];
+  zmq_bridge?: {
+    port_5555: boolean;
+    port_5556: boolean;
+    connected: boolean;
+    checked_at: string | null;
+  };
+  last_candle_times?: Record<string, string>;
+}
+
+export interface DeployEAResult {
+  success: boolean;
+  message: string;
+  ea_version?: string;
+  ex5_path?: string;
+  ex5_size_bytes?: number;
+  backup_dir?: string | null;
+  verified_hashes?: Record<string, string>;
+  compile?: {
+    compiled: boolean;
+    errors: number;
+    warnings: number;
+    metaeditor?: string;
+    log_path?: string;
+    log_tail?: string[];
+  };
+  settings_check?: {
+    exists: boolean;
+    path: string;
+    allow_algo_trading: boolean | null;
+    allow_dll_imports: boolean | null;
+    note: string;
+  };
+  zmq_bridge?: {
+    port_5555: boolean;
+    port_5556: boolean;
+    connected: boolean;
+  };
+  chart_attachment?: {
+    automated: boolean;
+    note: string;
+  };
+  steps?: Array<{ step: string; ok: boolean; detail: string }>;
 }

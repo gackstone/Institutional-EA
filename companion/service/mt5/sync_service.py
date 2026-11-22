@@ -55,6 +55,7 @@ class MT5SyncService:
         self.bridge_port = bridge_port
         self.bot_magic = int(bot_magic)
         self._mt5_override = mt5_module
+        self._bridge_explicit = bridge_client is not None
         self.bridge = bridge_client or BridgeClient(host=bridge_host, port=bridge_port)
 
         self._lock = threading.RLock()
@@ -187,17 +188,18 @@ class MT5SyncService:
             self.connection_status = "SYNCHRONIZING"
             if terminal_path:
                 self.terminal_path = terminal_path
-            try:
-                if self.bridge.connect():
-                    self.connection_status = "CONNECTED"
-                    self.reconnect_attempts = 0
-                    self.last_error = None
-                    self.repo.record_connection_event("MT5_BRIDGE", "CONNECTED", f"Connected to {self.bridge_host}:{self.bridge_port}")
-                    self.repo.resolve_component_errors("MT5SyncService", "MT5 Bridge connection restored")
-                    self.events.log("MT5", "INFO", f"Connected to MT5 Bridge ({self.bridge_host}:{self.bridge_port})")
-                    return True
-            except Exception as exc:
-                self.last_error = str(exc)
+            if self._mt5_override is None or self._bridge_explicit:
+                try:
+                    if self.bridge.connect():
+                        self.connection_status = "CONNECTED"
+                        self.reconnect_attempts = 0
+                        self.last_error = None
+                        self.repo.record_connection_event("MT5_BRIDGE", "CONNECTED", f"Connected to {self.bridge_host}:{self.bridge_port}")
+                        self.repo.resolve_component_errors("MT5SyncService", "MT5 Bridge connection restored")
+                        self.events.log("MT5", "INFO", f"Connected to MT5 Bridge ({self.bridge_host}:{self.bridge_port})")
+                        return True
+                except Exception as exc:
+                    self.last_error = str(exc)
 
             # Fallback to direct MetaTrader5 API
             mt5 = self._get_mt5()

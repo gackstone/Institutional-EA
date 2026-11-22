@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { BarChart3, BookOpen, CheckCircle2, Database, FileText, Lock, Settings as SettingsIcon, Trash2 } from "lucide-react";
 import { controlClient } from "../../services/ipc";
 import {
@@ -6,6 +6,7 @@ import {
   BalanceSnapshotRecord,
   ControlLogEntry,
   ControlStatusPayload,
+  SelfCheckReport,
   TradeHistoryRecord,
 } from "../../types";
 import { SHORT_FORM_GLOSSARY, UI_COPY } from "../../constants/uiCopy";
@@ -328,6 +329,25 @@ export const SystemHealthScreen: React.FC<{
   onReload: () => Promise<void>;
 }> = ({ status, audits, onReload }) => {
   const h = status?.health;
+  const [selfCheck, setSelfCheck] = useState<SelfCheckReport | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const runSelfCheck = async () => {
+    setChecking(true);
+    try {
+      const rep = await controlClient.getSelfCheck();
+      setSelfCheck(rep);
+    } catch {
+      setSelfCheck(null);
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  useEffect(() => {
+    runSelfCheck();
+  }, []);
+
   return (
     <div className="space-y-4">
       <div className="iea-glass-card p-5">
@@ -336,8 +356,15 @@ export const SystemHealthScreen: React.FC<{
             <Database className="w-5 h-5 text-[#B0F648]" />
             <span>System Health</span>
           </h2>
-          <button onClick={() => onReload()} className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF] font-semibold">
-            Refresh
+          <button
+            disabled={checking}
+            onClick={async () => {
+              await onReload();
+              await runSelfCheck();
+            }}
+            className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF] font-semibold disabled:opacity-50"
+          >
+            {checking ? "Checking..." : "Re-run Self-Check"}
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs">
@@ -345,20 +372,63 @@ export const SystemHealthScreen: React.FC<{
             <div className="text-[#8496B8]">SQLite DB</div>
             <div className="flex items-center space-x-1.5 font-semibold text-[#B0F648]">
               <CheckCircle2 className="w-4 h-4" />
-              <span>{h?.sqlite.healthy ? `OK (v${h.sqlite.schema_version})` : "ERR"}</span>
+              <span>{h?.sqlite.healthy ? `OK (v${h.sqlite.schema_version})` : "WAITING"}</span>
             </div>
-            <div className="font-mono text-[10px] text-[#8496B8] break-all">{h?.sqlite.db_path}</div>
+            <div className="font-mono text-[10px] text-[#8496B8] break-all">{h?.sqlite.db_path || "—"}</div>
           </div>
           <div className="iea-glass-tile p-4 space-y-1">
             <div className="text-[#8496B8]">MT5 &amp; DEMO</div>
-            <div className="font-mono text-[#F4F7FF]">Conn: {String(h?.mt5_connected ?? true)}</div>
-            <div className="font-mono text-[#B0F648] font-bold">DEMO: {String(h?.demo_verified ?? true)}</div>
+            <div className="font-mono text-[#F4F7FF]">Conn: {String(h?.mt5_connected ?? false)}</div>
+            <div className="font-mono text-[#B0F648] font-bold">DEMO: {String(h?.demo_verified ?? false)}</div>
           </div>
           <div className="iea-glass-tile p-4 space-y-1">
             <div className="text-[#8496B8]">Active Err</div>
             <div className="text-2xl font-light font-mono text-[#F4F7FF]">{h?.active_error_count ?? 0}</div>
           </div>
         </div>
+      </div>
+
+      {/* Live Startup & Runtime Self-Check */}
+      <div className="iea-glass-card p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[#F4F7FF]">Runtime Self-Check</h3>
+          <span
+            className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+              selfCheck?.status === "HEALTHY"
+                ? "bg-[#B0F648]/20 text-[#B0F648]"
+                : "bg-[#FBBF24]/20 text-[#FBBF24]"
+            }`}
+          >
+            {selfCheck ? selfCheck.status : "SERVICE OFFLINE"}
+          </span>
+        </div>
+        {!selfCheck ? (
+          <div className="text-xs text-[#8496B8] py-2">
+            Control Service unreachable. Click Reconnect in the top bar or Re-run Self-Check.
+          </div>
+        ) : (
+          <div className="space-y-2 text-xs">
+            {selfCheck.checks.map((c) => (
+              <div key={c.id} className="iea-glass-tile px-3.5 py-2.5 flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-semibold text-[#F4F7FF]">{c.name}</div>
+                  <div className="text-[11px] text-[#B6C5E0] font-mono mt-0.5">{c.detail}</div>
+                </div>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold shrink-0 ${
+                    c.status === "PASS"
+                      ? "bg-[#B0F648]/20 text-[#B0F648]"
+                      : c.status === "WARN"
+                      ? "bg-[#FBBF24]/20 text-[#FBBF24]"
+                      : "bg-[#FF5A6E]/20 text-[#FF5A6E]"
+                  }`}
+                >
+                  {c.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="iea-glass-card p-5">
