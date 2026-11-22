@@ -1,87 +1,96 @@
 /**
- * Institutional EA Companion — Centralized Glassmorphism Design Tokens
- * Single Source of Truth sampled from the visual reference image.
- * Documented in companion/docs/DESIGN_SPEC.md.
+ * Institutional EA Companion — Centralized Neutral Charcoal Design Tokens
+ * Single Source of Truth sampled from IMAGE 1 ("Overlay") and IMAGE 2 (Sidebar).
+ * Documented in companion/docs/THEME_SPEC.md.
  */
 
 export const DESIGN_TOKENS = {
   colors: {
     bg: {
-      canvas: "#091426",
-      navyTop: "#0A152B",
-      navyDeep: "#071020",
-      royalGlow: "#2F497C",
-      horizonGlow: "#7196CB",
-      tealDepth: "#112B42",
+      canvas: "#0E0D0B",
+      titlebar: "#12110F",
+      panel: "#1E1D1B",
+      panelTopLeft: "#2B2A26",
+      panelMid: "#23221F",
+      card: "#161513",
+      inset: "#100F0D",
+      elevated: "#242320",
+      active: "#2B2A26",
     },
-    surface: {
-      glassCard: "rgba(21, 39, 74, 0.52)",
-      glassElevated: "rgba(26, 48, 90, 0.72)",
-      glassSidebarCollapsed: "rgba(10, 21, 43, 0.84)",
-      glassSidebarExpanded: "rgba(11, 23, 47, 0.94)",
-      glassTile: "rgba(20, 41, 66, 0.52)",
-      tableHeader: "rgba(32, 54, 101, 0.34)",
-      tableRowHover: "rgba(34, 61, 106, 0.48)",
-      tableRowStripe: "rgba(22, 41, 78, 0.28)",
-      pillControl: "rgba(24, 44, 82, 0.68)",
+    sidebar: {
+      expandedBg: "#191D20",
+      collapsedBg: "#17181A",
+      activeFill: "#272A2F",
+      collapsedActiveFill: "#303135",
+      border: "rgba(255, 255, 255, 0.08)",
+      textActive: "#FFFFFF",
+      textInactive: "#9CA1A6",
+      treeLine: "#303437",
+      logoTileBg: "#F8F8FA",
+      badgeMintBg: "#A9ECDA",
+      badgeMintText: "#0E1A16",
+      badgePeachBg: "#F5C59F",
+      badgePeachText: "#1F140B",
     },
     border: {
-      glass: "rgba(186, 214, 255, 0.14)",
-      glassHover: "rgba(186, 214, 255, 0.26)",
-      glassStrong: "rgba(194, 240, 118, 0.38)",
-      divider: "rgba(148, 179, 226, 0.11)",
+      subtle: "rgba(255, 255, 253, 0.07)",
+      default: "rgba(255, 255, 253, 0.11)",
+      strong: "#3A3935",
+      divider: "rgba(255, 255, 253, 0.06)",
     },
     accent: {
-      lime: "#B0F648",
-      limeSoft: "#C2F076",
-      limeBright: "#99EF44",
-      limeUnderline: "#C3E67E",
-      limeMutedBg: "rgba(176, 246, 72, 0.14)",
-      violet: "#C077FA",
-      violetSoft: "#C9ACDA",
-      violetMutedBg: "rgba(192, 119, 250, 0.16)",
-      cyan: "#5EEAD4",
-      cyanMutedBg: "rgba(94, 234, 212, 0.14)",
-      royalBlue: "#4F8CFF",
+      primary: "#F5F5F2",
+      primaryHover: "#FFFFFF",
+      onPrimary: "#121110",
     },
     semantic: {
-      profit: "#B0F648",
-      profitSoft: "rgba(176, 246, 72, 0.15)",
-      danger: "#FF5A6E",
-      dangerSoft: "rgba(255, 90, 110, 0.16)",
-      warning: "#FBBF24",
-      warningSoft: "rgba(251, 191, 36, 0.16)",
+      profit: "#6EE7B7",
+      profitSolid: "#36B37E",
+      profitSoft: "rgba(54, 179, 126, 0.14)",
+      profitBorder: "rgba(110, 231, 183, 0.30)",
+      danger: "#F07178",
+      dangerSolid: "#D94854",
+      dangerSoft: "rgba(217, 72, 84, 0.14)",
+      dangerBorder: "rgba(240, 113, 120, 0.34)",
+      warning: "#EAB354",
+      warningSoft: "rgba(234, 179, 84, 0.14)",
+      warningBorder: "rgba(234, 179, 84, 0.34)",
+      info: "#5EC2C6",
+      infoSoft: "rgba(94, 194, 198, 0.13)",
+      infoBorder: "rgba(94, 194, 198, 0.34)",
     },
     text: {
-      primary: "#F4F7FF",
-      secondary: "#B6C5E0",
-      muted: "#8496B8",
-      onLime: "#081321",
+      primary: "#F5F5F2",
+      secondary: "#B4B3B0",
+      muted: "#8A8986",
+      dim: "#666562",
     },
     chart: {
-      background: "#081223",
-      gridLine: "rgba(113, 150, 203, 0.11)",
-      axisText: "#8FA4C8",
-      axisBorder: "rgba(148, 179, 226, 0.16)",
-      crosshair: "rgba(176, 246, 72, 0.45)",
-      crosshairLabelBg: "#122444",
-      upCandle: "#B0F648",
-      upWick: "#C2F076",
-      downCandle: "#FF5A6E",
-      downWick: "#FF7A8A",
+      background: "#100F0D",
+      gridLine: "rgba(255, 255, 253, 0.06)",
+      axisText: "#8A8986",
+      axisBorder: "rgba(255, 255, 253, 0.08)",
+      crosshair: "rgba(245, 245, 242, 0.38)",
+      crosshairLabelBg: "#242320",
+      upCandle: "#36B37E",
+      upWick: "#6EE7B7",
+      downCandle: "#D94854",
+      downWick: "#F07178",
     },
   },
   radii: {
-    card: "18px",
-    tile: "14px",
+    panel: "28px",
+    sidebar: "20px",
+    card: "16px",
+    tile: "12px",
     button: "12px",
     pill: "9999px",
   },
   sidebar: {
-    collapsedWidthPx: 60,
-    expandedWidthPx: 256,
-    collapseDelayMs: 120,
-    transitionDurationMs: 200,
+    collapsedWidthPx: 76,
+    expandedWidthPx: 264,
+    collapseDelayMs: 140,
+    transitionDurationMs: 220,
   },
 } as const;
 
@@ -95,8 +104,52 @@ export type SymbolAccentSpec = {
 };
 
 /**
- * Returns circular coin/instrument icon chip styling modeled on the reference image's
- * neon-lime Ethereum and violet Cardano circular table chips.
+ * Neutral monochrome symbol chip styling for non-chart tables and cards.
+ */
+export function getNeutralSymbolChipSpec(symbol: string): SymbolAccentSpec {
+  const upper = (symbol || "").toUpperCase();
+  if (upper.includes("XAU") || upper.includes("GOLD")) {
+    return {
+      symbol,
+      shortCode: "Au",
+      chipBg: "bg-[#242320] text-[#F5F5F2]",
+      chipText: "text-[#F5F5F2]",
+      chipRing: "ring-1 ring-[#3A3935]",
+      tagLabel: "Gold Spot",
+    };
+  }
+  if (upper.includes("BTC")) {
+    return {
+      symbol,
+      shortCode: "₿",
+      chipBg: "bg-[#242320] text-[#F5F5F2]",
+      chipText: "text-[#F5F5F2]",
+      chipRing: "ring-1 ring-[#3A3935]",
+      tagLabel: "Bitcoin 24/7",
+    };
+  }
+  if (upper.includes("JPY")) {
+    return {
+      symbol,
+      shortCode: "¥",
+      chipBg: "bg-[#242320] text-[#F5F5F2]",
+      chipText: "text-[#F5F5F2]",
+      chipRing: "ring-1 ring-[#3A3935]",
+      tagLabel: "FX Inverse",
+    };
+  }
+  return {
+    symbol,
+    shortCode: upper.slice(0, 2) || "FX",
+    chipBg: "bg-[#242320] text-[#F5F5F2]",
+    chipText: "text-[#F5F5F2]",
+    chipRing: "ring-1 ring-[#3A3935]",
+    tagLabel: "Instrument",
+  };
+}
+
+/**
+ * Preserved verbatim for LiveTradingChart.tsx (Chart Protection Rule — DO NOT ALTER).
  */
 export function getSymbolChipSpec(symbol: string): SymbolAccentSpec {
   const upper = (symbol || "").toUpperCase();

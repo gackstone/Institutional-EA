@@ -11,7 +11,6 @@ export default {
         sans: [
           '"Plus Jakarta Sans Variable"',
           '"Plus Jakarta Sans"',
-          'Inter',
           'system-ui',
           '-apple-system',
           'BlinkMacSystemFont',
@@ -33,19 +32,20 @@ export default {
       colors: {
         "iea": {
           canvas: "var(--iea-bg-canvas)",
-          navy: "var(--iea-bg-navy-top)",
-          royal: "var(--iea-bg-royal-glow)",
-          horizon: "var(--iea-bg-horizon-glow)",
-          lime: "var(--iea-accent-lime)",
-          limeSoft: "var(--iea-accent-lime-soft)",
-          limeBright: "var(--iea-accent-lime-bright)",
-          violet: "var(--iea-accent-violet)",
-          cyan: "var(--iea-accent-cyan)",
+          titlebar: "var(--iea-bg-titlebar)",
+          panel: "var(--iea-surface-panel)",
+          card: "var(--iea-surface-card)",
+          inset: "var(--iea-surface-inset)",
+          elevated: "var(--iea-surface-elevated)",
+          active: "var(--iea-surface-active)",
+          profit: "var(--iea-profit)",
           danger: "var(--iea-danger)",
           warning: "var(--iea-warning)",
+          info: "var(--iea-info)",
           textPrimary: "var(--iea-text-primary)",
           textSecondary: "var(--iea-text-secondary)",
           textMuted: "var(--iea-text-muted)",
+          textDim: "var(--iea-text-dim)",
         },
         "institutional-ea": {
           bg: "var(--institutional-ea-bg)",
@@ -72,10 +72,10 @@ export default {
         }
       },
       boxShadow: {
-        'card': '0 18px 42px -12px rgba(4, 10, 24, 0.65), inset 0 1px 0 0 rgba(255, 255, 255, 0.12)',
-        'pop': '0 24px 54px -12px rgba(4, 10, 24, 0.78), inset 0 1px 0 0 rgba(255, 255, 255, 0.16)',
-        'lime-glow': '0 0 18px rgba(176, 246, 72, 0.35)',
-        'xs': '0 2px 8px rgba(4, 10, 24, 0.35)',
+        'panel': '0 20px 48px -16px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 253, 0.06)',
+        'card': 'inset 0 1px 0 0 rgba(255, 255, 253, 0.04)',
+        'pop': '0 24px 54px -12px rgba(0, 0, 0, 0.72), inset 0 1px 0 0 rgba(255, 255, 253, 0.06)',
+        'xs': '0 2px 8px rgba(0, 0, 0, 0.35)',
       }
     },
   },
