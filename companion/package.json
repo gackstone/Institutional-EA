@@ -16,7 +16,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "test": "node --experimental-strip-types --test src/utils/__tests__/tradeChartMath.test.ts",
+    "test": "node --experimental-strip-types --test src/utils/__tests__/tradeChartMath.test.ts src/utils/__tests__/chartTvLightFixture.test.ts",
     "preview": "vite preview",
     "electron": "electron electron/main.cjs",
     "electron:dev": "concurrently \"vite\" \"wait-on tcp:5173 && electron electron/main.cjs --dev\"",

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   CandlestickSeries,
   ColorType,
@@ -6,6 +6,7 @@ import {
   createChart,
   IChartApi,
   ISeriesApi,
+  LineStyle,
   UTCTimestamp,
 } from "lightweight-charts";
 import {
@@ -18,7 +19,6 @@ import {
   Minimize2,
   Radio,
   ShieldCheck,
-  Target,
   TrendingUp,
 } from "lucide-react";
 import {
@@ -27,13 +27,8 @@ import {
   DataFeedStatus,
   SymbolChartBundle,
 } from "../services/dashboardDataAdapter";
-import {
-  calculateTradeZones,
-  RawPriceLabelItem,
-  ResolvedPriceLabelItem,
-  resolveLabelCollisions,
-} from "../utils/tradeChartMath";
-import { DESIGN_TOKENS, getSymbolChipSpec } from "../styles/designTokens";
+import { getSymbolChipSpec } from "../styles/designTokens";
+import { CHART_TV_LIGHT_THEME } from "../styles/chartTheme";
 import { UI_COPY } from "../constants/uiCopy";
 
 export interface OverlayTogglesState {
@@ -54,63 +49,63 @@ interface LiveTradingChartProps {
   onCaptureScreenshot?: (ticket: number, symbol: string, stage: string, dataUrl: string) => void;
 }
 
-interface ProjectedZoneBox {
+interface ProjectedFvgObBox {
   id: string;
   topY: number;
   heightPx: number;
   leftX: number;
   widthPx: number;
-  kind: "FVG_BULL" | "FVG_BEAR" | "IFVG" | "OB_BULL" | "OB_BEAR";
-  label: string;
-  tooltip: string;
-  mitigated?: boolean;
+  text: "FVG" | "OB";
+  mitigated: boolean;
+  labelLeftX: number;
+  showText: boolean;
 }
 
-interface ProjectedTradePositionBox {
+interface ProjectedPositionTemplate {
   id: string;
-  topY: number;
-  heightPx: number;
-  leftX: number;
-  widthPx: number;
-  kind: "PROFIT" | "LOSS";
-  opacity: number;
-  dashed?: boolean;
-}
-
-interface ProjectedSignalArrow {
-  id: string;
-  x: number;
-  y: number;
   direction: "BUY" | "SELL";
+  leftX: number;
+  mainWidthPx: number;
+  extWidthPx: number;
+  fullWidthPx: number;
+  profitTopY: number | null;
+  profitHeightPx: number;
+  lossTopY: number | null;
+  lossHeightPx: number;
+  entryY: number;
+  tpOuterY: number | null;
+  tp1InnerY: number | null;
+  slY: number | null;
+  pathStartX: number;
+  pathStartY: number;
+  pathEndX: number;
+  pathEndY: number;
+  labelText: "LONG POSITION" | "SHORT POSITION";
+  labelX: number;
+  labelY: number;
+  opacityScale: number;
+  isPending: boolean;
 }
 
-interface ProjectedLineLevel {
+interface ProjectedMutedLine {
   id: string;
   y: number;
-  price: number;
-  style: "solid" | "dashed" | "dotted";
-  color: string;
   startX: number;
   endX: number;
-  width: number;
-  opacity?: number;
+  color: string;
+  dashed: boolean;
 }
 
-interface ProjectedAnnotationPin {
+interface ProjectedStructureDot {
   id: string;
   x: number;
   y: number;
-  label: string;
-  detail: string;
-  tone: "mss" | "choch" | "bos";
 }
 
 interface ProjectedSessionBand {
   id: string;
   leftX: number;
   widthPx: number;
-  label: string;
-  color: string;
 }
 
 const SYMBOLS: ChartSymbol[] = ["XAUUSD", "USDJPY", "BTCUSD"];
@@ -158,16 +153,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
   const [overlays, setOverlays] = useState<OverlayTogglesState>(loadSavedOverlayToggles);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
-  const [chartDims, setChartDims] = useState<{ width: number; height: number }>({
-    width: 760,
-    height: 440,
-  });
-  const [resolvedLabels, setResolvedLabels] = useState<ResolvedPriceLabelItem[]>([]);
-  const [zoneBoxes, setZoneBoxes] = useState<ProjectedZoneBox[]>([]);
-  const [tradePositionBoxes, setTradePositionBoxes] = useState<ProjectedTradePositionBox[]>([]);
-  const [signalArrows, setSignalArrows] = useState<ProjectedSignalArrow[]>([]);
-  const [levelLines, setLevelLines] = useState<ProjectedLineLevel[]>([]);
-  const [annotationPins, setAnnotationPins] = useState<ProjectedAnnotationPin[]>([]);
+  const [fvgObBoxes, setFvgObBoxes] = useState<ProjectedFvgObBox[]>([]);
+  const [positionTemplates, setPositionTemplates] = useState<ProjectedPositionTemplate[]>([]);
+  const [mutedLines, setMutedLines] = useState<ProjectedMutedLine[]>([]);
+  const [structureDots, setStructureDots] = useState<ProjectedStructureDot[]>([]);
   const [sessionBands, setSessionBands] = useState<ProjectedSessionBand[]>([]);
 
   const toggleOverlay = (key: keyof OverlayTogglesState) => {
@@ -189,15 +178,13 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
   useEffect(() => {
     if (!isFullscreen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsFullscreen(false);
-      }
+      if (e.key === "Escape") setIsFullscreen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [isFullscreen]);
 
-  // Compute pixel coordinates for zones, lines, annotations, and collision-free labels
+  // Compute pixel coordinates for TradingView-light zones, position templates, and text-free muted layers
   const recomputeOverlayGeometry = useCallback(() => {
     const chart = chartRef.current;
     const series = seriesRef.current;
@@ -207,10 +194,11 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     const rect = container.getBoundingClientRect();
     const width = Math.max(320, Math.floor(rect.width));
     const height = Math.max(260, Math.floor(rect.height));
-    const plotBottom = Math.max(180, height - 30); // Leave bottom time-axis clear
-    const plotRight = Math.max(200, width - 74); // Leave right price-axis scale clear
+    const plotBottom = Math.max(180, height - 28);
+    const plotRight = Math.max(200, width - 72);
 
     const priceToY = (price: number): number | null => {
+      if (!Number.isFinite(price) || price <= 0) return null;
       try {
         const y = series.priceToCoordinate(price);
         if (y === null || !Number.isFinite(y)) return null;
@@ -231,352 +219,248 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       }
     };
 
-    const nextZones: ProjectedZoneBox[] = [];
-    const nextTradeBoxes: ProjectedTradePositionBox[] = [];
-    const nextSignalArrows: ProjectedSignalArrow[] = [];
-    const nextLines: ProjectedLineLevel[] = [];
-    const rawLabels: RawPriceLabelItem[] = [];
-    const nextPins: ProjectedAnnotationPin[] = [];
-    const nextSessions: ProjectedSessionBand[] = [];
+    // Estimate pixel width per bar for min-3-bar extension
+    let barSpacingPx = 9;
+    if (bundle.candles.length >= 2) {
+      const xA = timeToX(bundle.candles[bundle.candles.length - 2].time);
+      const xB = timeToX(bundle.candles[bundle.candles.length - 1].time);
+      if (xA !== null && xB !== null && Math.abs(xB - xA) >= 2) {
+        barSpacingPx = Math.abs(xB - xA);
+      }
+    }
 
-    // 1. Sessions shading bands (capped to 3 most recent)
+    const lastCandle = bundle.candles[bundle.candles.length - 1];
+    const latestCandleX = lastCandle ? timeToX(lastCandle.time) ?? plotRight - 24 : plotRight - 24;
+
+    const nextSessions: ProjectedSessionBand[] = [];
+    const nextFvgObs: ProjectedFvgObBox[] = [];
+    const nextPositions: ProjectedPositionTemplate[] = [];
+    const nextMutedLines: ProjectedMutedLine[] = [];
+    const nextDots: ProjectedStructureDot[] = [];
+
+    // 1. Sessions (text-free, ultra-faint vertical bands)
     if (overlays.sessions) {
       for (const sess of bundle.sessions.slice(-3)) {
-        const x1 = timeToX(sess.startTime) ?? 18;
-        const x2 = timeToX(sess.endTime) ?? plotRight - 6;
+        const x1 = timeToX(sess.startTime);
+        const x2 = timeToX(sess.endTime) ?? plotRight;
+        if (x1 === null) continue;
         const left = Math.max(0, Math.min(x1, x2));
         const right = Math.min(plotRight, Math.max(x1, x2));
-        if (right - left > 24) {
-          nextSessions.push({
-            id: sess.id,
-            leftX: left,
-            widthPx: right - left,
-            label: sess.label,
-            color: sess.color,
-          });
+        if (right - left > 12) {
+          nextSessions.push({ id: sess.id, leftX: left, widthPx: right - left });
         }
       }
     }
 
-    // 2. FVG / IFVG / Order Block boxes (capped to 4 most recent)
+    // 2. FVG & OB Boxes (light-green translucent fill, "FVG" / "OB" dark text inside near right end)
     if (overlays.fvgOb) {
-      for (const z of bundle.fvgObZones.slice(-4)) {
+      for (const z of bundle.fvgObZones.slice(-6)) {
         const yTop = priceToY(z.topPrice);
         const yBot = priceToY(z.bottomPrice);
-        if (yTop !== null && yBot !== null) {
-          const top = Math.max(6, Math.min(yTop, yBot));
-          const bot = Math.min(plotBottom - 4, Math.max(yTop, yBot));
-          const startX = Math.max(12, Math.min(plotRight - 70, timeToX(z.startTime) ?? 48));
-          const endX = z.endTime
-            ? Math.max(startX + 36, Math.min(plotRight, timeToX(z.endTime) ?? plotRight))
-            : plotRight;
-          nextZones.push({
-            id: z.id,
-            topY: top,
-            heightPx: Math.max(12, bot - top),
-            leftX: startX,
-            widthPx: Math.max(36, endX - startX),
-            kind:
-              z.kind === "IFVG"
-                ? "IFVG"
-                : z.kind === "FVG"
-                ? z.bias === "BULLISH"
-                  ? "FVG_BULL"
-                  : "FVG_BEAR"
-                : z.bias === "BULLISH"
-                ? "OB_BULL"
-                : "OB_BEAR",
-            label: z.label,
-            tooltip: `${z.kind} (${z.bias}) · ${z.bottomPrice.toFixed(bundle.digits)}–${z.topPrice.toFixed(
-              bundle.digits
-            )} · ${z.mitigated ? "Mitigated" : "Active"}`,
-            mitigated: z.mitigated,
-          });
-        }
+        const rawStartX = timeToX(z.startTime);
+        if (yTop === null || yBot === null || rawStartX === null) continue;
+        const rawEndX = z.endTime ? timeToX(z.endTime) ?? plotRight : plotRight;
+        const left = Math.max(0, Math.min(rawStartX, rawEndX));
+        const right = Math.min(plotRight, Math.max(rawStartX, rawEndX));
+        if (right <= 0 || left >= plotRight) continue;
+
+        const top = Math.max(2, Math.min(yTop, yBot));
+        const bot = Math.min(plotBottom - 2, Math.max(yTop, yBot));
+        const hPx = bot - top;
+        const wPx = right - left;
+        if (wPx < 4 || hPx < 4) continue;
+
+        const boxText: "FVG" | "OB" = z.kind === "OB" ? "OB" : "FVG";
+        const showText = hPx >= 14 && wPx >= 34;
+        // Anchor label inside the visible portion near the right end
+        const visibleRight = Math.min(right, plotRight - 6);
+        const labelLeftX = Math.max(left + 6, visibleRight - (boxText === "FVG" ? 30 : 24));
+
+        nextFvgObs.push({
+          id: z.id,
+          topY: top,
+          heightPx: hPx,
+          leftX: left,
+          widthPx: wPx,
+          text: boxText,
+          mitigated: z.mitigated,
+          labelLeftX,
+          showText,
+        });
       }
     }
 
-    // 3. Liquidity Levels (PWH / PDH / EQH / PDL / EQL / PWL — capped to 6)
+    // 3. Liquidity Levels (text-free muted dashed horizontal lines)
     if (overlays.liquidity) {
       for (const liq of bundle.liquidityLevels.slice(0, 6)) {
         const y = priceToY(liq.price);
-        if (y !== null && y >= 6 && y <= plotBottom) {
-          const startX = Math.max(14, Math.min(plotRight - 90, timeToX(liq.startTime) ?? 20));
-          const endX =
-            liq.swept && liq.endTime
-              ? Math.max(startX + 45, Math.min(plotRight, timeToX(liq.endTime) ?? plotRight))
-              : plotRight;
-          nextLines.push({
-            id: liq.id,
+        if (y === null || y < 4 || y > plotBottom - 4) continue;
+        const startX = Math.max(0, timeToX(liq.startTime) ?? 0);
+        const endX =
+          liq.swept && liq.endTime
+            ? Math.min(plotRight, timeToX(liq.endTime) ?? plotRight)
+            : plotRight;
+        if (endX - startX > 8) {
+          nextMutedLines.push({
+            id: `liq-${liq.id}`,
             y,
-            price: liq.price,
-            style: liq.swept ? "dotted" : "dashed",
-            color:
-              liq.code === "EQH" || liq.code === "EQL"
-                ? "rgba(192, 119, 250, 0.72)"
-                : liq.side === "HIGH"
-                ? "rgba(194, 240, 118, 0.60)"
-                : "rgba(94, 234, 212, 0.60)",
             startX,
             endX,
-            width: 1.2,
-          });
-          rawLabels.push({
-            id: liq.id,
-            price: liq.price,
-            idealY: y,
-            priority: 60,
-            label: `${liq.code} ${liq.price.toFixed(bundle.digits)}`,
-            sublabel: liq.swept ? "SWEPT" : undefined,
-            tone: "liquidity",
+            color: CHART_TV_LIGHT_THEME.layers.liquidityLine,
+            dashed: true,
           });
         }
       }
     }
 
-    // 4. Structure Breaks (MSS / CHoCH / BOS — with horizontal break ray from swing pivot to break bar)
+    // 4. Structure Breaks (text-free thin lines + tiny pivot dots)
     if (overlays.structure) {
       for (const st of bundle.structureBreaks.slice(-4)) {
         const y = priceToY(st.price);
-        const xBreak = timeToX(st.time) ?? Math.floor(plotRight * 0.62);
-        const xStart = timeToX(st.startTime) ?? Math.max(20, xBreak - 85);
-        if (y !== null && y >= 14 && y <= plotBottom - 10) {
-          nextLines.push({
-            id: `struct-line-${st.id}`,
-            y,
-            price: st.price,
-            style: st.kind === "BOS" ? "solid" : "dotted",
-            color: st.bias === "BULLISH" ? "rgba(176, 246, 72, 0.70)" : "rgba(192, 119, 250, 0.75)",
-            startX: Math.max(16, Math.min(xStart, xBreak - 24)),
-            endX: Math.min(plotRight - 20, Math.max(xStart + 24, xBreak)),
-            width: 1.4,
-          });
-          nextPins.push({
-            id: st.id,
-            x: Math.max(36, Math.min(plotRight - 135, xBreak - 18)),
-            y,
-            label: st.label,
-            detail: `${st.price.toFixed(bundle.digits)}`,
-            tone: st.kind === "MSS" ? "mss" : st.kind === "BOS" ? "bos" : "choch",
-          });
+        const xBreak = timeToX(st.time);
+        if (y === null || xBreak === null || y < 6 || y > plotBottom - 6) continue;
+        const xStart = timeToX(st.startTime) ?? Math.max(0, xBreak - barSpacingPx * 6);
+        nextMutedLines.push({
+          id: `struct-${st.id}`,
+          y,
+          startX: Math.max(0, Math.min(xStart, xBreak)),
+          endX: Math.min(plotRight, Math.max(xStart, xBreak)),
+          color: CHART_TV_LIGHT_THEME.layers.structureLine,
+          dashed: st.kind !== "BOS",
+        });
+        if (xBreak >= 0 && xBreak <= plotRight) {
+          nextDots.push({ id: `dot-${st.id}`, x: xBreak, y });
         }
       }
     }
 
-    // 5. Trades Layer: Clean TradingView-Style Long/Short Position Drawing ONLY (ZERO text, pills, or tags)
+    // 5. Trades Layer: TradingView-Style LONG POSITION / SHORT POSITION Template
     if (overlays.tradeLabels) {
-      const lastCandle = bundle.candles[bundle.candles.length - 1];
-      const latestCandleX = lastCandle ? timeToX(lastCandle.time) ?? plotRight : plotRight;
-      const clampedEndX = Math.max(48, Math.min(plotRight, latestCandleX + 10));
+      bundle.trades.slice(0, 4).forEach((trade, idx) => {
+        const outerTp = trade.tp2 > 0 ? trade.tp2 : trade.tp1;
+        // Pending signals without SL/TP data show nothing on the chart
+        if (trade.isPendingSignal && trade.stopLoss <= 0 && outerTp <= 0) return;
 
-      bundle.trades.slice(0, 3).forEach((trade, idx) => {
-        const zones = calculateTradeZones({
-          direction: trade.direction,
-          entryPrice: trade.entryPrice,
-          stopLoss: trade.stopLoss,
-          initialStopLoss: trade.initialStopLoss,
-          tp1: trade.tp1,
-          tp2: trade.tp2,
-        });
+        const entryY = priceToY(trade.entryPrice);
+        if (entryY === null) return;
 
-        const entryStartX = Math.max(
-          16,
-          Math.min(clampedEndX - 28, timeToX(trade.entryTime) ?? Math.floor(clampedEndX * 0.5))
-        );
-        const boxWidth = Math.max(28, clampedEndX - entryStartX);
+        const rawEntryX = timeToX(trade.entryTime);
+        if (rawEntryX === null) return;
 
-        // Cap opacity so multiple trades on the same symbol stay crisp and readable
-        const isPrimary = idx === 0;
-        const profitFillOpacity = isPrimary ? 0.16 : 0.08;
-        const lossFillOpacity = isPrimary ? 0.15 : 0.08;
-        const lineOpacity = isPrimary ? 1.0 : 0.65;
+        const rawEndX =
+          trade.isClosed && trade.exitTime
+            ? timeToX(trade.exitTime) ?? latestCandleX
+            : latestCandleX;
+
+        // If closed trade scrolled completely out of view, skip
+        if (rawEndX < 0 || rawEntryX > plotRight) return;
+
+        const leftX = Math.max(0, Math.min(rawEntryX, rawEndX));
+        const mainRightX = Math.min(plotRight, Math.max(leftX + barSpacingPx * 2, rawEndX));
+        const mainWidthPx = Math.max(12, mainRightX - leftX);
+
+        // Short light-shaded right extension (~15% of trade width, min 3 bars, never beyond right margin)
+        const desiredExt = Math.max(barSpacingPx * 3, mainWidthPx * 0.15);
+        const fullRightX = Math.min(plotRight - 2, mainRightX + desiredExt);
+        const extWidthPx = Math.max(0, fullRightX - mainRightX);
+        const fullWidthPx = mainWidthPx + extWidthPx;
 
         const isBuy = trade.direction === "BUY";
-        const outerTp = trade.tp2 > 0 ? trade.tp2 : trade.tp1;
+        const tpOuterY = outerTp > 0 ? priceToY(outerTp) : null;
         const hasBothTps = trade.tp1 > 0 && trade.tp2 > 0 && Math.abs(trade.tp2 - trade.tp1) > 1e-6;
+        const tp1InnerY = hasBothTps ? priceToY(trade.tp1) : null;
+        const slY = trade.stopLoss > 0 ? priceToY(trade.stopLoss) : null;
 
-        // Profit Zone (Green/Lime): ABOVE entry for LONG, BELOW entry for SHORT
-        if (outerTp > 0) {
-          const yEntry = priceToY(trade.entryPrice);
-          const yTp = priceToY(outerTp);
-          if (yEntry !== null && yTp !== null) {
-            const validProfitDir = isBuy ? outerTp > trade.entryPrice : outerTp < trade.entryPrice;
-            if (validProfitDir) {
-              const top = Math.max(4, Math.min(yEntry, yTp));
-              const bot = Math.min(plotBottom, Math.max(yEntry, yTp));
-              if (bot - top >= 2) {
-                nextTradeBoxes.push({
-                  id: `pos-profit-${trade.ticket}`,
-                  topY: top,
-                  heightPx: bot - top,
-                  leftX: entryStartX,
-                  widthPx: boxWidth,
-                  kind: "PROFIT",
-                  opacity: profitFillOpacity,
-                });
-              }
+        let profitTopY: number | null = null;
+        let profitHeightPx = 0;
+        if (tpOuterY !== null) {
+          const validProfit = isBuy ? outerTp > trade.entryPrice : outerTp < trade.entryPrice;
+          if (validProfit) {
+            const top = Math.max(2, Math.min(entryY, tpOuterY));
+            const bot = Math.min(plotBottom - 2, Math.max(entryY, tpOuterY));
+            if (bot - top >= 2) {
+              profitTopY = top;
+              profitHeightPx = bot - top;
             }
           }
         }
 
-        // Loss Zone (Red): BELOW entry for LONG, ABOVE entry for SHORT (uses CURRENT stop loss)
-        if (trade.stopLoss > 0) {
-          const yEntry = priceToY(trade.entryPrice);
-          const ySl = priceToY(trade.stopLoss);
-          if (yEntry !== null && ySl !== null) {
-            const validLossDir = isBuy ? trade.stopLoss < trade.entryPrice : trade.stopLoss > trade.entryPrice;
-            if (validLossDir) {
-              const top = Math.max(4, Math.min(yEntry, ySl));
-              const bot = Math.min(plotBottom, Math.max(yEntry, ySl));
-              if (bot - top >= 2) {
-                nextTradeBoxes.push({
-                  id: `pos-loss-${trade.ticket}`,
-                  topY: top,
-                  heightPx: bot - top,
-                  leftX: entryStartX,
-                  widthPx: boxWidth,
-                  kind: "LOSS",
-                  opacity: lossFillOpacity,
-                });
-              }
+        let lossTopY: number | null = null;
+        let lossHeightPx = 0;
+        if (slY !== null) {
+          const validLoss = isBuy ? trade.stopLoss < trade.entryPrice : trade.stopLoss > trade.entryPrice;
+          if (validLoss) {
+            const top = Math.max(2, Math.min(entryY, slY));
+            const bot = Math.min(plotBottom - 2, Math.max(entryY, slY));
+            if (bot - top >= 2) {
+              lossTopY = top;
+              lossHeightPx = bot - top;
             }
           }
         }
 
-        // Entry Line (clean solid neutral white across the position zone)
-        const entryY = priceToY(trade.entryPrice);
-        if (entryY !== null && entryY >= 4 && entryY <= plotBottom) {
-          nextLines.push({
-            id: `line-entry-${trade.ticket}`,
-            y: entryY,
-            price: trade.entryPrice,
-            style: "solid",
-            color: "#F4F7FF",
-            startX: entryStartX,
-            endX: clampedEndX,
-            width: 1.5,
-            opacity: lineOpacity,
-          });
-        }
+        // Dashed path line from (entryTime, entryPrice) to (exitTime/latest, exitPrice/currentPrice)
+        const endPrice = trade.isClosed && trade.exitPrice ? trade.exitPrice : trade.currentPrice;
+        const pathEndY = priceToY(endPrice) ?? entryY;
 
-        // Current Stop Loss Edge (clean solid red)
-        if (trade.stopLoss > 0) {
-          const slY = priceToY(trade.stopLoss);
-          if (slY !== null && slY >= 4 && slY <= plotBottom) {
-            nextLines.push({
-              id: `line-sl-${trade.ticket}`,
-              y: slY,
-              price: trade.stopLoss,
-              style: "solid",
-              color: "#FF5A6E",
-              startX: entryStartX,
-              endX: clampedEndX,
-              width: 1.5,
-              opacity: lineOpacity,
-            });
-          }
-        }
+        // Place ONLY "LONG POSITION" (below box on SL side) or "SHORT POSITION" (above box on SL side)
+        const boxBottomY = Math.max(
+          entryY,
+          lossTopY !== null ? lossTopY + lossHeightPx : entryY,
+          profitTopY !== null ? profitTopY + profitHeightPx : entryY
+        );
+        const boxTopY = Math.min(
+          entryY,
+          lossTopY !== null ? lossTopY : entryY,
+          profitTopY !== null ? profitTopY : entryY
+        );
 
-        // Faint dashed Original/Ghost SL line when stop has moved (tighten-only / BE+ / trail), NO text
-        if (zones.ghostInitialSlPrice !== null) {
-          const ghostY = priceToY(zones.ghostInitialSlPrice);
-          if (ghostY !== null && ghostY >= 4 && ghostY <= plotBottom) {
-            nextLines.push({
-              id: `line-ghost-sl-${trade.ticket}`,
-              y: ghostY,
-              price: zones.ghostInitialSlPrice,
-              style: "dashed",
-              color: "rgba(255, 90, 110, 0.36)",
-              startX: entryStartX,
-              endX: clampedEndX,
-              width: 1,
-              opacity: lineOpacity,
-            });
-          }
-        }
+        const labelY = isBuy
+          ? Math.min(plotBottom - 16, boxBottomY + 6)
+          : Math.max(4, boxTopY - 18);
 
-        // Outer TP Edge (clean solid green/lime)
-        if (outerTp > 0) {
-          const tpOuterY = priceToY(outerTp);
-          if (tpOuterY !== null && tpOuterY >= 4 && tpOuterY <= plotBottom) {
-            nextLines.push({
-              id: `line-tp-outer-${trade.ticket}`,
-              y: tpOuterY,
-              price: outerTp,
-              style: "solid",
-              color: "#B0F648",
-              startX: entryStartX,
-              endX: clampedEndX,
-              width: 1.5,
-              opacity: lineOpacity,
-            });
-          }
-        }
+        const opacityScale = trade.isPendingSignal
+          ? CHART_TV_LIGHT_THEME.position.pendingOpacityScale
+          : idx === 0 && !trade.isClosed
+          ? 1.0
+          : CHART_TV_LIGHT_THEME.position.secondaryOpacityScale;
 
-        // Inner TP1 Line (thin dashed green inside the profit zone when both TP1 & TP2 exist), NO text
-        if (hasBothTps) {
-          const tp1Y = priceToY(trade.tp1);
-          if (tp1Y !== null && tp1Y >= 4 && tp1Y <= plotBottom) {
-            nextLines.push({
-              id: `line-tp1-${trade.ticket}`,
-              y: tp1Y,
-              price: trade.tp1,
-              style: "dashed",
-              color: "rgba(194, 240, 118, 0.72)",
-              startX: entryStartX,
-              endX: clampedEndX,
-              width: 1,
-              opacity: lineOpacity,
-            });
-          }
-        }
-
-        // Icon-only signal arrow if no SL/TP levels exist on a pending signal
-        if (trade.stopLoss <= 0 && outerTp <= 0 && entryY !== null) {
-          nextSignalArrows.push({
-            id: `sig-arrow-${trade.ticket}`,
-            x: entryStartX,
-            y: entryY,
-            direction: trade.direction,
-          });
-        }
+        nextPositions.push({
+          id: `pos-tpl-${trade.ticket}-${idx}`,
+          direction: trade.direction,
+          leftX,
+          mainWidthPx,
+          extWidthPx,
+          fullWidthPx,
+          profitTopY,
+          profitHeightPx,
+          lossTopY,
+          lossHeightPx,
+          entryY,
+          tpOuterY,
+          tp1InnerY,
+          slY,
+          pathStartX: leftX,
+          pathStartY: entryY,
+          pathEndX: mainRightX,
+          pathEndY,
+          labelText: isBuy ? "LONG POSITION" : "SHORT POSITION",
+          labelX: leftX,
+          labelY,
+          opacityScale,
+          isPending: Boolean(trade.isPendingSignal),
+        });
       });
     }
 
-    // Run priority-aware collision-free vertical label placement solver (Liquidity labels only)
-    const nonOverlapping = resolveLabelCollisions(rawLabels, {
-      minY: 8,
-      maxY: plotBottom - 6,
-      minGapPx: 23,
-      defaultHeightPx: 20,
-      maxLabels: 8,
-    });
-
-    // De-collide structure annotation pins vertically if two share similar X and Y
-    const sortedPins = [...nextPins].sort((a, b) => a.y - b.y);
-    for (let i = 1; i < sortedPins.length; i++) {
-      if (
-        Math.abs(sortedPins[i].x - sortedPins[i - 1].x) < 110 &&
-        sortedPins[i].y - sortedPins[i - 1].y < 23
-      ) {
-        sortedPins[i] = {
-          ...sortedPins[i],
-          y: Math.min(plotBottom - 14, sortedPins[i - 1].y + 24),
-        };
-      }
-    }
-
-    setChartDims({ width, height });
-    setZoneBoxes(nextZones);
-    setTradePositionBoxes(nextTradeBoxes);
-    setSignalArrows(nextSignalArrows);
-    setLevelLines(nextLines);
-    setResolvedLabels(nonOverlapping);
-    setAnnotationPins(sortedPins);
     setSessionBands(nextSessions);
+    setFvgObBoxes(nextFvgObs);
+    setPositionTemplates(nextPositions);
+    setMutedLines(nextMutedLines);
+    setStructureDots(nextDots);
   }, [bundle, overlays]);
 
-  // Initialize lightweight-charts instance and ResizeObserver
+  // Initialize lightweight-charts instance (TradingView Light style, transparent canvas over #FFFFFF)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -587,48 +471,48 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       height: Math.max(260, Math.floor(initialRect.height || 440)),
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: DESIGN_TOKENS.colors.chart.axisText,
-        fontFamily: "'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace",
+        textColor: CHART_TV_LIGHT_THEME.axisText,
+        fontFamily: CHART_TV_LIGHT_THEME.typography.axisFontFamily,
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: DESIGN_TOKENS.colors.chart.gridLine },
-        horzLines: { color: DESIGN_TOKENS.colors.chart.gridLine },
+        vertLines: { color: CHART_TV_LIGHT_THEME.gridLine },
+        horzLines: { color: CHART_TV_LIGHT_THEME.gridLine },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          color: DESIGN_TOKENS.colors.chart.crosshair,
-          labelBackgroundColor: DESIGN_TOKENS.colors.chart.crosshairLabelBg,
+          color: CHART_TV_LIGHT_THEME.crosshairLine,
+          style: LineStyle.Dashed,
+          width: 1,
+          labelBackgroundColor: CHART_TV_LIGHT_THEME.crosshairLabelBg,
         },
         horzLine: {
-          color: DESIGN_TOKENS.colors.chart.crosshair,
-          labelBackgroundColor: DESIGN_TOKENS.colors.chart.crosshairLabelBg,
+          color: CHART_TV_LIGHT_THEME.crosshairLine,
+          style: LineStyle.Dashed,
+          width: 1,
+          labelBackgroundColor: CHART_TV_LIGHT_THEME.crosshairLabelBg,
         },
       },
       rightPriceScale: {
-        borderColor: DESIGN_TOKENS.colors.chart.axisBorder,
-        scaleMargins: {
-          top: 0.08,
-          bottom: 0.08,
-        },
+        borderColor: CHART_TV_LIGHT_THEME.axisBorder,
+        scaleMargins: { top: 0.1, bottom: 0.1 },
       },
       timeScale: {
-        borderColor: DESIGN_TOKENS.colors.chart.axisBorder,
+        borderColor: CHART_TV_LIGHT_THEME.axisBorder,
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 8,
+        rightOffset: 10,
         barSpacing: 9,
       },
     });
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: DESIGN_TOKENS.colors.chart.upCandle,
-      downColor: DESIGN_TOKENS.colors.chart.downCandle,
-      borderUpColor: DESIGN_TOKENS.colors.chart.upCandle,
-      borderDownColor: DESIGN_TOKENS.colors.chart.downCandle,
-      wickUpColor: DESIGN_TOKENS.colors.chart.upWick,
-      wickDownColor: DESIGN_TOKENS.colors.chart.downWick,
+      upColor: CHART_TV_LIGHT_THEME.candles.bull,
+      downColor: CHART_TV_LIGHT_THEME.candles.bear,
+      borderVisible: false,
+      wickUpColor: CHART_TV_LIGHT_THEME.candles.bull,
+      wickDownColor: CHART_TV_LIGHT_THEME.candles.bear,
       priceFormat: {
         type: "price",
         precision: bundle.digits,
@@ -639,9 +523,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     chartRef.current = chart;
     seriesRef.current = candleSeries;
 
-    const handleVisibleChange = () => {
-      recomputeOverlayGeometry();
-    };
+    const handleVisibleChange = () => recomputeOverlayGeometry();
     chart.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleChange);
 
     const resizeObserver = new ResizeObserver((entries) => {
@@ -687,7 +569,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     return () => clearTimeout(timer);
   }, [isFullscreen, recomputeOverlayGeometry]);
 
-  // Update candle series data & price precision when symbol/timeframe/bundle updates
+  // Update candle series data & auto-scale range when bundle changes
   useEffect(() => {
     const chart = chartRef.current;
     const series = seriesRef.current;
@@ -701,17 +583,16 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       },
     });
 
-    const formatted = bundle.candles.map((c) => ({
-      time: c.time as UTCTimestamp,
-      open: c.open,
-      high: c.high,
-      low: c.low,
-      close: c.close,
-    }));
+    series.setData(
+      bundle.candles.map((c) => ({
+        time: c.time as UTCTimestamp,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+      }))
+    );
 
-    series.setData(formatted);
-
-    // Ensure auto-scale price range spans Entry, SL, Ghost Initial SL, TP1, TP2
     series.applyOptions({
       autoscaleInfoProvider: (original: () => { priceRange: { minValue: number; maxValue: number } } | null) => {
         const res = original();
@@ -719,14 +600,14 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
         let minVal = res.priceRange.minValue;
         let maxVal = res.priceRange.maxValue;
         for (const t of bundle.trades) {
-          for (const p of [t.entryPrice, t.stopLoss, t.initialStopLoss, t.tp1, t.tp2]) {
+          for (const p of [t.entryPrice, t.stopLoss, t.tp1, t.tp2]) {
             if (p > 0) {
               minVal = Math.min(minVal, p);
               maxVal = Math.max(maxVal, p);
             }
           }
         }
-        const pad = (maxVal - minVal) * 0.06;
+        const pad = (maxVal - minVal) * 0.08;
         return {
           priceRange: {
             minValue: minVal - pad,
@@ -736,14 +617,8 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       },
     });
 
-    requestAnimationFrame(() => {
-      recomputeOverlayGeometry();
-    });
+    requestAnimationFrame(() => recomputeOverlayGeometry());
   }, [bundle, recomputeOverlayGeometry]);
-
-  const handleToggleFullscreen = () => {
-    setIsFullscreen((prev) => !prev);
-  };
 
   // Auto-save chart PNG screenshot via lightweight-charts takeScreenshot() when a real trade opens
   const capturedTicketsRef = useRef<Set<string>>(new Set());
@@ -752,8 +627,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       if (!chartRef.current || !onCaptureScreenshot) return;
       try {
         const canvas = chartRef.current.takeScreenshot();
-        const dataUrl = canvas.toDataURL("image/png");
-        onCaptureScreenshot(ticket, symbol, stage, dataUrl);
+        onCaptureScreenshot(ticket, symbol, stage, canvas.toDataURL("image/png"));
       } catch {
         // ignore screenshot errors
       }
@@ -773,23 +647,6 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     }
   }, [primaryTrade, bundle.candles.length, bundle.brokerSymbol, onCaptureScreenshot, triggerChartScreenshot]);
 
-  const labelToneClasses: Partial<Record<ResolvedPriceLabelItem["tone"], string>> = useMemo(
-    () => ({
-      liquidity: "bg-[#14274A]/92 border-[#C2F076]/55 text-[#C2F076]",
-      structure: "bg-[#241B4B]/92 border-[#C077FA]/65 text-[#E5C7FF]",
-    }),
-    []
-  );
-
-  const pinToneClasses: Record<ProjectedAnnotationPin["tone"], string> = useMemo(
-    () => ({
-      mss: "bg-[#221D4E]/95 border-[#C077FA] text-[#E5C7FF]",
-      choch: "bg-[#2A1D54]/95 border-[#C9ACDA] text-[#F0DEFF]",
-      bos: "bg-[#16343A]/95 border-[#5EEAD4] text-[#C8FFF4]",
-    }),
-    []
-  );
-
   return (
     <section
       aria-label="Live Institutional Execution Chart"
@@ -805,9 +662,9 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
           : "flex flex-col h-full min-h-[470px] iea-chart-glass-shell overflow-hidden"
       }
     >
-      {/* Chart Toolbar Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 bg-[#0D1B36]/85 border-b border-[rgba(186,214,255,0.13)] shrink-0">
-        {/* Left: Symbol Switcher with Circular Coin Chips + Timeframes + Live Quote */}
+      {/* Adaptive Dark Glass Header above White TradingView Plot */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 bg-[#0D1B36]/92 border-b border-[rgba(186,214,255,0.14)] shrink-0">
+        {/* Left: Symbol Switcher + Timeframes + Live Quote & Provenance */}
         <div className="flex flex-wrap items-center gap-2">
           <div
             className="inline-flex items-center bg-[#091426]/80 border border-[rgba(186,214,255,0.15)] rounded-full p-0.5 gap-0.5"
@@ -843,7 +700,6 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             })}
           </div>
 
-          {/* Timeframe Selector (Segmented Pill Tabs) */}
           <div
             className="inline-flex items-center bg-[#091426]/80 border border-[rgba(186,214,255,0.15)] rounded-full p-0.5 gap-0.5"
             role="group"
@@ -870,7 +726,6 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             })}
           </div>
 
-          {/* Live Bid/Ask + Spread + Data Provenance Pill */}
           <div
             className="hidden xl:flex items-center space-x-1.5 px-2.5 py-1 iea-pill-control font-mono text-xs"
             title={`Source: ${bundle.source} · Broker ${bundle.brokerSymbol} · ${bundle.freshnessReason}`}
@@ -912,7 +767,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
           </div>
         </div>
 
-        {/* Right: Short-Form Toggleable Overlays + Fullscreen Toggle */}
+        {/* Right: Independent Layer Toggles + Screenshot + Fullscreen */}
         <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
@@ -1002,8 +857,8 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
 
           <button
             type="button"
-            onClick={handleToggleFullscreen}
-            aria-label={isFullscreen ? "Exit fullscreen chart" : "Fit chart content to view"}
+            onClick={() => setIsFullscreen((p) => !p)}
+            aria-label={isFullscreen ? "Exit fullscreen chart" : "Fullscreen chart"}
             title={isFullscreen ? "Exit Fullscreen (Esc)" : "Fullscreen Chart"}
             data-testid="chart-fullscreen-toggle"
             className={`p-1.5 rounded-full border transition ${
@@ -1012,18 +867,14 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                 : "bg-[#0E1E3B]/80 hover:bg-[#19305C] border-[rgba(186,214,255,0.18)] text-[#F4F7FF]"
             }`}
           >
-            {isFullscreen ? (
-              <Minimize2 className="w-3.5 h-3.5" />
-            ) : (
-              <Maximize2 className="w-3.5 h-3.5" />
-            )}
+            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
         </div>
       </div>
 
-      {/* Sub-Header Active Trade Strip + Compact Drawing Legend */}
+      {/* Sub-Header Active Trade Info Strip (App UI outside the plot) */}
       {primaryTrade && (
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-1.5 bg-[#0B172F]/90 border-b border-[rgba(186,214,255,0.11)] text-xs font-mono shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-1.5 bg-[#0B172F]/92 border-b border-[rgba(186,214,255,0.12)] text-xs font-mono shrink-0">
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
@@ -1035,34 +886,26 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               {primaryTrade.direction} {primaryTrade.volume.toFixed(2)}L
             </span>
             <span className="text-[#F4F7FF] font-bold">#{primaryTrade.ticket}</span>
-            <span
-              title="Owner & Setup Quality Score"
-              className="px-2 py-0.5 rounded-full bg-[#223D6A]/70 text-[#5EEAD4] border border-[#5EEAD4]/30 text-[10px] font-sans font-medium"
-            >
-              {primaryTrade.ownership} · S{primaryTrade.qualityScore}
-            </span>
-            <span className="text-[#8496B8]" title="Entry Price">
+            <span className="text-[#8496B8]">
               In <strong className="text-[#F4F7FF]">{primaryTrade.entryPrice.toFixed(bundle.digits)}</strong>
             </span>
-            <span className="text-[#FF7A8A]" title="Active Stop Loss (Initial SL in brackets)">
-              SL <strong>{primaryTrade.stopLoss.toFixed(bundle.digits)}</strong>
-              {Math.abs(primaryTrade.initialStopLoss - primaryTrade.stopLoss) > 1e-6 && (
-                <span className="text-[#8496B8] ml-1">
-                  ({primaryTrade.initialStopLoss.toFixed(bundle.digits)})
-                </span>
-              )}
+            <span className="text-[#FF7A8A]">
+              SL <strong>{primaryTrade.stopLoss > 0 ? primaryTrade.stopLoss.toFixed(bundle.digits) : "—"}</strong>
             </span>
-            <span className="text-[#C2F076]" title="Partial Take Profit 1 (50%)">
-              TP1 <strong>{primaryTrade.tp1.toFixed(bundle.digits)}</strong> (+{primaryTrade.tp1R.toFixed(2)}R)
-            </span>
-            <span className="text-[#B0F648]" title="Final Take Profit 2 Target">
-              TP2 <strong>{primaryTrade.tp2.toFixed(bundle.digits)}</strong> (+{primaryTrade.tp2R.toFixed(2)}R)
-            </span>
+            {primaryTrade.tp1 > 0 && (
+              <span className="text-[#C2F076]">
+                TP1 <strong>{primaryTrade.tp1.toFixed(bundle.digits)}</strong>
+              </span>
+            )}
+            {primaryTrade.tp2 > 0 && (
+              <span className="text-[#B0F648]">
+                TP2 <strong>{primaryTrade.tp2.toFixed(bundle.digits)}</strong>
+              </span>
+            )}
           </div>
 
           <div className="flex items-center space-x-2">
             <span
-              title="Floating P&L and R-Multiple"
               className={`px-2.5 py-0.5 rounded-full font-bold ${
                 primaryTrade.floatingPnl >= 0
                   ? "bg-[#B0F648]/20 text-[#B0F648] border border-[#B0F648]/45"
@@ -1073,17 +916,11 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               {primaryTrade.floatingR >= 0 ? "+" : ""}
               {primaryTrade.floatingR.toFixed(2)}R)
             </span>
-            <span
-              title="Rule R9.3: Stop Loss can only be tightened, never widened or removed"
-              className="inline-flex items-center space-x-1 text-[10px] font-sans text-[#C2F076] bg-[#B0F648]/12 border border-[#B0F648]/30 px-2 py-0.5 rounded-full"
-            >
+            <span className="inline-flex items-center space-x-1 text-[10px] font-sans text-[#C2F076] bg-[#B0F648]/12 border border-[#B0F648]/30 px-2 py-0.5 rounded-full">
               <ShieldCheck className="w-3 h-3" />
               <span>Tighten-SL</span>
             </span>
-            <span
-              title="Real-time telemetry feed status"
-              className="inline-flex items-center space-x-1 text-[10px] font-sans text-[#B6C5E0] bg-[#091426]/80 px-2 py-0.5 rounded-full border border-[rgba(186,214,255,0.14)]"
-            >
+            <span className="inline-flex items-center space-x-1 text-[10px] font-sans text-[#B6C5E0] bg-[#091426]/80 px-2 py-0.5 rounded-full border border-[rgba(186,214,255,0.14)]">
               <Radio className="w-3 h-3 text-[#B0F648] animate-pulse" />
               <span>{feedStatus}</span>
             </span>
@@ -1091,121 +928,123 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
         </div>
       )}
 
-      {/* Main Chart Viewport — true z-order: zones (z-5) -> candles (z-10) -> lines (z-20) -> non-trade labels (z-30) */}
+      {/* White TradingView Plot Surface — z-5 zones -> z-10 candles -> z-20 lines -> z-30 ONLY position & FVG/OB text */}
       <div
         className="relative flex-1 min-h-0 w-full"
-        style={{ backgroundColor: DESIGN_TOKENS.colors.chart.background }}
+        style={{ backgroundColor: CHART_TV_LIGHT_THEME.background }}
       >
         {bundle.candles.length === 0 && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#0B1528]/80 text-center px-4">
-            <div className="text-sm font-semibold text-[#F4F7FF]">
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 text-center px-4">
+            <div className="text-sm font-semibold text-[#1F2937]">
               {bundle.marketClosed ? "Market Closed" : "Waiting for MT5 Candles"}
             </div>
-            <div className="text-xs font-mono text-[#8496B8] mt-1">
+            <div className="text-xs font-mono text-[#6B7280] mt-1">
               {bundle.brokerSymbol} ({bundle.timeframe}) · {bundle.freshnessReason}
             </div>
           </div>
         )}
 
-        {/* BACKDROP OVERLAY LAYER (z-5): Behind candlesticks so candles stay 100% crisp */}
+        {/* BACKDROP LAYER (z-5): Behind candlesticks so candles stay 100% crisp & un-tinted */}
         <div
           className="absolute inset-0 z-[5] pointer-events-none overflow-hidden select-none"
-          style={{ right: "72px", bottom: "26px" }}
+          style={{ right: "72px", bottom: "28px" }}
         >
-          {/* Session Background Bands */}
+          {/* Text-free Session Bands */}
           {sessionBands.map((sb) => (
             <div
               key={sb.id}
               style={{
                 left: `${sb.leftX}px`,
                 width: `${sb.widthPx}px`,
-                backgroundColor: sb.color,
+                backgroundColor: CHART_TV_LIGHT_THEME.layers.sessionBand,
               }}
-              className="absolute top-0 bottom-0 border-x border-[rgba(186,214,255,0.12)]"
+              className="absolute top-0 bottom-0"
             />
           ))}
 
-          {/* FVG / IFVG / OB Shaded Boxes */}
-          {zoneBoxes.map((zb) => {
-            const boxStyleByKind: Record<ProjectedZoneBox["kind"], string> = {
-              FVG_BULL: "bg-[#5EEAD4]/[0.10] border border-[#5EEAD4]/40 rounded-r-md",
-              FVG_BEAR: "bg-[#FBBF24]/[0.10] border border-[#FBBF24]/40 rounded-r-md",
-              IFVG: "bg-[#C077FA]/[0.06] border border-dashed border-[#C077FA]/35 rounded-md opacity-75",
-              OB_BULL: "bg-[#B0F648]/[0.09] border border-[#C2F076]/40 rounded-r-md",
-              OB_BEAR: "bg-[#C077FA]/[0.10] border border-[#C077FA]/45 rounded-r-md",
-            };
-            return (
-              <div
-                key={zb.id}
-                style={{
-                  top: `${zb.topY}px`,
-                  height: `${zb.heightPx}px`,
-                  left: `${zb.leftX}px`,
-                  width: `${zb.widthPx}px`,
-                }}
-                className={`absolute ${boxStyleByKind[zb.kind]}`}
-              />
-            );
-          })}
-
-          {/* Trades Layer: Clean Long/Short Position Profit & Loss Zones (NO text, NO pills, NO tooltips) */}
-          {tradePositionBoxes.map((tb) => (
+          {/* FVG & OB Light-Green Translucent Rectangles (no heavy border) */}
+          {fvgObBoxes.map((box) => (
             <div
-              key={tb.id}
-              data-testid={`trade-position-zone-${tb.kind.toLowerCase()}`}
+              key={box.id}
+              data-testid={`tv-box-${box.text.toLowerCase()}`}
               style={{
-                top: `${tb.topY}px`,
-                height: `${tb.heightPx}px`,
-                left: `${tb.leftX}px`,
-                width: `${tb.widthPx}px`,
-                backgroundColor:
-                  tb.kind === "PROFIT"
-                    ? `rgba(176, 246, 72, ${tb.opacity})`
-                    : `rgba(255, 90, 110, ${tb.opacity})`,
+                top: `${box.topY}px`,
+                height: `${box.heightPx}px`,
+                left: `${box.leftX}px`,
+                width: `${box.widthPx}px`,
+                backgroundColor: box.mitigated
+                  ? CHART_TV_LIGHT_THEME.fvgOb.mitigatedFill
+                  : CHART_TV_LIGHT_THEME.fvgOb.fill,
               }}
-              className={`absolute ${tb.dashed ? "border border-dashed border-white/20" : ""}`}
+              className="absolute"
             />
+          ))}
+
+          {/* LONG / SHORT Position Zones (2-shade Profit Zone + Light Red Loss Zone) */}
+          {positionTemplates.map((pt) => (
+            <React.Fragment key={pt.id}>
+              {/* Profit Zone: Stronger main duration fill + Lighter right extension */}
+              {pt.profitTopY !== null && pt.profitHeightPx > 0 && (
+                <>
+                  <div
+                    data-testid={`tv-pos-profit-main-${pt.direction.toLowerCase()}`}
+                    style={{
+                      top: `${pt.profitTopY}px`,
+                      height: `${pt.profitHeightPx}px`,
+                      left: `${pt.leftX}px`,
+                      width: `${pt.mainWidthPx}px`,
+                      backgroundColor: CHART_TV_LIGHT_THEME.position.profitFillPrimary,
+                      opacity: pt.opacityScale,
+                    }}
+                    className="absolute"
+                  />
+                  {pt.extWidthPx > 0 && (
+                    <div
+                      data-testid={`tv-pos-profit-ext-${pt.direction.toLowerCase()}`}
+                      style={{
+                        top: `${pt.profitTopY}px`,
+                        height: `${pt.profitHeightPx}px`,
+                        left: `${pt.leftX + pt.mainWidthPx}px`,
+                        width: `${pt.extWidthPx}px`,
+                        backgroundColor: CHART_TV_LIGHT_THEME.position.profitFillExtension,
+                        opacity: pt.opacityScale,
+                      }}
+                      className="absolute"
+                    />
+                  )}
+                </>
+              )}
+
+              {/* Loss Zone: Single light red/pink fill across full width */}
+              {pt.lossTopY !== null && pt.lossHeightPx > 0 && (
+                <div
+                  data-testid={`tv-pos-loss-${pt.direction.toLowerCase()}`}
+                  style={{
+                    top: `${pt.lossTopY}px`,
+                    height: `${pt.lossHeightPx}px`,
+                    left: `${pt.leftX}px`,
+                    width: `${pt.fullWidthPx}px`,
+                    backgroundColor: CHART_TV_LIGHT_THEME.position.lossFill,
+                    opacity: pt.opacityScale,
+                  }}
+                  className="absolute"
+                />
+              )}
+            </React.Fragment>
           ))}
         </div>
 
-        {/* Lightweight Charts Canvas Mount (z-10, transparent bg so candles sit cleanly ON TOP of zones) */}
+        {/* Lightweight Charts Canvas Mount (z-10, transparent bg so candles render ON TOP of zones) */}
         <div ref={containerRef} className="absolute inset-0 z-10 w-full h-full" />
 
-        {/* FOREGROUND OVERLAY LAYER (z-20 / z-30): Lines above zones + labels ONLY for non-trade layers */}
+        {/* FOREGROUND LINES & ALLOWED LABELS (z-20 / z-30) */}
         <div
           className="absolute inset-0 z-20 pointer-events-none overflow-hidden select-none"
-          style={{ right: "72px", bottom: "26px" }}
+          style={{ right: "72px", bottom: "28px" }}
         >
-          {/* Session Header Labels (Sessions layer only) */}
-          {sessionBands.map((sb) => (
-            <div
-              key={`lbl-${sb.id}`}
-              style={{ left: `${sb.leftX}px`, width: `${sb.widthPx}px` }}
-              className="absolute top-0"
-            >
-              <span className="inline-block m-1.5 px-2 py-0.5 rounded-full bg-[#0A152B]/85 text-[9px] font-mono text-[#B6C5E0] border border-[rgba(186,214,255,0.16)]">
-                {sb.label}
-              </span>
-            </div>
-          ))}
-
-          {/* FVG / IFVG / OB Labels (FVG/OB layer only) */}
-          {zoneBoxes.map((zb) => (
-            <div
-              key={`lbl-${zb.id}`}
-              title={zb.tooltip}
-              style={{ top: `${zb.topY}px`, left: `${zb.leftX}px` }}
-              className="absolute pointer-events-auto"
-            >
-              <span className="inline-block ml-1.5 mt-0.5 px-1.5 py-0.2 text-[9px] font-mono font-semibold text-[#F4F7FF] bg-[#0A152B]/85 rounded-full border border-[rgba(186,214,255,0.14)]">
-                {zb.label}
-              </span>
-            </div>
-          ))}
-
-          {/* Horizontal Level Lines (Trades Entry/SL/TP/GhostSL + Liquidity + Structure Rays) & Signal Arrows */}
-          <svg className="absolute inset-0 z-20 w-full h-full overflow-visible">
-            {levelLines.map((ln) => (
+          <svg className="absolute inset-0 w-full h-full overflow-visible">
+            {/* Muted Text-Free Liquidity & Structure Lines */}
+            {mutedLines.map((ln) => (
               <line
                 key={ln.id}
                 x1={ln.startX}
@@ -1213,112 +1052,137 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                 x2={ln.endX}
                 y2={ln.y}
                 stroke={ln.color}
-                strokeWidth={ln.width}
-                strokeOpacity={ln.opacity ?? 1}
-                strokeDasharray={
-                  ln.style === "dashed" ? "6 4" : ln.style === "dotted" ? "2 3" : undefined
-                }
+                strokeWidth={1}
+                strokeDasharray={ln.dashed ? "4 4" : undefined}
               />
             ))}
 
-            {/* Icon-only arrow markers for signals without SL/TP levels (zero text) */}
-            {signalArrows.map((arr) =>
-              arr.direction === "BUY" ? (
-                <polygon
-                  key={arr.id}
-                  points={`${arr.x},${arr.y - 6} ${arr.x - 5},${arr.y + 4} ${arr.x + 5},${arr.y + 4}`}
-                  fill="#B0F648"
-                />
-              ) : (
-                <polygon
-                  key={arr.id}
-                  points={`${arr.x},${arr.y + 6} ${arr.x - 5},${arr.y - 4} ${arr.x + 5},${arr.y - 4}`}
-                  fill="#FF5A6E"
-                />
-              )
-            )}
+            {/* Small Text-Free Structure Pivot Dots */}
+            {structureDots.map((dot) => (
+              <circle
+                key={dot.id}
+                cx={dot.x}
+                cy={dot.y}
+                r={3}
+                fill={CHART_TV_LIGHT_THEME.layers.structureDot}
+              />
+            ))}
 
-            {/* Leader lines connecting true price Y to collision-resolved liquidity badge Y when displaced */}
-            {resolvedLabels
-              .filter((lbl) => lbl.displaced)
-              .map((lbl) => (
-                <path
-                  key={`leader-${lbl.id}`}
-                  d={`M ${Math.max(120, chartDims.width - 280)} ${lbl.idealY} L ${Math.max(
-                    135,
-                    chartDims.width - 262
-                  )} ${lbl.resolvedY}`}
-                  stroke="rgba(182, 197, 224, 0.55)"
-                  strokeWidth={1}
-                  strokeDasharray="2 2"
-                  fill="none"
-                />
-              ))}
+            {/* Position Template Crisp 1px Edges, Entry Line & Dashed Path Line */}
+            {positionTemplates.map((pt) => {
+              const edgeDash = pt.isPending ? "4 4" : undefined;
+              const rightX = pt.leftX + pt.fullWidthPx;
+              return (
+                <g key={`lines-${pt.id}`} opacity={pt.opacityScale}>
+                  {/* Thin Gray Entry Line across full zone */}
+                  <line
+                    x1={pt.leftX}
+                    y1={pt.entryY}
+                    x2={rightX}
+                    y2={pt.entryY}
+                    stroke={CHART_TV_LIGHT_THEME.position.entryLine}
+                    strokeWidth={1}
+                    strokeDasharray={edgeDash}
+                  />
+
+                  {/* Subtle 1px Outer TP Edge */}
+                  {pt.tpOuterY !== null && (
+                    <line
+                      x1={pt.leftX}
+                      y1={pt.tpOuterY}
+                      x2={rightX}
+                      y2={pt.tpOuterY}
+                      stroke={CHART_TV_LIGHT_THEME.position.tpEdge}
+                      strokeWidth={1}
+                      strokeDasharray={edgeDash}
+                    />
+                  )}
+
+                  {/* Thin Dashed Inner TP1 Line (when TP1 & TP2 both exist, no text) */}
+                  {pt.tp1InnerY !== null && (
+                    <line
+                      x1={pt.leftX}
+                      y1={pt.tp1InnerY}
+                      x2={rightX}
+                      y2={pt.tp1InnerY}
+                      stroke={CHART_TV_LIGHT_THEME.position.tp1InnerDashed}
+                      strokeWidth={1}
+                      strokeDasharray="4 4"
+                    />
+                  )}
+
+                  {/* Subtle 1px Outer SL Edge */}
+                  {pt.slY !== null && (
+                    <line
+                      x1={pt.leftX}
+                      y1={pt.slY}
+                      x2={rightX}
+                      y2={pt.slY}
+                      stroke={CHART_TV_LIGHT_THEME.position.slEdge}
+                      strokeWidth={1}
+                      strokeDasharray={edgeDash}
+                    />
+                  )}
+
+                  {/* Thin Gray Dashed Path Line from Entry to Exit/Current */}
+                  <line
+                    x1={pt.pathStartX}
+                    y1={pt.pathStartY}
+                    x2={pt.pathEndX}
+                    y2={pt.pathEndY}
+                    stroke={CHART_TV_LIGHT_THEME.position.pathDashedLine}
+                    strokeWidth={1}
+                    strokeDasharray="4 4"
+                  />
+                </g>
+              );
+            })}
           </svg>
 
-          {/* Structure Break Annotations (MSS / CHoCH / BOS only — zero trade pins) */}
-          {annotationPins.map((pin) => (
-            <div
-              key={pin.id}
-              title={`${pin.label} · ${pin.detail}`}
-              style={{
-                left: `${pin.x}px`,
-                top: `${Math.max(8, pin.y - 11)}px`,
-              }}
-              className={`absolute z-30 pointer-events-auto px-2 py-0.5 rounded-lg border text-[10px] font-mono leading-tight shadow-sm whitespace-nowrap ${
-                pinToneClasses[pin.tone]
-              }`}
-            >
-              <div className="font-bold flex items-center space-x-1">
-                <Target className="w-2.5 h-2.5 shrink-0" />
-                <span>{pin.label}</span>
-                <span className="text-[9px] opacity-80">{pin.detail}</span>
-              </div>
-            </div>
-          ))}
+          {/* FVG & OB Text INSIDE Boxes ("FVG" / "OB" only, dark regular weight, vertically centered near right end) */}
+          {fvgObBoxes
+            .filter((box) => box.showText)
+            .map((box) => (
+              <span
+                key={`txt-${box.id}`}
+                data-testid={`tv-box-label-${box.text.toLowerCase()}`}
+                style={{
+                  position: "absolute",
+                  left: `${box.labelLeftX}px`,
+                  top: `${box.topY + box.heightPx / 2}px`,
+                  transform: "translateY(-50%)",
+                  color: CHART_TV_LIGHT_THEME.typography.labelColor,
+                  fontFamily: CHART_TV_LIGHT_THEME.typography.fontFamily,
+                  fontSize: CHART_TV_LIGHT_THEME.typography.boxLabelSize,
+                  fontWeight: 500,
+                  lineHeight: 1,
+                }}
+              >
+                {box.text}
+              </span>
+            ))}
 
-          {/* Collision-Aware Right-Aligned Level Labels (Liquidity layer only — zero trade labels) */}
-          {resolvedLabels.map((lbl) => (
-            <div
-              key={lbl.id}
-              data-testid={`chart-level-label-${lbl.tone}`}
-              title={`${lbl.label}${lbl.sublabel ? ` (${lbl.sublabel})` : ""}`}
+          {/* Position Template Labels ("LONG POSITION" below SL side / "SHORT POSITION" above SL side) */}
+          {positionTemplates.map((pt) => (
+            <span
+              key={`lbl-${pt.id}`}
+              data-testid={`tv-pos-label-${pt.direction.toLowerCase()}`}
               style={{
-                top: `${lbl.resolvedY - 10}px`,
-                right: "6px",
+                position: "absolute",
+                left: `${pt.labelX}px`,
+                top: `${pt.labelY}px`,
+                color: CHART_TV_LIGHT_THEME.typography.labelColor,
+                fontFamily: CHART_TV_LIGHT_THEME.typography.fontFamily,
+                fontSize: CHART_TV_LIGHT_THEME.typography.positionLabelSize,
+                fontWeight: 700,
+                letterSpacing: "0.02em",
+                lineHeight: 1,
+                opacity: pt.opacityScale,
               }}
-              className={`absolute z-30 pointer-events-auto px-2 py-0.5 rounded-full border text-[10px] font-mono leading-none flex items-center space-x-1 whitespace-nowrap ${
-                labelToneClasses[lbl.tone] || ""
-              }`}
             >
-              <span className="font-bold">{lbl.label}</span>
-              {lbl.sublabel && (
-                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-black/35 text-[#F4F7FF]">
-                  {lbl.sublabel}
-                </span>
-              )}
-            </div>
+              {pt.labelText}
+            </span>
           ))}
-
-          {/* Compact Bottom-Left Drawing Layer Legend */}
-          <div className="absolute left-2.5 bottom-2 z-30 flex flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#091426]/85 border border-[rgba(186,214,255,0.14)] text-[9px] font-mono text-[#B6C5E0]">
-            <span className="inline-flex items-center space-x-1">
-              <span className="w-2 h-2 rounded-full bg-[#B0F648]" />
-              <span>TP/Bull</span>
-            </span>
-            <span className="inline-flex items-center space-x-1">
-              <span className="w-2 h-2 rounded-full bg-[#FF5A6E]" />
-              <span>SL/Risk</span>
-            </span>
-            <span className="inline-flex items-center space-x-1">
-              <span className="w-2 h-2 rounded-full bg-[#5EEAD4]" />
-              <span>FVG</span>
-            </span>
-            <span className="inline-flex items-center space-x-1">
-              <span className="w-2 h-2 rounded-full bg-[#C077FA]" />
-              <span>MSS/EQH</span>
-            </span>
-          </div>
         </div>
       </div>
     </section>
