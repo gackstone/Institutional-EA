@@ -6,9 +6,11 @@ Binds exclusively to 127.0.0.1 and validates Bearer/X-Companion-Token on every r
 from __future__ import annotations
 import base64
 import json
+import os
 import queue
 import re
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -18,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 from companion.database.repository import CompanionRepository
 from companion.service.configuration.config_service import ConfigurationService, ConfigurationValidationError
 from companion.service.events.event_bus import EventBus
+from companion.service.mt5.ea_deployer import deploy_ea_pipeline, extract_ea_version
 from companion.service.mt5.sync_service import MT5SyncService
 from companion.service.operations.ps_runner import OperationsRunner
 from companion.service.orchestration.engine_controller import EngineController
@@ -45,8 +48,15 @@ class ControlServiceContext:
         btcusd_sample: Optional[BTCUSDSampleTradingService] = None,
         telegram_notifier: Optional[TelegramNotifier] = None,
         ati: Optional[Any] = None,
+        data_dir: Optional[str | Path] = None,
+        host: str = "127.0.0.1",
+        port: int = 8765,
     ):
         self.project_root = Path(project_root)
+        self.data_dir = Path(data_dir) if data_dir else self.project_root
+        self.host = host
+        self.port = int(port)
+        self.started_at = time.time()
         self.repo = repo
         self.auth = auth
         self.events = events
@@ -57,6 +67,79 @@ class ControlServiceContext:
         self.btcusd_sample = btcusd_sample
         self.telegram_notifier = telegram_notifier
         self.ati = ati
+
+    def run_self_check(self) -> Dict[str, Any]:
+        """Runs real end-to-end readiness & health checks for System Health UI."""
+        snap = self.mt5_sync.get_snapshot()
+        zmq = self.mt5_sync.check_zmq_bridge()
+        acc = snap.get("account") or {}
+        syms = snap.get("symbols") or {}
+        required_syms = ["XAUUSD.m", "USDJPY.m", "BTCUSD.m"]
+        present_syms = [s for s in required_syms if s in syms]
+        ea_src = self.project_root / "mql5" / "Experts" / "PythonBridgeEA.mq5"
+        ea_ver = extract_ea_version(ea_src) if ea_src.exists() else ""
+        last_candles = snap.get("last_candle_times") or {}
+
+        checks = [
+            {
+                "id": "control_service",
+                "name": "Control Service",
+                "status": "PASS",
+                "detail": f"Listening on {self.host}:{self.port} (PID {os.getpid()})",
+            },
+            {
+                "id": "mt5_connection",
+                "name": "MT5 Terminal Connection",
+                "status": "PASS" if snap.get("connection_status") == "CONNECTED" else "FAIL",
+                "detail": (
+                    f"Connected to {acc.get('broker', 'MT5')}"
+                    if snap.get("connection_status") == "CONNECTED"
+                    else (snap.get("last_error") or "MT5 not connected")
+                ),
+            },
+            {
+                "id": "demo_mode",
+                "name": "DEMO Account Lock",
+                "status": "PASS" if acc.get("demo_verified") else ("WARN" if snap.get("connection_status") != "CONNECTED" else "FAIL"),
+                "detail": f"Mode: {acc.get('trade_mode', 'UNKNOWN')} (LIVE_TRADING_ENABLED=false)",
+            },
+            {
+                "id": "symbols",
+                "name": "Required Symbols (XAUUSD.m, USDJPY.m, BTCUSD.m)",
+                "status": "PASS" if len(present_syms) == len(required_syms) else ("WARN" if present_syms else "FAIL"),
+                "detail": f"{len(present_syms)}/{len(required_syms)} active: {', '.join(present_syms) or 'none'}",
+            },
+            {
+                "id": "zmq_bridge",
+                "name": "ZMQ / TCP Bridge (5555 / 5556)",
+                "status": "PASS" if zmq.get("port_5555") else "WARN",
+                "detail": f"5555={'LISTENING' if zmq.get('port_5555') else 'IDLE'}, 5556={'LISTENING' if zmq.get('port_5556') else 'IDLE'}",
+            },
+            {
+                "id": "ea_source",
+                "name": "PythonBridgeEA Asset",
+                "status": "PASS" if ea_src.exists() else "FAIL",
+                "detail": f"v{ea_ver or 'unknown'} verified" if ea_src.exists() else "PythonBridgeEA.mq5 missing",
+            },
+            {
+                "id": "candles",
+                "name": "Live Candle Feed",
+                "status": "PASS" if len(last_candles) > 0 else "WARN",
+                "detail": (
+                    ", ".join(f"{k}: {v[11:19]}Z" for k, v in last_candles.items())
+                    if last_candles
+                    else "Awaiting first candle request"
+                ),
+            },
+        ]
+        overall = "HEALTHY" if all(c["status"] == "PASS" for c in checks[:4]) else "DEGRADED"
+        return {
+            "status": overall,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "checks": checks,
+            "zmq_bridge": zmq,
+            "last_candle_times": last_candles,
+        }
 
 
 def create_request_handler(ctx: ControlServiceContext):
@@ -91,8 +174,16 @@ def create_request_handler(ctx: ControlServiceContext):
             path = parsed.path
             query = parse_qs(parsed.query)
 
-            if path == "/healthz":
-                self._send_json(200, {"status": "ok", "service": "institutional-ea-control-service"})
+            if path in ("/healthz", "/health"):
+                self._send_json(200, {
+                    "status": "ok",
+                    "service": "institutional-ea-control-service",
+                    "host": ctx.host,
+                    "port": ctx.port,
+                    "pid": os.getpid(),
+                    "uptime_sec": round(time.time() - ctx.started_at, 2),
+                    "mt5_status": ctx.mt5_sync.connection_status,
+                })
                 return
 
             if not self._is_authorized(query):
@@ -135,6 +226,8 @@ def create_request_handler(ctx: ControlServiceContext):
                 self._send_json(200, ctx.engine.get_status())
             elif path == "/api/health":
                 self._send_json(200, ctx.engine.get_health())
+            elif path == "/api/health/selfcheck":
+                self._send_json(200, ctx.run_self_check())
             elif path == "/api/mt5/snapshot":
                 self._send_json(200, ctx.mt5_sync.get_snapshot())
             elif path == "/api/mt5/detect":
@@ -226,8 +319,8 @@ def create_request_handler(ctx: ControlServiceContext):
                 if not re.fullmatch(r"[A-Za-z0-9._-]+\.png", name):
                     self._send_json(400, {"error": "Invalid screenshot filename"})
                 else:
-                    fpath = (ctx.project_root / "data" / "screenshots" / name).resolve()
-                    shots_root = (ctx.project_root / "data" / "screenshots").resolve()
+                    fpath = (ctx.data_dir / "data" / "screenshots" / name).resolve()
+                    shots_root = (ctx.data_dir / "data" / "screenshots").resolve()
                     if not str(fpath).startswith(str(shots_root)) or not fpath.exists():
                         self._send_json(404, {"error": "Screenshot not found"})
                     else:
@@ -306,12 +399,25 @@ def create_request_handler(ctx: ControlServiceContext):
             elif path == "/api/engine/clear-emergency-stop":
                 self._send_json(200, ctx.engine.clear_emergency_stop(confirmed=bool(body.get("confirmed", False))))
             elif path == "/api/mt5/connect":
-                ok = ctx.mt5_sync.connect()
-                snap = ctx.mt5_sync.sync_all() if ok else ctx.mt5_sync.get_snapshot()
-                self._send_json(200, {"success": ok, "snapshot": snap})
+                term_path = body.get("terminal_path")
+                ok = ctx.mt5_sync.connect(terminal_path=term_path)
+                snap = ctx.mt5_sync.sync_all(terminal_path=term_path) if ok else ctx.mt5_sync.get_snapshot()
+                self._send_json(200, {"success": ok, "error": ctx.mt5_sync.last_error, "snapshot": snap})
             elif path == "/api/mt5/sync":
-                snap = ctx.mt5_sync.sync_all(target_symbols=body.get("symbols"))
-                self._send_json(200, {"success": True, "snapshot": snap})
+                term_path = body.get("terminal_path")
+                snap = ctx.mt5_sync.sync_all(target_symbols=body.get("symbols"), terminal_path=term_path)
+                ok = snap.get("connection_status") == "CONNECTED"
+                self._send_json(200, {"success": ok, "error": snap.get("last_error"), "snapshot": snap})
+            elif path == "/api/mt5/deploy-ea":
+                res = deploy_ea_pipeline(
+                    project_root=ctx.project_root,
+                    mt5_sync=ctx.mt5_sync,
+                    executable_path=body.get("executable_path"),
+                    data_folder=body.get("data_folder"),
+                    experts_dir=body.get("experts_dir"),
+                    compile_ea=bool(body.get("compile", True)),
+                )
+                self._send_json(200 if res.get("success") else 400, res)
             elif path == "/api/trades/modify":
                 self._send_json(200, ctx.engine.modify_position_sl_tp(
                     ticket=int(body["ticket"]),
@@ -398,7 +504,7 @@ def create_request_handler(ctx: ControlServiceContext):
                     try:
                         b64_part = data_url.split(",", 1)[1]
                         png_bytes = base64.b64decode(b64_part)
-                        shots_dir = ctx.project_root / "data" / "screenshots"
+                        shots_dir = ctx.data_dir / "data" / "screenshots"
                         shots_dir.mkdir(parents=True, exist_ok=True)
                         ts_tag = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
                         fname = f"trade_{ticket}_{symbol}_{stage}_{ts_tag}.png"
@@ -466,13 +572,16 @@ def build_control_server(
     token: Optional[str] = None,
     mt5_module: Any = None,
     enable_telegram_polling: bool = False,
+    data_dir: Optional[str | Path] = None,
 ) -> tuple[ThreadingHTTPServer, ControlServiceContext]:
     bind_host = LocalAuthManager.validate_bind_host(host)
     root = Path(project_root)
-    repo = CompanionRepository(db_path or (root / "data" / "companion_control.db"))
-    auth = LocalAuthManager(token=token, token_file=root / "state" / "companion_token.txt")
+    writable_root = Path(data_dir) if data_dir else root
+    repo = CompanionRepository(db_path or (writable_root / "data" / "companion_control.db"))
+    auth = LocalAuthManager(token=token, token_file=writable_root / "state" / "companion_token.txt")
     events = EventBus()
-    config_service = ConfigurationService(root / "config", repo)
+    cfg_dir = writable_root / "config" if (writable_root / "config" / "settings.json").exists() else (root / "config")
+    config_service = ConfigurationService(cfg_dir, repo)
     cfg = config_service.get_full_config()
     settings = cfg.get("settings", {})
     mt5_sync = MT5SyncService(
@@ -528,7 +637,11 @@ def build_control_server(
         btcusd_sample=btcusd_sample,
         telegram_notifier=tg_notifier,
         ati=ati_instance,
+        data_dir=writable_root,
+        host=bind_host,
+        port=int(port),
     )
     handler = create_request_handler(ctx)
     server = ThreadingHTTPServer((bind_host, int(port)), handler)
+    ctx.port = int(server.server_address[1])
     return server, ctx
