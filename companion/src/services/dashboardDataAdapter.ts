@@ -46,6 +46,10 @@ export interface ChartTradeOverlay {
   ownership: "BOT_OWN" | "MANUAL" | "OTHER_EA";
   protected: boolean;
   strategyTag: string;
+  exitTime?: number;
+  exitPrice?: number;
+  isClosed?: boolean;
+  isPendingSignal?: boolean;
 }
 
 export interface LiquidityLevelOverlay {
