@@ -1,16 +1,13 @@
 import {
-  ControlErrorEvent,
   ControlLogEntry,
   ControlPosition,
   ControlStatusPayload,
   ControlSymbolSpec,
   OperatingMode,
-  RiskDecisionRecord,
   TradeHistoryRecord,
 } from "../types";
 import {
   calculateTradeMetrics,
-  computeScheduleAndSession,
   maskAccountNumber,
   normalizeCanonicalSymbol,
   snapTimestampToCandle,
@@ -125,77 +122,11 @@ export interface SymbolChartBundle {
   sessions: SessionMarkerOverlay[];
 }
 
-export interface TradeTimelineEvent {
-  id: string;
-  timestamp: string;
-  symbol: ChartSymbol;
-  ticket: number;
-  stage: "SIGNAL" | "RISK_GATE" | "ORDER_FILLED" | "BE_MOVED" | "PARTIAL_TP1" | "TRAIL_SL" | "CLOSED";
-  title: string;
-  detail: string;
-  rMultiple?: string;
-  tone: "emerald" | "sky" | "amber" | "rose" | "slate";
-}
-
-export interface RiskProfileSpec {
-  profile: "DEMO" | "LIVE" | "PROP";
-  active: boolean;
-  locked?: boolean;
-  riskPerTradePct: number;
-  dailyLossLimitPct: number;
-  maxTotalDrawdownPct: number;
-  maxOpenPositions: number;
-  portfolioRiskCapPct: number;
-}
-
-export interface InverseCoordinationTelemetry {
-  rollingCorrelation60m: number;
-  goldBias: "BULLISH" | "BEARISH" | "NEUTRAL";
-  usdjpyBias: "BULLISH" | "BEARISH" | "NEUTRAL";
-  dxyProxyZScore: number;
-  coherenceState: "ALIGNED_INVERSE" | "DIVERGENT_CAUTION" | "DECOUPLED";
-  hedgeGateStatus: "APPROVED" | "THROTTLED_50PCT" | "CONFLICT_BLOCKED";
-  note: string;
-}
-
-export interface SystemHealthExtendedTelemetry {
-  eaHeartbeatAgeMs: number;
-  eaHeartbeatStatus: "OK" | "WARN" | "STALE";
-  bridgeZmqPorts: { pullPort: number; pubPort: number; bound: boolean };
-  outboundQueueDepth: number;
-  cusumDecayScore: number;
-  cusumThreshold: number;
-  psiFeatureDrift: number;
-  psiThreshold: number;
-  tcaAvgSlippageBps: number;
-  tcaFillLatencyMs: number;
-  activeErrorCount: number;
-  warmupBarsLoaded: number;
-  warmupBarsRequired: number;
-}
-
-export interface ManualAdoptionCandidate {
-  ticket: number;
-  symbol: ChartSymbol;
-  direction: TradeDirection;
-  volume: number;
-  openPrice: number;
-  currentPrice: number;
-  sl: number;
-  tp: number;
-  profit: number;
-  adoptedByGuard: boolean;
-  suggestedProtectiveSl: number;
-  suggestedTp1: number;
-  statusNote: string;
-}
-
 export interface NormalizedDashboardData {
   status: ControlStatusPayload;
   maskedAccount: string;
   executionMode: "DEMO";
   liveTradingEnabled: false;
-  scheduleInfo: ReturnType<typeof computeScheduleAndSession>;
   kpis: {
     balance: number;
     equity: number;
@@ -209,18 +140,9 @@ export interface NormalizedDashboardData {
     totalDrawdownUsedPct: number;
     totalDrawdownCapPct: number;
     botPositionsCount: number;
-    manualPositionsCount: number;
-    otherEaPositionsCount: number;
     pendingOrdersCount: number;
   };
-  riskProfiles: RiskProfileSpec[];
-  inverseCoordination: InverseCoordinationTelemetry;
-  healthExtended: SystemHealthExtendedTelemetry;
-  timelineEvents: TradeTimelineEvent[];
-  manualAdoptionQueue: ManualAdoptionCandidate[];
   recentTrades: TradeHistoryRecord[];
-  riskDecisions: RiskDecisionRecord[];
-  activeErrors: ControlErrorEvent[];
 }
 
 const TIMEFRAME_SECONDS: Record<ChartTimeframe, number> = {
@@ -819,11 +741,8 @@ function buildFallbackChartTrades(
 export function buildNormalizedDashboardData(
   rawStatus: ControlStatusPayload | null,
   rawTrades: TradeHistoryRecord[],
-  rawDecisions: RiskDecisionRecord[],
-  rawErrors: ControlErrorEvent[],
   now: Date = new Date()
 ): NormalizedDashboardData {
-  const scheduleInfo = computeScheduleAndSession(now);
 
   // Normalize or construct DEMO fallback ControlStatusPayload
   // // TODO(real-data): When Control Service is offline in browser preview, fallback status provides typed DEMO telemetry.
@@ -1050,7 +969,7 @@ export function buildNormalizedDashboardData(
         db_path: "state/companion_control.db",
         schema_version: 3,
       },
-      active_error_count: rawErrors.filter((e) => e.status === "ACTIVE").length,
+      active_error_count: rawStatus?.health?.active_error_count ?? 0,
       stop_flag_active: stopFlagActive,
       pause_flag_active: pauseFlagActive,
       mt5_connected: true,
@@ -1149,175 +1068,11 @@ export function buildNormalizedDashboardData(
   const totalDrawdownCapPct = 8.0;
   const totalDrawdownUsedPct = 0.62;
 
-  // Risk Manager Profile Table (DEMO / LIVE / PROP)
-  const riskProfiles: RiskProfileSpec[] = [
-    {
-      profile: "DEMO",
-      active: true,
-      locked: false,
-      riskPerTradePct: 0.5,
-      dailyLossLimitPct: 3.0,
-      maxTotalDrawdownPct: 8.0,
-      maxOpenPositions: 5,
-      portfolioRiskCapPct: 6.0,
-    },
-    {
-      profile: "PROP",
-      active: false,
-      locked: false,
-      riskPerTradePct: 0.25,
-      dailyLossLimitPct: 2.0,
-      maxTotalDrawdownPct: 4.0,
-      maxOpenPositions: 3,
-      portfolioRiskCapPct: 2.5,
-    },
-    {
-      profile: "LIVE",
-      active: false,
-      locked: true, // Hard-locked per safety rule #2 (LIVE_TRADING_ENABLED=false)
-      riskPerTradePct: 0.35,
-      dailyLossLimitPct: 2.0,
-      maxTotalDrawdownPct: 5.0,
-      maxOpenPositions: 3,
-      portfolioRiskCapPct: 3.0,
-    },
-  ];
-
-  // // TODO(real-data): Wire Gold-USDJPY rolling correlation & DXY proxy z-score from PortfolioRiskEngine telemetry.
-  const inverseCoordination: InverseCoordinationTelemetry = {
-    rollingCorrelation60m: -0.84,
-    goldBias: "BULLISH",
-    usdjpyBias: "BEARISH",
-    dxyProxyZScore: -1.42,
-    coherenceState: "ALIGNED_INVERSE",
-    hedgeGateStatus: "APPROVED",
-    note: "XAUUSD Long + USDJPY Short aligns with USD weakness (-0.84 60m r). No directional double-exposure.",
-  };
-
-  // // TODO(real-data): Wire CUSUM/PSI/TCA metrics from engine monitoring state/health payload.
-  const lastHbMs = status.engine.last_heartbeat
-    ? Math.max(120, Math.min(2400, now.getTime() - new Date(status.engine.last_heartbeat).getTime()))
-    : 340;
-  const healthExtended: SystemHealthExtendedTelemetry = {
-    eaHeartbeatAgeMs: Math.min(lastHbMs, 950),
-    eaHeartbeatStatus: lastHbMs < 5000 ? "OK" : lastHbMs < 15000 ? "WARN" : "STALE",
-    bridgeZmqPorts: { pullPort: 5555, pubPort: 5556, bound: status.engine.bridge_running },
-    outboundQueueDepth: 0,
-    cusumDecayScore: 0.18,
-    cusumThreshold: 1.25,
-    psiFeatureDrift: 0.06,
-    psiThreshold: 0.2,
-    tcaAvgSlippageBps: 0.42,
-    tcaFillLatencyMs: 38,
-    activeErrorCount: status.health.active_error_count,
-    warmupBarsLoaded: 500,
-    warmupBarsRequired: 500,
-  };
-
-  // Live Trade Timeline
-  const timelineEvents: TradeTimelineEvent[] = [
-    {
-      id: "tl-1",
-      timestamp: new Date(now.getTime() - 2 * 60000).toISOString(),
-      symbol: "XAUUSD",
-      ticket: 88412091,
-      stage: "PARTIAL_TP1",
-      title: "XAUUSD #88412091 Partial Close 50% @ TP1",
-      detail: "Closed 0.12 lots at 2668.10; locked +1.25R realized, remainder trailing to TP2 (2676.00).",
-      rMultiple: "+1.25R",
-      tone: "emerald",
-    },
-    {
-      id: "tl-2",
-      timestamp: new Date(now.getTime() - 6 * 60000).toISOString(),
-      symbol: "XAUUSD",
-      ticket: 88412091,
-      stage: "BE_MOVED",
-      title: "XAUUSD #88412091 Stop Loss Tightened to Break-Even+",
-      detail: "Tighten-only SL policy moved stop 2658.00 → 2663.20 (+0.15R lock). Ghost initial SL retained.",
-      rMultiple: "+0.15R Lock",
-      tone: "sky",
-    },
-    {
-      id: "tl-3",
-      timestamp: new Date(now.getTime() - 14 * 60000).toISOString(),
-      symbol: "USDJPY",
-      ticket: 88412094,
-      stage: "ORDER_FILLED",
-      title: "USDJPY #88412094 SELL 0.20L Filled @ 154.580",
-      detail: "Inverse Gold coordination approved (-0.84 corr). SL 154.540 (BE+ trailed) / TP2 153.950.",
-      rMultiple: "+1.08R Float",
-      tone: "emerald",
-    },
-    {
-      id: "tl-4",
-      timestamp: new Date(now.getTime() - 23 * 60000).toISOString(),
-      symbol: "BTCUSD",
-      ticket: 88412105,
-      stage: "RISK_GATE",
-      title: "PortfolioRiskEngine Authorized BTCUSD BUY 0.10L",
-      detail: "Score 90/100 · Risk 0.35% ($89.18) · Available portfolio capacity 4.85%.",
-      rMultiple: "0.35% Risk",
-      tone: "amber",
-    },
-    {
-      id: "tl-5",
-      timestamp: new Date(now.getTime() - 48 * 60000).toISOString(),
-      symbol: "BTCUSD",
-      ticket: 88412041,
-      stage: "CLOSED",
-      title: "BTCUSD #88412041 Closed at Protective Stop Loss",
-      detail: "Initial stop 90710.00 respected with zero slippage widening.",
-      rMultiple: "-1.00R",
-      tone: "rose",
-    },
-  ];
-
-  // Manual Position Adoption Queue
-  const manualPositions = positions.filter((p) => p.ownership === "MANUAL");
-  const manualAdoptionQueue: ManualAdoptionCandidate[] =
-    manualPositions.length > 0
-      ? manualPositions.map((mp) => {
-          const sym: ChartSymbol = mp.symbol.includes("JPY")
-            ? "USDJPY"
-            : mp.symbol.includes("BTC")
-            ? "BTCUSD"
-            : "XAUUSD";
-          const dir: TradeDirection = mp.direction === "SELL" ? "SELL" : "BUY";
-          const offset = sym === "BTCUSD" ? 280 : sym === "USDJPY" ? 0.22 : 4.2;
-          return {
-            ticket: mp.ticket,
-            symbol: sym,
-            direction: dir,
-            volume: mp.volume,
-            openPrice: mp.open_price,
-            currentPrice: mp.current_price,
-            sl: mp.sl,
-            tp: mp.tp,
-            profit: mp.profit,
-            adoptedByGuard: mp.protected && mp.sl > 0,
-            suggestedProtectiveSl: Number(
-              (dir === "BUY" ? mp.open_price - offset : mp.open_price + offset).toFixed(sym === "USDJPY" ? 3 : 2)
-            ),
-            suggestedTp1: Number(
-              (dir === "BUY" ? mp.open_price + offset * 1.5 : mp.open_price - offset * 1.5).toFixed(
-                sym === "USDJPY" ? 3 : 2
-              )
-            ),
-            statusNote:
-              mp.sl > 0
-                ? "Adopted by DEMO_MANUAL_ASSIST Guard (Tighten-Only SL Active)"
-                : "Unprotected Manual Trade — Click Adopt & Protect SL",
-          };
-        })
-      : [];
-
   return {
     status,
     maskedAccount: maskAccountNumber(status.mt5.account.account_number),
     executionMode: "DEMO",
     liveTradingEnabled: false,
-    scheduleInfo,
     kpis: {
       balance,
       equity,
@@ -1331,18 +1086,9 @@ export function buildNormalizedDashboardData(
       totalDrawdownUsedPct,
       totalDrawdownCapPct,
       botPositionsCount: status.mt5.reconciliation.bot_owned_count,
-      manualPositionsCount: status.mt5.reconciliation.manual_count,
-      otherEaPositionsCount: status.mt5.reconciliation.other_ea_count,
       pendingOrdersCount: pendingOrders.length,
     },
-    riskProfiles,
-    inverseCoordination,
-    healthExtended,
-    timelineEvents,
-    manualAdoptionQueue,
     recentTrades,
-    riskDecisions: rawDecisions,
-    activeErrors: rawErrors,
   };
 }
 
