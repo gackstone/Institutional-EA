@@ -8,10 +8,45 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
-        mono: ['ui-monospace', '"SFMono-Regular"', '"Cascadia Mono"', 'Menlo', 'Consolas', 'monospace'],
+        sans: [
+          '"Plus Jakarta Sans Variable"',
+          '"Plus Jakarta Sans"',
+          'Inter',
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"Segoe UI"',
+          'Roboto',
+          'sans-serif',
+        ],
+        mono: [
+          '"JetBrains Mono Variable"',
+          '"JetBrains Mono"',
+          'ui-monospace',
+          '"SFMono-Regular"',
+          '"Cascadia Mono"',
+          'Menlo',
+          'Consolas',
+          'monospace',
+        ],
       },
       colors: {
+        "iea": {
+          canvas: "var(--iea-bg-canvas)",
+          navy: "var(--iea-bg-navy-top)",
+          royal: "var(--iea-bg-royal-glow)",
+          horizon: "var(--iea-bg-horizon-glow)",
+          lime: "var(--iea-accent-lime)",
+          limeSoft: "var(--iea-accent-lime-soft)",
+          limeBright: "var(--iea-accent-lime-bright)",
+          violet: "var(--iea-accent-violet)",
+          cyan: "var(--iea-accent-cyan)",
+          danger: "var(--iea-danger)",
+          warning: "var(--iea-warning)",
+          textPrimary: "var(--iea-text-primary)",
+          textSecondary: "var(--iea-text-secondary)",
+          textMuted: "var(--iea-text-muted)",
+        },
         "institutional-ea": {
           bg: "var(--institutional-ea-bg)",
           card: "var(--institutional-ea-card)",
@@ -37,9 +72,10 @@ export default {
         }
       },
       boxShadow: {
-        'card': '0 1px 3px 0 rgba(16, 42, 42, 0.04), 0 1px 2px -1px rgba(16, 42, 42, 0.03)',
-        'pop': '0 10px 25px -5px rgba(16, 42, 42, 0.08), 0 8px 10px -6px rgba(16, 42, 42, 0.04)',
-        'xs': '0 1px 2px rgba(19, 23, 34, 0.04)',
+        'card': '0 18px 42px -12px rgba(4, 10, 24, 0.65), inset 0 1px 0 0 rgba(255, 255, 255, 0.12)',
+        'pop': '0 24px 54px -12px rgba(4, 10, 24, 0.78), inset 0 1px 0 0 rgba(255, 255, 255, 0.16)',
+        'lime-glow': '0 0 18px rgba(176, 246, 72, 0.35)',
+        'xs': '0 2px 8px rgba(4, 10, 24, 0.35)',
       }
     },
   },

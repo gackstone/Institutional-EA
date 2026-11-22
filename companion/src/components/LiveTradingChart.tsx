@@ -14,6 +14,7 @@ import {
   Eye,
   Layers,
   Maximize2,
+  Minimize2,
   Radio,
   ShieldCheck,
   Target,
@@ -31,6 +32,7 @@ import {
   ResolvedPriceLabelItem,
   resolveLabelCollisions,
 } from "../utils/tradeChartMath";
+import { DESIGN_TOKENS, getSymbolChipSpec } from "../styles/designTokens";
 
 export interface OverlayTogglesState {
   liquidity: boolean;
@@ -107,6 +109,8 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     tradeLabels: true,
   });
 
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
   const [chartDims, setChartDims] = useState<{ width: number; height: number }>({
     width: 760,
     height: 440,
@@ -122,6 +126,19 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
   };
 
   const primaryTrade = bundle.trades[0] || null;
+  const activeSymbolChip = getSymbolChipSpec(selectedSymbol);
+
+  // Close fullscreen on Escape key
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isFullscreen]);
 
   // Compute pixel coordinates for zones, lines, annotations, and collision-free labels
   const recomputeOverlayGeometry = useCallback(() => {
@@ -175,7 +192,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             leftX: left,
             widthPx: right - left,
             label: sess.label,
-            color: sess.color,
+            color:
+              sess.session === "LONDON"
+                ? "rgba(47, 73, 124, 0.20)"
+                : "rgba(176, 246, 72, 0.08)",
           });
         }
       }
@@ -219,7 +239,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             y,
             price: liq.price,
             style: liq.swept ? "dotted" : "dashed",
-            color: liq.side === "HIGH" ? "rgba(251, 191, 36, 0.55)" : "rgba(56, 189, 248, 0.55)",
+            color: liq.side === "HIGH" ? "rgba(194, 240, 118, 0.55)" : "rgba(94, 234, 212, 0.55)",
             startX: 16,
           });
           rawLabels.push({
@@ -310,7 +330,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             y: entryY,
             price: trade.entryPrice,
             style: "solid",
-            color: trade.direction === "BUY" ? "#38bdf8" : "#f43f5e",
+            color: trade.direction === "BUY" ? "#5EEAD4" : "#C077FA",
             startX: entryStartX,
           });
           rawLabels.push({
@@ -331,7 +351,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             y: slY,
             price: trade.stopLoss,
             style: "solid",
-            color: "#ef4444",
+            color: "#FF5A6E",
             startX: entryStartX,
           });
           const isBeOrPositive =
@@ -357,7 +377,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               y: ghostY,
               price: zones.ghostInitialSlPrice,
               style: "dashed",
-              color: "rgba(248, 113, 113, 0.45)",
+              color: "rgba(255, 90, 110, 0.45)",
               startX: entryStartX,
             });
             rawLabels.push({
@@ -371,7 +391,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
           }
         }
 
-        // TP1 Line & Badge (Green)
+        // TP1 Line & Badge (Neon Lime)
         if (trade.tp1 > 0) {
           const tp1Y = priceToY(trade.tp1);
           if (tp1Y !== null) {
@@ -380,7 +400,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               y: tp1Y,
               price: trade.tp1,
               style: "dashed",
-              color: "#10b981",
+              color: "#C2F076",
               startX: entryStartX,
             });
             rawLabels.push({
@@ -394,7 +414,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
           }
         }
 
-        // TP2 Line & Badge (Green)
+        // TP2 Line & Badge (Neon Lime)
         if (trade.tp2 > 0) {
           const tp2Y = priceToY(trade.tp2);
           if (tp2Y !== null) {
@@ -403,7 +423,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               y: tp2Y,
               price: trade.tp2,
               style: "solid",
-              color: "#059669",
+              color: "#B0F648",
               startX: entryStartX,
             });
             rawLabels.push({
@@ -484,7 +504,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     setSessionBands(nextSessions);
   }, [bundle, overlays, primaryTrade]);
 
-  // Initialize lightweight-charts instance and ResizeObserver
+  // Initialize lightweight-charts instance and ResizeObserver with the new Navy/Lime theme
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -494,35 +514,35 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       width: Math.max(320, Math.floor(initialRect.width || 760)),
       height: Math.max(260, Math.floor(initialRect.height || 440)),
       layout: {
-        background: { type: ColorType.Solid, color: "#070a0e" },
-        textColor: "#94a3b8",
-        fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace",
+        background: { type: ColorType.Solid, color: DESIGN_TOKENS.colors.chart.background },
+        textColor: DESIGN_TOKENS.colors.chart.axisText,
+        fontFamily: "'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: "rgba(30, 41, 59, 0.45)" },
-        horzLines: { color: "rgba(30, 41, 59, 0.45)" },
+        vertLines: { color: DESIGN_TOKENS.colors.chart.gridLine },
+        horzLines: { color: DESIGN_TOKENS.colors.chart.gridLine },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          color: "rgba(56, 189, 248, 0.45)",
-          labelBackgroundColor: "#0f172a",
+          color: DESIGN_TOKENS.colors.chart.crosshair,
+          labelBackgroundColor: DESIGN_TOKENS.colors.chart.crosshairLabelBg,
         },
         horzLine: {
-          color: "rgba(56, 189, 248, 0.45)",
-          labelBackgroundColor: "#0f172a",
+          color: DESIGN_TOKENS.colors.chart.crosshair,
+          labelBackgroundColor: DESIGN_TOKENS.colors.chart.crosshairLabelBg,
         },
       },
       rightPriceScale: {
-        borderColor: "#1e293b",
+        borderColor: DESIGN_TOKENS.colors.chart.axisBorder,
         scaleMargins: {
           top: 0.08,
           bottom: 0.08,
         },
       },
       timeScale: {
-        borderColor: "#1e293b",
+        borderColor: DESIGN_TOKENS.colors.chart.axisBorder,
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 8,
@@ -531,12 +551,12 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     });
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#10b981",
-      downColor: "#ef4444",
-      borderUpColor: "#10b981",
-      borderDownColor: "#ef4444",
-      wickUpColor: "#34d399",
-      wickDownColor: "#f87171",
+      upColor: DESIGN_TOKENS.colors.chart.upCandle,
+      downColor: DESIGN_TOKENS.colors.chart.downCandle,
+      borderUpColor: DESIGN_TOKENS.colors.chart.upCandle,
+      borderDownColor: DESIGN_TOKENS.colors.chart.downCandle,
+      wickUpColor: DESIGN_TOKENS.colors.chart.upWick,
+      wickDownColor: DESIGN_TOKENS.colors.chart.downWick,
       priceFormat: {
         type: "price",
         precision: bundle.digits,
@@ -575,6 +595,25 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       seriesRef.current = null;
     };
   }, []);
+
+  // Re-trigger resize when toggling fullscreen
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const container = containerRef.current;
+      if (container && chartRef.current) {
+        const rect = container.getBoundingClientRect();
+        if (rect.width > 100 && rect.height > 100) {
+          chartRef.current.applyOptions({
+            width: Math.floor(rect.width),
+            height: Math.floor(rect.height),
+          });
+          chartRef.current.timeScale().fitContent();
+          recomputeOverlayGeometry();
+        }
+      }
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [isFullscreen, recomputeOverlayGeometry]);
 
   // Update candle series data & price precision when symbol/timeframe/bundle updates
   useEffect(() => {
@@ -630,38 +669,35 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     });
   }, [bundle, recomputeOverlayGeometry]);
 
-  const handleFitView = () => {
-    if (chartRef.current) {
-      chartRef.current.timeScale().fitContent();
-      requestAnimationFrame(() => recomputeOverlayGeometry());
-    }
+  const handleToggleFullscreen = () => {
+    setIsFullscreen((prev) => !prev);
   };
 
   const labelToneClasses: Record<ResolvedPriceLabelItem["tone"], string> = useMemo(
     () => ({
-      entry: "bg-sky-950/95 border-sky-400 text-sky-100 shadow-sm",
-      sl: "bg-rose-950/95 border-rose-500 text-rose-100 shadow-sm",
-      ghost_sl: "bg-slate-900/90 border-rose-500/50 border-dashed text-rose-300/90",
-      tp1: "bg-emerald-950/95 border-emerald-400 text-emerald-100 shadow-sm",
-      tp2: "bg-emerald-900/95 border-emerald-300 text-emerald-50 shadow-sm",
-      live: "bg-amber-950/95 border-amber-400 text-amber-100 shadow-md",
-      liquidity: "bg-slate-900/90 border-amber-500/50 text-amber-200",
-      structure: "bg-slate-900/90 border-purple-400/60 text-purple-200",
+      entry: "bg-[#12294D]/95 border-[#5EEAD4] text-[#F4F7FF] shadow-sm",
+      sl: "bg-[#381324]/95 border-[#FF5A6E] text-[#FFD9DF] shadow-sm",
+      ghost_sl: "bg-[#192848]/90 border-[#FF5A6E]/55 border-dashed text-[#FF9AA7]",
+      tp1: "bg-[#1A3528]/95 border-[#C2F076] text-[#E6FFB8] shadow-sm",
+      tp2: "bg-[#1E3F24]/95 border-[#B0F648] text-[#F4F7FF] shadow-[0_0_12px_rgba(176,246,72,0.28)]",
+      live: "bg-[#B0F648] border-[#C2F076] text-[#081321] font-bold shadow-[0_0_16px_rgba(176,246,72,0.45)]",
+      liquidity: "bg-[#14274A]/92 border-[#C2F076]/55 text-[#C2F076]",
+      structure: "bg-[#241B4B]/92 border-[#C077FA]/65 text-[#E5C7FF]",
     }),
     []
   );
 
   const pinToneClasses: Record<ProjectedAnnotationPin["tone"], string> = useMemo(
     () => ({
-      buy: "bg-emerald-950/95 border-emerald-400 text-emerald-200",
-      sell: "bg-rose-950/95 border-rose-400 text-rose-200",
-      be: "bg-sky-950/95 border-sky-400 text-sky-200",
-      partial: "bg-emerald-900/95 border-emerald-300 text-emerald-100",
-      tp: "bg-emerald-900/95 border-emerald-300 text-emerald-100",
-      sl: "bg-rose-950/95 border-rose-400 text-rose-200",
-      closed: "bg-slate-900/95 border-slate-500 text-slate-200",
-      mss: "bg-indigo-950/95 border-indigo-400 text-indigo-200",
-      choch: "bg-purple-950/95 border-purple-400 text-purple-200",
+      buy: "bg-[#193829]/95 border-[#B0F648] text-[#E6FFB8]",
+      sell: "bg-[#381324]/95 border-[#FF5A6E] text-[#FFD9DF]",
+      be: "bg-[#132D4E]/95 border-[#5EEAD4] text-[#C8FFF4]",
+      partial: "bg-[#1E3F24]/95 border-[#B0F648] text-[#F4F7FF]",
+      tp: "bg-[#1E3F24]/95 border-[#B0F648] text-[#F4F7FF]",
+      sl: "bg-[#381324]/95 border-[#FF5A6E] text-[#FFD9DF]",
+      closed: "bg-[#162749]/95 border-[rgba(186,214,255,0.3)] text-[#B6C5E0]",
+      mss: "bg-[#221D4E]/95 border-[#C077FA] text-[#E5C7FF]",
+      choch: "bg-[#2A1D54]/95 border-[#C9ACDA] text-[#F0DEFF]",
     }),
     []
   );
@@ -669,35 +705,57 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
   return (
     <section
       aria-label="Live Institutional Execution Chart"
-      className="flex flex-col h-full min-h-[460px] bg-[#070a0e] border border-slate-800/90 rounded-xl overflow-hidden"
+      data-fullscreen={isFullscreen ? "true" : "false"}
+      className={
+        isFullscreen
+          ? "fixed inset-3 z-50 flex flex-col iea-chart-glass-shell overflow-hidden shadow-2xl"
+          : "flex flex-col h-full min-h-[470px] iea-chart-glass-shell overflow-hidden"
+      }
     >
       {/* Chart Toolbar Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-950/90 border-b border-slate-800/90 shrink-0">
-        {/* Left: Symbol Switcher + Live Quote + Timeframes */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5" role="group" aria-label="Select Chart Symbol">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2.5 bg-[#0D1B36]/85 border-b border-[rgba(186,214,255,0.13)] shrink-0">
+        {/* Left: Symbol Switcher with Circular Coin Chips + Timeframes + Live Quote */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Symbol Selector Pills */}
+          <div
+            className="inline-flex items-center bg-[#091426]/80 border border-[rgba(186,214,255,0.15)] rounded-full p-1 gap-1"
+            role="group"
+            aria-label="Select Chart Symbol"
+          >
             {SYMBOLS.map((sym) => {
               const active = sym === selectedSymbol;
+              const chip = getSymbolChipSpec(sym);
               return (
                 <button
                   key={sym}
                   type="button"
                   onClick={() => onSelectSymbol(sym)}
                   aria-pressed={active}
-                  className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold transition ${
+                  className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold transition-all duration-150 inline-flex items-center space-x-1.5 ${
                     active
-                      ? "bg-sky-600 text-white shadow-xs"
-                      : "text-slate-300 hover:text-white hover:bg-slate-800/70"
+                      ? "bg-[#B0F648] text-[#081321] shadow-[0_0_16px_rgba(176,246,72,0.4)]"
+                      : "text-[#B6C5E0] hover:text-[#F4F7FF] hover:bg-white/5"
                   }`}
                 >
-                  {sym}
+                  <span
+                    className={`w-4 h-4 rounded-full text-[9px] font-extrabold inline-flex items-center justify-center ${
+                      active ? "bg-[#081321] text-[#B0F648]" : chip.chipBg
+                    }`}
+                  >
+                    {chip.shortCode}
+                  </span>
+                  <span>{sym}</span>
                 </button>
               );
             })}
           </div>
 
-          {/* Timeframe Selector */}
-          <div className="inline-flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5" role="group" aria-label="Select Chart Timeframe">
+          {/* Timeframe Selector (Segmented Pill Tabs) */}
+          <div
+            className="inline-flex items-center bg-[#091426]/80 border border-[rgba(186,214,255,0.15)] rounded-full p-1 gap-0.5"
+            role="group"
+            aria-label="Select Chart Timeframe"
+          >
             {TIMEFRAMES.map((tf) => {
               const active = tf === selectedTimeframe;
               return (
@@ -706,10 +764,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                   type="button"
                   onClick={() => onSelectTimeframe(tf)}
                   aria-pressed={active}
-                  className={`px-2 py-1 rounded-md text-[11px] font-mono font-semibold transition ${
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold transition-all duration-150 ${
                     active
-                      ? "bg-slate-700 text-sky-300 border border-sky-500/40"
-                      : "text-slate-400 hover:text-slate-200"
+                      ? "bg-[#223D6A] text-[#B0F648] border border-[#B0F648]/45 shadow-[0_0_10px_rgba(176,246,72,0.18)]"
+                      : "text-[#8496B8] hover:text-[#F4F7FF]"
                   }`}
                 >
                   {tf}
@@ -718,28 +776,33 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             })}
           </div>
 
-          {/* Live Bid/Ask + Spread Ticker */}
-          <div className="hidden xl:flex items-center space-x-2 px-2.5 py-1 bg-slate-900/90 border border-slate-800 rounded-lg font-mono text-xs">
-            <span className="text-slate-400">{bundle.brokerSymbol}</span>
-            <span className="text-emerald-400 font-bold">{bundle.bid.toFixed(bundle.digits)}</span>
-            <span className="text-slate-600">/</span>
-            <span className="text-rose-400 font-bold">{bundle.ask.toFixed(bundle.digits)}</span>
-            <span className="text-[11px] text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded">
+          {/* Live Bid/Ask + Spread Pill */}
+          <div className="hidden xl:flex items-center space-x-2 px-3 py-1 iea-pill-control font-mono text-xs">
+            <span
+              className={`w-4 h-4 rounded-full text-[9px] font-bold inline-flex items-center justify-center ${activeSymbolChip.chipBg}`}
+            >
+              {activeSymbolChip.shortCode}
+            </span>
+            <span className="text-[#B6C5E0]">{bundle.brokerSymbol}</span>
+            <span className="text-[#B0F648] font-bold">{bundle.bid.toFixed(bundle.digits)}</span>
+            <span className="text-[#8496B8]">/</span>
+            <span className="text-[#FF5A6E] font-bold">{bundle.ask.toFixed(bundle.digits)}</span>
+            <span className="text-[10px] text-[#C2F076] bg-[#B0F648]/12 px-2 py-0.5 rounded-full border border-[#B0F648]/25">
               {bundle.spreadPoints} pts
             </span>
           </div>
         </div>
 
-        {/* Right: Toggleable Overlays + Feed Indicator */}
+        {/* Right: Toggleable Overlays + Fullscreen Toggle */}
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             onClick={() => toggleOverlay("liquidity")}
             aria-pressed={overlays.liquidity}
-            className={`px-2 py-1 rounded text-[11px] font-medium border transition inline-flex items-center space-x-1 ${
+            className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all duration-150 inline-flex items-center space-x-1 ${
               overlays.liquidity
-                ? "bg-amber-950/70 border-amber-500/60 text-amber-200"
-                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                ? "bg-[#B0F648]/16 border-[#B0F648]/50 text-[#C2F076]"
+                : "bg-[#0E1E3B]/70 border-[rgba(186,214,255,0.14)] text-[#8496B8] hover:text-[#F4F7FF]"
             }`}
           >
             <Layers className="w-3 h-3" />
@@ -750,10 +813,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             type="button"
             onClick={() => toggleOverlay("fvgOb")}
             aria-pressed={overlays.fvgOb}
-            className={`px-2 py-1 rounded text-[11px] font-medium border transition inline-flex items-center space-x-1 ${
+            className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all duration-150 inline-flex items-center space-x-1 ${
               overlays.fvgOb
-                ? "bg-sky-950/70 border-sky-500/60 text-sky-200"
-                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                ? "bg-[#5EEAD4]/16 border-[#5EEAD4]/50 text-[#5EEAD4]"
+                : "bg-[#0E1E3B]/70 border-[rgba(186,214,255,0.14)] text-[#8496B8] hover:text-[#F4F7FF]"
             }`}
           >
             <Activity className="w-3 h-3" />
@@ -764,10 +827,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             type="button"
             onClick={() => toggleOverlay("structure")}
             aria-pressed={overlays.structure}
-            className={`px-2 py-1 rounded text-[11px] font-medium border transition inline-flex items-center space-x-1 ${
+            className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all duration-150 inline-flex items-center space-x-1 ${
               overlays.structure
-                ? "bg-purple-950/70 border-purple-500/60 text-purple-200"
-                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                ? "bg-[#C077FA]/18 border-[#C077FA]/55 text-[#E5C7FF]"
+                : "bg-[#0E1E3B]/70 border-[rgba(186,214,255,0.14)] text-[#8496B8] hover:text-[#F4F7FF]"
             }`}
           >
             <TrendingUp className="w-3 h-3" />
@@ -778,10 +841,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             type="button"
             onClick={() => toggleOverlay("sessions")}
             aria-pressed={overlays.sessions}
-            className={`px-2 py-1 rounded text-[11px] font-medium border transition inline-flex items-center space-x-1 ${
+            className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all duration-150 inline-flex items-center space-x-1 ${
               overlays.sessions
-                ? "bg-teal-950/70 border-teal-500/60 text-teal-200"
-                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                ? "bg-[#4F8CFF]/20 border-[#7196CB]/60 text-[#D4E4FF]"
+                : "bg-[#0E1E3B]/70 border-[rgba(186,214,255,0.14)] text-[#8496B8] hover:text-[#F4F7FF]"
             }`}
           >
             <Clock className="w-3 h-3" />
@@ -792,10 +855,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             type="button"
             onClick={() => toggleOverlay("tradeLabels")}
             aria-pressed={overlays.tradeLabels}
-            className={`px-2 py-1 rounded text-[11px] font-medium border transition inline-flex items-center space-x-1 ${
+            className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all duration-150 inline-flex items-center space-x-1 ${
               overlays.tradeLabels
-                ? "bg-emerald-950/80 border-emerald-500/60 text-emerald-200"
-                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                ? "bg-[#B0F648]/20 border-[#B0F648]/60 text-[#B0F648]"
+                : "bg-[#0E1E3B]/70 border-[rgba(186,214,255,0.14)] text-[#8496B8] hover:text-[#F4F7FF]"
             }`}
           >
             <Eye className="w-3 h-3" />
@@ -804,70 +867,79 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
 
           <button
             type="button"
-            onClick={handleFitView}
-            aria-label="Fit chart content to view"
-            title="Fit chart content"
-            className="p-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300"
+            onClick={handleToggleFullscreen}
+            aria-label={isFullscreen ? "Exit fullscreen chart" : "Fit chart content to view"}
+            title={isFullscreen ? "Exit Fullscreen (Esc)" : "Fullscreen Chart"}
+            data-testid="chart-fullscreen-toggle"
+            className={`p-1.5 rounded-full border transition ${
+              isFullscreen
+                ? "bg-[#B0F648] text-[#081321] border-[#B0F648]"
+                : "bg-[#0E1E3B]/80 hover:bg-[#19305C] border-[rgba(186,214,255,0.18)] text-[#F4F7FF]"
+            }`}
           >
-            <Maximize2 className="w-3.5 h-3.5" />
+            {isFullscreen ? (
+              <Minimize2 className="w-3.5 h-3.5" />
+            ) : (
+              <Maximize2 className="w-3.5 h-3.5" />
+            )}
           </button>
         </div>
       </div>
 
       {/* Sub-Header Active Trade Strip */}
       {primaryTrade && (
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-slate-900/90 border-b border-slate-800/80 text-xs font-mono shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 bg-[#0B172F]/90 border-b border-[rgba(186,214,255,0.11)] text-xs font-mono shrink-0">
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${
+              className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
                 primaryTrade.direction === "BUY"
-                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                  : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                  ? "bg-[#B0F648]/20 text-[#B0F648] border border-[#B0F648]/45"
+                  : "bg-[#FF5A6E]/20 text-[#FF5A6E] border border-[#FF5A6E]/45"
               }`}
             >
               {primaryTrade.direction} {primaryTrade.volume.toFixed(2)}L
             </span>
-            <span className="text-slate-200 font-bold">#{primaryTrade.ticket}</span>
-            <span className="px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 text-[10px] font-sans font-semibold">
+            <span className="text-[#F4F7FF] font-bold">#{primaryTrade.ticket}</span>
+            <span className="px-2 py-0.5 rounded-full bg-[#223D6A]/70 text-[#5EEAD4] border border-[#5EEAD4]/30 text-[10px] font-sans font-medium">
               {primaryTrade.ownership} · Score {primaryTrade.qualityScore}/100
             </span>
-            <span className="text-slate-400">
-              Entry <strong className="text-slate-100">{primaryTrade.entryPrice.toFixed(bundle.digits)}</strong>
+            <span className="text-[#8496B8]">
+              Entry <strong className="text-[#F4F7FF]">{primaryTrade.entryPrice.toFixed(bundle.digits)}</strong>
             </span>
-            <span className="text-rose-300">
+            <span className="text-[#FF7A8A]">
               SL <strong>{primaryTrade.stopLoss.toFixed(bundle.digits)}</strong>
               {Math.abs(primaryTrade.initialStopLoss - primaryTrade.stopLoss) > 1e-6 && (
-                <span className="text-slate-400 ml-1">
+                <span className="text-[#8496B8] ml-1">
                   (Init {primaryTrade.initialStopLoss.toFixed(bundle.digits)})
                 </span>
               )}
             </span>
-            <span className="text-emerald-300">
+            <span className="text-[#C2F076]">
               TP1 <strong>{primaryTrade.tp1.toFixed(bundle.digits)}</strong> (+{primaryTrade.tp1R.toFixed(2)}R)
             </span>
-            <span className="text-emerald-400">
+            <span className="text-[#B0F648]">
               TP2 <strong>{primaryTrade.tp2.toFixed(bundle.digits)}</strong> (+{primaryTrade.tp2R.toFixed(2)}R)
             </span>
           </div>
 
           <div className="flex items-center space-x-2">
             <span
-              className={`px-2 py-0.5 rounded font-bold ${
+              className={`px-2.5 py-0.5 rounded-full font-bold ${
                 primaryTrade.floatingPnl >= 0
-                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                  : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                  ? "bg-[#B0F648]/20 text-[#B0F648] border border-[#B0F648]/45"
+                  : "bg-[#FF5A6E]/20 text-[#FF5A6E] border border-[#FF5A6E]/45"
               }`}
             >
               {primaryTrade.floatingPnl >= 0 ? "+" : ""}${primaryTrade.floatingPnl.toFixed(2)} (
               {primaryTrade.floatingR >= 0 ? "+" : ""}
               {primaryTrade.floatingR.toFixed(2)}R)
             </span>
-            <span className="inline-flex items-center space-x-1 text-[10px] font-sans text-emerald-300 bg-emerald-950/70 border border-emerald-500/30 px-2 py-0.5 rounded">
+            <span className="inline-flex items-center space-x-1 text-[10px] font-sans text-[#C2F076] bg-[#B0F648]/12 border border-[#B0F648]/30 px-2.5 py-0.5 rounded-full">
               <ShieldCheck className="w-3 h-3" />
               <span>Tighten-Only SL</span>
             </span>
-            <span className="inline-flex items-center space-x-1 text-[10px] font-sans text-slate-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-              <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
+            <span className="inline-flex items-center space-x-1 text-[10px] font-sans text-[#B6C5E0] bg-[#091426]/80 px-2.5 py-0.5 rounded-full border border-[rgba(186,214,255,0.14)]">
+              <Radio className="w-3 h-3 text-[#B0F648] animate-pulse" />
               <span>{feedStatus}</span>
             </span>
           </div>
@@ -879,7 +951,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
         {/* Lightweight Charts Canvas Mount */}
         <div ref={containerRef} className="absolute inset-0 z-0 w-full h-full" />
 
-        {/* Pointer-events-none Synchronized Institutional Overlay Layer (z-10 above lightweight-charts canvas z-index: 1/2) */}
+        {/* Pointer-events-none Synchronized Institutional Overlay Layer (z-10 above lightweight-charts canvas) */}
         <div
           className="absolute inset-0 z-10 pointer-events-none overflow-hidden select-none"
           style={{ right: "72px", bottom: "26px" }}
@@ -893,9 +965,9 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                 width: `${sb.widthPx}px`,
                 backgroundColor: sb.color,
               }}
-              className="absolute top-0 bottom-0 border-x border-slate-700/30"
+              className="absolute top-0 bottom-0 border-x border-[rgba(186,214,255,0.14)]"
             >
-              <span className="inline-block m-1.5 px-1.5 py-0.5 rounded bg-slate-950/80 text-[9px] font-mono text-slate-300 border border-slate-800">
+              <span className="inline-block m-1.5 px-2 py-0.5 rounded-full bg-[#0A152B]/85 text-[9px] font-mono text-[#B6C5E0] border border-[rgba(186,214,255,0.18)]">
                 {sb.label}
               </span>
             </div>
@@ -904,13 +976,13 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
           {/* 2. Shaded Risk & Reward Zones + FVG/OB Boxes */}
           {zoneBoxes.map((zb) => {
             const boxStyleByKind: Record<ProjectedZoneBox["kind"], string> = {
-              RISK: "bg-rose-500/12 border-y border-rose-500/35",
-              REWARD_TP1: "bg-emerald-500/12 border-y border-emerald-500/35",
-              REWARD_TP2: "bg-emerald-500/10 border-y border-emerald-400/30",
-              FVG_BULL: "bg-sky-500/14 border border-sky-400/40",
-              FVG_BEAR: "bg-amber-500/14 border border-amber-400/40",
-              OB_BULL: "bg-teal-500/14 border border-teal-400/40",
-              OB_BEAR: "bg-purple-500/14 border border-purple-400/40",
+              RISK: "bg-[#FF5A6E]/12 border-y border-[#FF5A6E]/40",
+              REWARD_TP1: "bg-[#B0F648]/12 border-y border-[#B0F648]/40",
+              REWARD_TP2: "bg-[#B0F648]/10 border-y border-[#C2F076]/35",
+              FVG_BULL: "bg-[#5EEAD4]/14 border border-[#5EEAD4]/40 rounded-r-md",
+              FVG_BEAR: "bg-[#FBBF24]/14 border border-[#FBBF24]/40 rounded-r-md",
+              OB_BULL: "bg-[#B0F648]/13 border border-[#C2F076]/40 rounded-r-md",
+              OB_BEAR: "bg-[#C077FA]/14 border border-[#C077FA]/45 rounded-r-md",
             };
             return (
               <div
@@ -923,7 +995,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                 }}
                 className={`absolute ${boxStyleByKind[zb.kind]}`}
               >
-                <span className="inline-block ml-1.5 mt-0.5 px-1.5 py-0.2 text-[9px] font-mono font-semibold text-slate-200 bg-slate-950/75 rounded">
+                <span className="inline-block ml-1.5 mt-0.5 px-2 py-0.5 text-[9px] font-mono font-semibold text-[#F4F7FF] bg-[#0A152B]/80 rounded-full border border-[rgba(186,214,255,0.15)]">
                   {zb.label}
                 </span>
               </div>
@@ -957,7 +1029,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                     135,
                     chartDims.width - 292
                   )} ${lbl.resolvedY}`}
-                  stroke="rgba(148, 163, 184, 0.55)"
+                  stroke="rgba(182, 197, 224, 0.55)"
                   strokeWidth={1}
                   strokeDasharray="2 2"
                   fill="none"
@@ -973,7 +1045,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                 left: `${pin.x}px`,
                 top: `${Math.max(8, pin.y - 11)}px`,
               }}
-              className={`absolute px-1.5 py-0.5 rounded border text-[10px] font-mono leading-tight shadow-sm whitespace-nowrap ${
+              className={`absolute px-2 py-0.5 rounded-lg border text-[10px] font-mono leading-tight shadow-sm whitespace-nowrap ${
                 pinToneClasses[pin.tone]
               }`}
             >
@@ -994,13 +1066,19 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                 top: `${lbl.resolvedY - 10}px`,
                 right: "6px",
               }}
-              className={`absolute px-2 py-0.5 rounded border text-[10px] font-mono leading-none flex items-center space-x-1.5 whitespace-nowrap ${
+              className={`absolute px-2.5 py-0.5 rounded-full border text-[10px] font-mono leading-none flex items-center space-x-1.5 whitespace-nowrap ${
                 labelToneClasses[lbl.tone]
               }`}
             >
               <span className="font-bold">{lbl.label}</span>
               {lbl.sublabel && (
-                <span className="text-[9px] px-1 py-0.5 rounded bg-black/35 text-slate-200">
+                <span
+                  className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                    lbl.tone === "live"
+                      ? "bg-[#081321]/20 text-[#081321] font-extrabold"
+                      : "bg-black/35 text-[#F4F7FF]"
+                  }`}
+                >
                   {lbl.sublabel}
                 </span>
               )}
