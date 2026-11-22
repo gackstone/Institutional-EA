@@ -763,9 +763,14 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     <section
       aria-label="Live Institutional Execution Chart"
       data-fullscreen={isFullscreen ? "true" : "false"}
+      style={
+        isFullscreen
+          ? { top: "calc(var(--iea-titlebar-h, 0px) + 12px)" }
+          : undefined
+      }
       className={
         isFullscreen
-          ? "fixed inset-3 z-50 flex flex-col iea-chart-glass-shell overflow-hidden shadow-2xl"
+          ? "fixed left-3 right-3 bottom-3 z-50 flex flex-col iea-chart-glass-shell overflow-hidden shadow-2xl"
           : "flex flex-col h-full min-h-[470px] iea-chart-glass-shell overflow-hidden"
       }
     >

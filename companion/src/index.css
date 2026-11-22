@@ -284,6 +284,17 @@
   }
 }
 
+/* Electron Native Window Titlebar Drag Regions */
+.iea-drag-region {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.iea-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
