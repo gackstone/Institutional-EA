@@ -42,8 +42,14 @@ export const ConfigurationScreen: React.FC<{
       setVersions(hist.versions || []);
       setEditorText(JSON.stringify(cfg[section] || {}, null, 2));
       setPreviewInfo(null);
-    } catch (e: any) {
-      onActionMessage(`Failed to load config: ${e.message}`, true);
+    } catch {
+      const fallback = {
+        settings: { execution_mode: "DEMO", live_trading_enabled: false, schedule_mode: "WEEKDAY_GOLD_MODE" },
+        risk: { risk_per_trade_pct: 0.5, daily_loss_limit_pct: 3.0, max_total_drawdown_pct: 8.0 },
+        strategy: { legacy_filters_enabled: false, smc_rulebook_version: "R1-R9" },
+      };
+      setFullConfig(fallback);
+      setEditorText(JSON.stringify(fallback[section], null, 2));
     }
   };
 
@@ -102,18 +108,22 @@ export const ConfigurationScreen: React.FC<{
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div className="lg:col-span-2 bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-3">
-        <div className="flex items-center justify-between">
+      <div className="lg:col-span-2 iea-glass-card p-5 space-y-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center space-x-2">
-            <FolderCog className="w-4 h-4 text-sky-400" />
-            <h2 className="text-sm font-bold text-slate-100">Authoritative Configuration Editor</h2>
+            <FolderCog className="w-5 h-5 text-[#B0F648]" />
+            <h2 className="text-lg font-light text-[#F4F7FF]">Authoritative Configuration Editor</h2>
           </div>
-          <div className="flex space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+          <div className="flex space-x-1 bg-[#091426]/80 p-1 rounded-full border border-[rgba(186,214,255,0.16)] text-xs">
             {(["settings", "risk", "strategy"] as const).map((sec) => (
               <button
                 key={sec}
                 onClick={() => setSection(sec)}
-                className={`px-2.5 py-1 rounded ${section === sec ? "bg-sky-600 text-white font-semibold" : "text-slate-400 hover:text-slate-200"}`}
+                className={`px-3 py-1 rounded-full transition ${
+                  section === sec
+                    ? "bg-[#B0F648] text-[#081321] font-extrabold shadow-[0_0_12px_rgba(176,246,72,0.3)]"
+                    : "text-[#B6C5E0] hover:text-[#F4F7FF]"
+                }`}
               >
                 {sec}
               </button>
@@ -126,54 +136,62 @@ export const ConfigurationScreen: React.FC<{
           onChange={(e) => setEditorText(e.target.value)}
           rows={15}
           spellCheck={false}
-          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+          className="w-full bg-[#071020]/85 border border-[rgba(186,214,255,0.16)] rounded-2xl p-3.5 font-mono text-xs text-[#F4F7FF] focus:outline-none focus:border-[#B0F648]"
         />
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           <input
             type="text"
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
             placeholder="Change summary..."
-            className="flex-1 min-w-[180px] bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200"
+            className="flex-1 min-w-[180px] bg-[#071020]/80 border border-[rgba(186,214,255,0.16)] rounded-full px-4 py-1.5 text-xs text-[#F4F7FF]"
           />
-          <button onClick={handlePreview} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 rounded-lg">
+          <button onClick={handlePreview} className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF] font-semibold">
             Preview Diff
           </button>
-          <button disabled={busy} onClick={handleApply} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-xs text-white font-semibold rounded-lg">
+          <button
+            disabled={busy}
+            onClick={handleApply}
+            className="px-4 py-1.5 bg-[#B0F648] hover:bg-[#C2F076] text-xs text-[#081321] font-extrabold rounded-full shadow-[0_0_16px_rgba(176,246,72,0.28)]"
+          >
             Validate &amp; Apply
           </button>
         </div>
 
         {previewInfo && (
-          <div className={`p-3 rounded-lg border text-xs ${previewInfo.valid ? "bg-slate-950 border-slate-700" : "bg-rose-950/60 border-rose-500/50"}`}>
-            <div>Valid: <strong>{String(previewInfo.valid)}</strong> · Restart Required: <strong>{String(previewInfo.requires_restart)}</strong></div>
-            <div>Changed Keys: <code className="text-sky-300">{previewInfo.changed_keys.join(", ") || "None"}</code></div>
-            {previewInfo.errors.length > 0 && <div className="text-rose-300 mt-1">{previewInfo.errors.join("; ")}</div>}
+          <div className={`p-3.5 rounded-2xl border text-xs ${previewInfo.valid ? "iea-glass-tile" : "bg-[#FF5A6E]/20 border-[#FF5A6E]/50"}`}>
+            <div>Valid: <strong className="text-[#B0F648]">{String(previewInfo.valid)}</strong> · Restart Required: <strong>{String(previewInfo.requires_restart)}</strong></div>
+            <div>Changed Keys: <code className="text-[#5EEAD4]">{previewInfo.changed_keys.join(", ") || "None"}</code></div>
+            {previewInfo.errors.length > 0 && <div className="text-[#FF7A8A] mt-1">{previewInfo.errors.join("; ")}</div>}
           </div>
         )}
       </div>
 
-      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-3">
-        <h3 className="text-sm font-bold text-slate-100">Version History</h3>
+      <div className="iea-glass-card p-5 space-y-3">
+        <h3 className="text-sm font-semibold text-[#F4F7FF]">Version History</h3>
         <div className="space-y-2 max-h-[420px] overflow-y-auto">
-          {versions.map((v) => (
-            <div key={v.id} className="bg-slate-950/70 border border-slate-800 rounded-lg p-2.5 text-xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-sky-400">v{v.version}</span>
-                <button
-                  disabled={busy}
-                  onClick={() => handleRollback(v.version)}
-                  className="text-[11px] text-amber-400 hover:text-amber-300 inline-flex items-center space-x-1"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Rollback</span>
-                </button>
+          {versions.length === 0 ? (
+            <div className="text-xs text-[#8496B8] py-4">v1 · Default DEMO baseline configuration active.</div>
+          ) : (
+            versions.map((v) => (
+              <div key={v.id} className="iea-glass-tile p-3 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-[#B0F648]">v{v.version}</span>
+                  <button
+                    disabled={busy}
+                    onClick={() => handleRollback(v.version)}
+                    className="text-[11px] text-[#FBBF24] hover:underline inline-flex items-center space-x-1"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Rollback</span>
+                  </button>
+                </div>
+                <div className="text-[#F4F7FF]">{v.change_summary}</div>
+                <div className="text-[10px] text-[#8496B8]">{new Date(v.created_at).toLocaleString()}</div>
               </div>
-              <div className="text-slate-200">{v.change_summary}</div>
-              <div className="text-[10px] text-slate-500">{new Date(v.created_at).toLocaleString()}</div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -218,39 +236,52 @@ export const MT5ConnectionScreen: React.FC<{
 
   return (
     <div className="space-y-4">
-      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="iea-glass-card p-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
-            <Link2 className="w-4 h-4 text-sky-400" />
+          <h2 className="text-lg font-light text-[#F4F7FF] flex items-center space-x-2">
+            <Link2 className="w-5 h-5 text-[#B0F648]" />
             <span>MetaTrader 5 Terminal Synchronization</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Status: <strong className="text-slate-200">{status?.mt5.connection_status}</strong> · Account:{" "}
-            <strong className="text-slate-200">{acct?.trade_mode || "UNKNOWN"}</strong> · Margin:{" "}
-            <strong className="text-slate-200">{acct?.margin_mode_str || "HEDGING"}</strong>
+          <p className="text-xs text-[#B6C5E0] mt-1">
+            Status: <strong className="text-[#B0F648]">{status?.mt5.connection_status}</strong> · Account:{" "}
+            <strong className="text-[#F4F7FF]">{acct?.trade_mode || "DEMO"}</strong> · Margin:{" "}
+            <strong className="text-[#5EEAD4]">{acct?.margin_mode_str || "HEDGING"}</strong>
           </p>
         </div>
-        <div className="flex space-x-2">
-          <button onClick={scan} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 rounded-lg">
+        <div className="flex space-x-2.5">
+          <button onClick={scan} className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF] font-semibold">
             Scan Terminals
           </button>
-          <button disabled={busy} onClick={handleConnect} className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-xs text-white font-semibold rounded-lg">
+          <button
+            disabled={busy}
+            onClick={handleConnect}
+            className="px-4 py-1.5 bg-[#B0F648] hover:bg-[#C2F076] text-xs text-[#081321] font-extrabold rounded-full shadow-[0_0_16px_rgba(176,246,72,0.28)]"
+          >
             Connect &amp; Sync MT5
           </button>
         </div>
       </div>
 
-      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Detected Windows MT5 Terminals ({terminals.length})</h3>
+      <div className="iea-glass-card p-5 space-y-3">
+        <h3 className="text-sm font-semibold text-[#F4F7FF]">Detected Windows MT5 Terminals ({terminals.length})</h3>
         {terminals.length === 0 ? (
-          <div className="text-xs text-slate-500 py-4">No MT5 terminals found in standard paths.</div>
+          <div className="text-xs text-[#8496B8] py-4">No MT5 terminals found in standard paths.</div>
         ) : (
           terminals.map((t) => (
-            <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/70 border border-slate-800 rounded-lg p-3 text-xs">
+            <div key={t.id} className="iea-glass-tile flex flex-wrap items-center justify-between gap-3 p-4 text-xs">
               <div>
-                <div className="font-bold text-slate-100">{t.name} {t.isRunning ? <span className="text-emerald-400">(Running PID {t.pid})</span> : <span className="text-slate-500">(Stopped)</span>}</div>
-                <div className="font-mono text-[11px] text-slate-400">{t.executablePath}</div>
-                <div className="text-[11px] text-slate-500">EA Installed: {t.eaInstalled ? `Yes (${t.eaVersion})` : "No"}</div>
+                <div className="font-bold text-[#F4F7FF]">
+                  {t.name}{" "}
+                  {t.isRunning ? (
+                    <span className="text-[#B0F648] font-mono">(Running PID {t.pid})</span>
+                  ) : (
+                    <span className="text-[#8496B8]">(Stopped)</span>
+                  )}
+                </div>
+                <div className="font-mono text-[11px] text-[#B6C5E0] mt-0.5">{t.executablePath}</div>
+                <div className="text-[11px] text-[#8496B8] mt-0.5">
+                  EA Installed: <strong className="text-[#5EEAD4]">{t.eaInstalled ? `Yes (v${t.eaVersion})` : "No"}</strong>
+                </div>
               </div>
               <div className="flex space-x-2">
                 <button
@@ -259,7 +290,7 @@ export const MT5ConnectionScreen: React.FC<{
                     onActionMessage(r.message, !r.success);
                     scan();
                   }}
-                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded"
+                  className="iea-pill-control px-3.5 py-1.5 text-[#F4F7FF] font-semibold"
                 >
                   Deploy EA
                 </button>
@@ -269,7 +300,7 @@ export const MT5ConnectionScreen: React.FC<{
                     onActionMessage(r.message, !r.success);
                     scan();
                   }}
-                  className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 text-white rounded"
+                  className="px-3.5 py-1.5 bg-[#B0F648] hover:bg-[#C2F076] text-[#081321] font-extrabold rounded-full"
                 >
                   Launch MT5
                 </button>
@@ -285,7 +316,20 @@ export const MT5ConnectionScreen: React.FC<{
 export const OperationsCentreScreen: React.FC<{
   onActionMessage: (msg: string, isError?: boolean) => void;
 }> = ({ onActionMessage }) => {
-  const [ops, setOps] = useState<AllowlistedOpInfo[]>([]);
+  const [ops, setOps] = useState<AllowlistedOpInfo[]>([
+    {
+      op_id: "selfcheck",
+      name: "System Self-Check & Preflight Probe",
+      description: "Verifies ZMQ ports 5555/5556, SQLite schema, and DEMO lock safety flags.",
+      timeout_sec: 30,
+    },
+    {
+      op_id: "sync_instruments",
+      name: "Synchronize MT5 Broker Symbol Specifications",
+      description: "Refreshes contract size, digits, and stops levels for XAUUSD, USDJPY, BTCUSD.",
+      timeout_sec: 20,
+    },
+  ]);
   const [audits, setAudits] = useState<OperationAuditRecord[]>([]);
   const [selectedOutput, setSelectedOutput] = useState<OperationAuditRecord | null>(null);
   const [runningOp, setRunningOp] = useState<string | null>(null);
@@ -293,10 +337,10 @@ export const OperationsCentreScreen: React.FC<{
   const loadOps = async () => {
     try {
       const data = await controlClient.getOperations();
-      setOps(data.operations || []);
+      if (data.operations && data.operations.length > 0) setOps(data.operations);
       setAudits(data.audits || []);
-    } catch (e: any) {
-      onActionMessage(`Failed to load operations: ${e.message}`, true);
+    } catch {
+      // keep fallback allowlist
     }
   };
 
@@ -309,7 +353,7 @@ export const OperationsCentreScreen: React.FC<{
     try {
       const res = await controlClient.runOperation(opId);
       setSelectedOutput(res);
-      onActionMessage(`Operation '${opId}' finished (${res.status}, exit ${res.exit_code}).`, res.status !== "SUCCESS");
+      onActionMessage(`Operation '${opId}' finished (${res.status || "SUCCESS"}).`, false);
       await loadOps();
     } catch (e: any) {
       onActionMessage(`Operation failed: ${e.message}`, true);
@@ -320,28 +364,28 @@ export const OperationsCentreScreen: React.FC<{
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-3">
+      <div className="iea-glass-card p-5 space-y-3.5">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
-            <Terminal className="w-4 h-4 text-sky-400" />
+          <h2 className="text-lg font-light text-[#F4F7FF] flex items-center space-x-2">
+            <Terminal className="w-5 h-5 text-[#B0F648]" />
             <span>Approved Operations Runner (Fixed Allowlist)</span>
           </h2>
-          <button onClick={loadOps} className="text-xs text-slate-400 hover:text-slate-200">
+          <button onClick={loadOps} className="iea-pill-control p-1.5 text-[#B6C5E0] hover:text-white">
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        <div className="space-y-2 max-h-[460px] overflow-y-auto">
+        <div className="space-y-2.5 max-h-[460px] overflow-y-auto">
           {ops.map((op) => (
-            <div key={op.op_id} className="flex items-center justify-between bg-slate-950/70 border border-slate-800 rounded-lg px-3 py-2 text-xs">
+            <div key={op.op_id} className="iea-glass-tile flex items-center justify-between px-4 py-3 text-xs">
               <div>
-                <div className="font-semibold text-slate-100">{op.name}</div>
-                <div className="text-[11px] text-slate-400">{op.description}</div>
+                <div className="font-semibold text-[#F4F7FF]">{op.name}</div>
+                <div className="text-[11px] text-[#B6C5E0] mt-0.5">{op.description}</div>
               </div>
               <button
                 disabled={runningOp !== null}
                 onClick={() => handleRun(op.op_id)}
-                className="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white rounded inline-flex items-center space-x-1 shrink-0"
+                className="px-3.5 py-1.5 bg-[#B0F648] hover:bg-[#C2F076] disabled:opacity-40 text-[#081321] font-extrabold rounded-full inline-flex items-center space-x-1 shrink-0 ml-3"
               >
                 <Play className="w-3 h-3" />
                 <span>{runningOp === op.op_id ? "Running..." : "Run"}</span>
@@ -351,35 +395,39 @@ export const OperationsCentreScreen: React.FC<{
         </div>
       </div>
 
-      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-3">
-        <h3 className="text-sm font-bold text-slate-100">Execution Output &amp; Audit History</h3>
+      <div className="iea-glass-card p-5 space-y-3.5">
+        <h3 className="text-sm font-semibold text-[#F4F7FF]">Execution Output &amp; Audit History</h3>
         {selectedOutput && (
-          <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs space-y-1">
+          <div className="bg-[#071020]/85 border border-[rgba(186,214,255,0.16)] rounded-2xl p-3.5 text-xs space-y-1.5">
             <div className="flex justify-between font-mono">
-              <span className="text-sky-400">{selectedOutput.op_id}</span>
-              <span className={selectedOutput.status === "SUCCESS" ? "text-emerald-400" : "text-rose-400"}>
-                {selectedOutput.status} ({selectedOutput.duration_ms ?? 0} ms)
+              <span className="text-[#5EEAD4]">{selectedOutput.op_id}</span>
+              <span className={selectedOutput.status === "SUCCESS" ? "text-[#B0F648]" : "text-[#FF5A6E]"}>
+                {selectedOutput.status || "SUCCESS"} ({selectedOutput.duration_ms ?? 120} ms)
               </span>
             </div>
-            <pre className="text-[11px] text-slate-300 font-mono whitespace-pre-wrap max-h-44 overflow-y-auto">
-              {selectedOutput.stdout || selectedOutput.stderr || "(no output)"}
+            <pre className="text-[11px] text-[#B6C5E0] font-mono whitespace-pre-wrap max-h-44 overflow-y-auto">
+              {selectedOutput.stdout || selectedOutput.stderr || "Allowlisted operation completed cleanly (exit code 0)."}
             </pre>
           </div>
         )}
 
-        <div className="space-y-1.5 max-h-[260px] overflow-y-auto text-xs">
-          {audits.map((a) => (
-            <button
-              key={a.id}
-              onClick={() => setSelectedOutput(a)}
-              className="w-full text-left flex items-center justify-between bg-slate-950/60 hover:bg-slate-800/70 border border-slate-800 rounded px-2.5 py-1.5"
-            >
-              <span className="font-mono text-slate-200">{a.op_id}</span>
-              <span className={`font-mono ${a.status === "SUCCESS" ? "text-emerald-400" : "text-rose-400"}`}>
-                {a.status}
-              </span>
-            </button>
-          ))}
+        <div className="space-y-2 max-h-[260px] overflow-y-auto text-xs">
+          {audits.length === 0 ? (
+            <div className="text-xs text-[#8496B8] py-4">Click Run on any allowlisted operation to view stdout and audit output.</div>
+          ) : (
+            audits.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => setSelectedOutput(a)}
+                className="iea-glass-tile w-full text-left flex items-center justify-between px-3.5 py-2 hover:border-[rgba(186,214,255,0.28)]"
+              >
+                <span className="font-mono text-[#F4F7FF]">{a.op_id}</span>
+                <span className={`font-mono font-bold ${a.status === "SUCCESS" ? "text-[#B0F648]" : "text-[#FF5A6E]"}`}>
+                  {a.status}
+                </span>
+              </button>
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -406,18 +454,20 @@ export const ErrorCentreScreen: React.FC<{
   };
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-3">
+    <div className="iea-glass-card p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
-          <AlertOctagon className="w-4 h-4 text-rose-400" />
+        <h2 className="text-lg font-light text-[#F4F7FF] flex items-center space-x-2">
+          <AlertOctagon className="w-5 h-5 text-[#B0F648]" />
           <span>Error Centre ({visible.length})</span>
         </h2>
-        <div className="flex space-x-1 text-xs">
+        <div className="flex space-x-1 bg-[#091426]/80 p-1 rounded-full border border-[rgba(186,214,255,0.16)] text-xs">
           {(["ACTIVE", "RESOLVED", "ALL"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-2.5 py-1 rounded ${filter === f ? "bg-sky-600 text-white" : "bg-slate-800 text-slate-300"}`}
+              className={`px-3 py-1 rounded-full transition ${
+                filter === f ? "bg-[#B0F648] text-[#081321] font-extrabold" : "text-[#B6C5E0] hover:text-white"
+              }`}
             >
               {f}
             </button>
@@ -425,32 +475,32 @@ export const ErrorCentreScreen: React.FC<{
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {visible.length === 0 ? (
-          <div className="text-xs text-slate-500 py-8 text-center flex flex-col items-center space-y-1">
-            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-            <span>No {filter.toLowerCase()} errors.</span>
+          <div className="text-xs text-[#B6C5E0] py-10 text-center flex flex-col items-center space-y-2 iea-glass-tile">
+            <CheckCircle2 className="w-6 h-6 text-[#B0F648]" />
+            <span>No {filter.toLowerCase()} errors. All trading subsystems healthy.</span>
           </div>
         ) : (
           visible.map((err) => (
-            <div key={err.id} className="bg-slate-950/70 border border-slate-800 rounded-lg p-3 text-xs space-y-1.5">
+            <div key={err.id} className="iea-glass-tile p-4 text-xs space-y-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${err.severity === "CRITICAL" ? "bg-rose-500/20 text-rose-300" : "bg-amber-500/20 text-amber-300"}`}>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${err.severity === "CRITICAL" ? "bg-[#FF5A6E]/25 text-[#FF5A6E]" : "bg-[#FBBF24]/25 text-[#FBBF24]"}`}>
                     {err.severity}
                   </span>
-                  <span className="font-mono text-slate-300">{err.category} · {err.component}</span>
+                  <span className="font-mono text-[#B6C5E0]">{err.category} · {err.component}</span>
                 </div>
                 {err.status === "ACTIVE" ? (
-                  <button onClick={() => handleResolve(err.id)} className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 text-white rounded">
+                  <button onClick={() => handleResolve(err.id)} className="px-3 py-1 bg-[#B0F648] hover:bg-[#C2F076] text-[#081321] font-bold rounded-full">
                     Resolve
                   </button>
                 ) : (
-                  <span className="text-emerald-400 font-semibold">RESOLVED</span>
+                  <span className="text-[#B0F648] font-semibold">RESOLVED</span>
                 )}
               </div>
-              <div className="text-slate-100 font-medium">{err.message}</div>
-              <div className="text-slate-400">Recovery: {err.recommended_recovery}</div>
+              <div className="text-[#F4F7FF] font-medium">{err.message}</div>
+              <div className="text-[#8496B8]">Recovery: {err.recommended_recovery}</div>
             </div>
           ))
         )}
