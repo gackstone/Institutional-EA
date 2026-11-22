@@ -132,14 +132,30 @@ class MT5SyncService:
             "running": running,
         }
 
-    def _init_mt5(self, mt5: Any, terminal_path: Optional[str] = None) -> Tuple[bool, Optional[str]]:
-        """Initializes MetaTrader5 Python API with optional terminal_path and captures last_error()."""
+    def _init_mt5(self, mt5: Any, terminal_path: Optional[str] = None, timeout_ms: int = 5000) -> Tuple[bool, Optional[str]]:
+        """Initializes MetaTrader5 Python API with bounded timeout (5s) and captures last_error()."""
         path_to_use = terminal_path or self.terminal_path
+
+        # Fast-path: if already initialized to this terminal, avoid redundant IPC handshake
+        term_info_fn = getattr(mt5, "terminal_info", None)
+        if callable(term_info_fn) and not terminal_path:
+            try:
+                if term_info_fn() is not None:
+                    return True, None
+            except Exception:
+                pass
+
         try:
-            ok = mt5.initialize(path=path_to_use) if path_to_use else mt5.initialize()
+            if path_to_use:
+                ok = mt5.initialize(path=path_to_use, timeout=timeout_ms)
+            else:
+                ok = mt5.initialize(timeout=timeout_ms)
         except TypeError:
-            # Mock MT5 modules in unit tests may define initialize() with no kwargs
-            ok = mt5.initialize()
+            # Mock MT5 modules in unit tests may define initialize() with no timeout kwarg
+            try:
+                ok = mt5.initialize(path=path_to_use) if path_to_use else mt5.initialize()
+            except TypeError:
+                ok = mt5.initialize()
         except Exception as exc:
             return False, f"MT5 initialize exception: {exc}"
 
@@ -183,25 +199,13 @@ class MT5SyncService:
         return dict(self.zmq_status)
 
     def connect(self, terminal_path: Optional[str] = None) -> bool:
-        """Connects via BridgeClient or direct MT5 API with bounded backoff tracking."""
+        """Connects via direct MetaTrader5 Python API first (fast, non-blocking), or Bridge IPC if listening."""
         with self._lock:
             self.connection_status = "SYNCHRONIZING"
             if terminal_path:
                 self.terminal_path = terminal_path
-            if self._mt5_override is None or self._bridge_explicit:
-                try:
-                    if self.bridge.connect():
-                        self.connection_status = "CONNECTED"
-                        self.reconnect_attempts = 0
-                        self.last_error = None
-                        self.repo.record_connection_event("MT5_BRIDGE", "CONNECTED", f"Connected to {self.bridge_host}:{self.bridge_port}")
-                        self.repo.resolve_component_errors("MT5SyncService", "MT5 Bridge connection restored")
-                        self.events.log("MT5", "INFO", f"Connected to MT5 Bridge ({self.bridge_host}:{self.bridge_port})")
-                        return True
-                except Exception as exc:
-                    self.last_error = str(exc)
 
-            # Fallback to direct MetaTrader5 API
+            # 1. Prefer direct MetaTrader5 Python API (connects in <200ms without binding port 5555)
             mt5 = self._get_mt5()
             if mt5 is not None:
                 ok, err = self._init_mt5(mt5, terminal_path=terminal_path)
@@ -215,6 +219,25 @@ class MT5SyncService:
                     return True
                 if err:
                     self.last_error = err
+
+            # 2. Fallback to BridgeClient only if explicitly injected or bridge IPC port 5556 is already listening
+            should_try_bridge = self._bridge_explicit
+            if not should_try_bridge and self._mt5_override is None:
+                zmq = self.check_zmq_bridge()
+                should_try_bridge = bool(zmq.get("port_5556"))
+
+            if should_try_bridge:
+                try:
+                    if self.bridge.connect():
+                        self.connection_status = "CONNECTED"
+                        self.reconnect_attempts = 0
+                        self.last_error = None
+                        self.repo.record_connection_event("MT5_BRIDGE", "CONNECTED", f"Connected to {self.bridge_host}:{self.bridge_port}")
+                        self.repo.resolve_component_errors("MT5SyncService", "MT5 Bridge connection restored")
+                        self.events.log("MT5", "INFO", f"Connected to MT5 Bridge ({self.bridge_host}:{self.bridge_port})")
+                        return True
+                except Exception as exc:
+                    self.last_error = str(exc)
 
             self.reconnect_attempts += 1
             self.connection_status = "DISCONNECTED"

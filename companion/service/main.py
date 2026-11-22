@@ -132,7 +132,8 @@ def main(argv: list[str] | None = None) -> int:
             pass
 
     def _sync_loop() -> None:
-        # Attempt initial MT5 connection & sync immediately on startup
+        # Yield briefly so HTTP /health responds immediately on startup
+        stop_event.wait(0.5)
         while not stop_event.is_set():
             try:
                 if ctx.mt5_sync.connection_status != "CONNECTED":
