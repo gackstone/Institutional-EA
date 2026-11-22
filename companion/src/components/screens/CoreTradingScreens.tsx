@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ChevronDown,
   Clock,
+  Loader2,
   Lock,
   Pause,
+  Play,
+  Plug,
   Scissors,
   Send,
   ShieldAlert,
@@ -11,6 +15,7 @@ import {
   Square,
   TrendingDown,
   TrendingUp,
+  Unplug,
   Wifi,
   WifiOff,
   XCircle,
@@ -20,6 +25,7 @@ import {
   ControlPosition,
   ControlServiceStatus,
   ControlStatusPayload,
+  MT5TerminalInfo,
   ScreenId,
   TradeHistoryRecord,
 } from "../../types";
@@ -36,9 +42,17 @@ import {
   calculateTradeMetrics,
   validateTightenOnlyStopLoss,
 } from "../../utils/tradeChartMath";
+import {
+  deriveTopBarControlState,
+  sanitizeControlError,
+} from "../../utils/topBarControlState";
 import { getSymbolChipSpec } from "../../styles/designTokens";
 import { UI_COPY } from "../../constants/uiCopy";
 import { LiveTradingChart } from "../LiveTradingChart";
+import type { EngineDrawingsFeed } from "../../utils/chartDrawingsSchema";
+
+// One-time confirmation flag per app session for demo order-placing Start
+let sessionStartDemoConfirmed = false;
 
 interface CommonProps {
   status: ControlStatusPayload | null;
@@ -73,19 +87,23 @@ export const DashboardScreen: React.FC<
   const [realCandles, setRealCandles] = useState<CandleBar[]>([]);
   const [liveQuote, setLiveQuote] = useState<ControlSymbolSpec | null>(null);
   const [candleWaitingReason, setCandleWaitingReason] = useState<string | undefined>(undefined);
+  const [drawingsFeed, setDrawingsFeed] = useState<EngineDrawingsFeed | null>(null);
+  const [drawingsError, setDrawingsError] = useState<string | null>(null);
   const [utcClockText, setUtcClockText] = useState<string>(() =>
     `${new Date().toISOString().slice(11, 19)} UTC`
   );
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [connectingMt5, setConnectingMt5] = useState<boolean>(false);
+  const [mt5PickerTerminals, setMt5PickerTerminals] = useState<MT5TerminalInfo[] | null>(null);
 
   // Sync external symbol jump (e.g., clicking a row in Live Signal Grid)
   useEffect(() => {
     setSelectedSymbol(initialSymbol);
   }, [initialSymbol]);
 
-  // Two-step confirmation modal state for Close All Bot Positions or Mobile Pause
+  // Confirmation modal state for Close All (2-step), Mobile Pause (2-step), Stop (1-step), Start Demo Orders (1-step)
   const [confirmModal, setConfirmModal] = useState<{
-    type: "CLOSE_ALL" | "PAUSE";
+    type: "CLOSE_ALL" | "PAUSE" | "STOP" | "START_DEMO";
     step: 1 | 2;
   } | null>(null);
 
@@ -143,6 +161,30 @@ export const DashboardScreen: React.FC<
     };
   }, [selectedSymbol, selectedTimeframe, serviceStatus?.status]);
 
+  // Fetch engine drawings feed (/api/chart/drawings) on load and live refresh
+  useEffect(() => {
+    let cancelled = false;
+    const loadDrawings = async () => {
+      try {
+        const feed = await controlClient.getChartDrawings(selectedSymbol, selectedTimeframe, 160);
+        if (!cancelled) {
+          setDrawingsFeed(feed);
+          setDrawingsError(null);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setDrawingsError(sanitizeControlError(err, "Unable to fetch engine drawings"));
+        }
+      }
+    };
+    loadDrawings();
+    const timer = setInterval(loadDrawings, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [selectedSymbol, selectedTimeframe, serviceStatus?.status, status?.mt5?.last_sync_at]);
+
   // Build normalized dashboard state strictly from real MT5/bot data
   const dash = useMemo(
     () => buildNormalizedDashboardData(status, trades),
@@ -168,6 +210,17 @@ export const DashboardScreen: React.FC<
   const eng = effectiveStatus.engine;
   const kpis = dash.kpis;
   const botOpenCount = activePositions.filter((p) => p.ownership === "BOT").length;
+  const topBar = useMemo(
+    () =>
+      deriveTopBarControlState({
+        status: effectiveStatus,
+        serviceStatus,
+        feedStatus,
+        busyAction,
+        connectingMt5,
+      }),
+    [effectiveStatus, serviceStatus, feedStatus, busyAction, connectingMt5]
+  );
   const provenanceLabel = dash.provenance.connected
     ? `${dash.provenance.source}${
         dash.provenance.updatedAt
@@ -192,18 +245,26 @@ export const DashboardScreen: React.FC<
     }
   };
 
-  // Execute existing Control Service endpoints safely
+  // Execute existing Control Service endpoints safely (ignores double clicks)
   const executeControlAction = async (
     label: string,
-    fn: () => Promise<{ success?: boolean; message?: string }>
+    fn: () => Promise<{ success?: boolean; message?: string; error?: string | null }>
   ) => {
+    if (busyAction !== null) return;
     setBusyAction(label);
     try {
       const res = await fn();
-      onActionMessage(`${label}: ${res.message || "OK"}`, res.success === false);
+      if (res.success === false) {
+        onActionMessage(
+          `${label}: ${sanitizeControlError(res.message || res.error, "Request rejected")}`,
+          true
+        );
+      } else {
+        onActionMessage(`${label}: ${res.message || "OK"}`, false);
+      }
       await onRefresh();
     } catch (e: any) {
-      const friendly = formatControlError(e);
+      const friendly = sanitizeControlError(formatControlError(e), "Action failed");
       const offlineSafetyNote =
         /offline/i.test(friendly) && /close all|stop|pause/i.test(label)
           ? " Manage open positions directly in MT5."
@@ -214,20 +275,109 @@ export const DashboardScreen: React.FC<
     }
   };
 
-  // Two-step confirmation handler for Close All Bot Positions or Pause
+  // Connect MT5 reusing the exact scan + connectMT5 flow from MT5 Terminal screen
+  const connectToTerminalPath = async (terminalPath?: string) => {
+    if (busyAction !== null) return;
+    setMt5PickerTerminals(null);
+    setConnectingMt5(true);
+    setBusyAction("Connect MT5");
+    try {
+      const res = await controlClient.connectMT5(terminalPath);
+      if (res.success) {
+        const acct = res.snapshot?.account;
+        if (acct?.account_number && !acct?.demo_verified) {
+          await controlClient.disconnectMT5().catch(() => {});
+          onActionMessage("DEMO Lock: Non-demo MT5 account refused.", true);
+        } else {
+          onActionMessage(
+            `MT5 Connected (${acct?.broker || "DEMO"} · ${
+              acct?.account_number ? `***${String(acct.account_number).slice(-4)}` : "DEMO"
+            })`
+          );
+        }
+      } else {
+        onActionMessage(
+          `Connect MT5: ${sanitizeControlError(res.error, "Unable to connect to MT5 terminal")}`,
+          true
+        );
+      }
+      await onRefresh();
+    } catch (e: any) {
+      onActionMessage(`Connect MT5 failed: ${sanitizeControlError(formatControlError(e))}`, true);
+    } finally {
+      setConnectingMt5(false);
+      setBusyAction(null);
+    }
+  };
+
+  const handleConnectMt5Click = async () => {
+    if (!topBar.connectBtn.enabled || busyAction !== null) return;
+    setConnectingMt5(true);
+    setBusyAction("Scan MT5");
+    try {
+      const terminals = await IPC.scanMT5Terminals().catch(() => [] as MT5TerminalInfo[]);
+      if (terminals.length > 1) {
+        setMt5PickerTerminals(terminals);
+        setConnectingMt5(false);
+        setBusyAction(null);
+        return;
+      }
+      setConnectingMt5(false);
+      setBusyAction(null);
+      await connectToTerminalPath(terminals[0]?.executablePath);
+    } catch {
+      setConnectingMt5(false);
+      setBusyAction(null);
+      await connectToTerminalPath(undefined);
+    }
+  };
+
+  const handleDisconnectMt5Click = async () => {
+    if (!topBar.connectBtn.disconnectEnabled || busyAction !== null) return;
+    await executeControlAction("Disconnect MT5", async () => {
+      const res = await controlClient.disconnectMT5();
+      return {
+        success: res.success,
+        message: res.success ? "Disconnected from MT5 terminal." : res.error || "Disconnect blocked",
+      };
+    });
+  };
+
+  const handleStartEngineClick = async () => {
+    if (!topBar.startBtn.enabled || busyAction !== null) return;
+    if (topBar.placesDemoOrders && !sessionStartDemoConfirmed) {
+      setConfirmModal({ type: "START_DEMO", step: 1 });
+      return;
+    }
+    await executeControlAction("Start", () => controlClient.startEngine());
+  };
+
+  // Confirmation modal handler
   const handleConfirmTwoStep = async () => {
     if (!confirmModal) return;
-    if (confirmModal.step === 1) {
+    if ((confirmModal.type === "CLOSE_ALL" || confirmModal.type === "PAUSE") && confirmModal.step === 1) {
       setConfirmModal({ ...confirmModal, step: 2 });
       return;
     }
 
     const actionType = confirmModal.type;
     setConfirmModal(null);
+    if (actionType === "START_DEMO") {
+      sessionStartDemoConfirmed = true;
+      await executeControlAction("Start", () => controlClient.startEngine());
+      return;
+    }
+    if (actionType === "STOP") {
+      await executeControlAction("Stop", () => controlClient.stopEngine());
+      return;
+    }
     if (actionType === "PAUSE") {
       await executeControlAction(
-        eng.pause_flag_active ? "Resume" : "Pause",
-        () => (eng.pause_flag_active ? controlClient.resumeEntries() : controlClient.pauseEntries())
+        topBar.pauseResumeBtn.label,
+        () =>
+          topBar.pauseResumeBtn.action === "RESUME"
+            ? controlClient.resumeEntries()
+            : controlClient.pauseEntries()
       );
       return;
     }
@@ -413,30 +563,75 @@ export const DashboardScreen: React.FC<
       )}
 
       {/* =====================================================================
-          ROW 1: COMPACT TOP STATUS BAR + SAFETY CONTROLS (Pause / Stop / Close All)
+          ROW 1: COMPACT TOP STATUS BAR + CONTROLS (Connect MT5 / Start / Pause-Resume / Stop | Close All)
       ====================================================================== */}
       <section
         aria-label="Terminal Top Status Bar"
-        className="iea-glass-card flex flex-wrap items-center justify-between gap-2.5 px-4 py-2.5"
+        className="iea-glass-card relative flex flex-wrap items-center justify-between gap-2 px-3.5 py-2"
       >
-        <div className="flex flex-wrap items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs min-w-0">
           {/* MT5 Connection + Masked Account */}
           <div
-            title={`Connected MT5 Account ${dash.maskedAccount} (${effectiveStatus.mt5.account.broker})`}
-            className="iea-pill-control inline-flex items-center space-x-1.5 px-3 py-1"
+            title={
+              topBar.mt5Connected
+                ? `Connected MT5 Account ${dash.maskedAccount} (${effectiveStatus.mt5.account.broker})`
+                : "MT5 Terminal disconnected"
+            }
+            className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 whitespace-nowrap"
           >
-            <Wifi className="w-3.5 h-3.5 text-[#B0F648]" />
+            {topBar.mt5Connected ? (
+              <Wifi className="w-3.5 h-3.5 text-[#B0F648] shrink-0" />
+            ) : (
+              <WifiOff className="w-3.5 h-3.5 text-[#FF5A6E] shrink-0" />
+            )}
             <span className="font-medium text-[#F4F7FF]">MT5</span>
-            <span className="font-mono font-bold text-[#B0F648]" data-testid="masked-account-badge">
-              {dash.maskedAccount}
+            <span
+              className={`font-mono font-bold ${
+                topBar.mt5Connected ? "text-[#B0F648]" : "text-[#8496B8]"
+              }`}
+              data-testid="masked-account-badge"
+            >
+              {topBar.mt5Connected ? dash.maskedAccount : "OFF"}
             </span>
+          </div>
+
+          {/* Compact Engine State + Mode Chip */}
+          <div
+            data-testid="engine-state-chip"
+            title={`Engine State: ${topBar.engineState} · Mode: ${topBar.operatingMode}${
+              eng.engine_pid ? ` · PID ${eng.engine_pid}` : ""
+            }`}
+            className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full border font-mono text-[11px] font-bold whitespace-nowrap ${
+              topBar.engineChipTone === "lime"
+                ? "bg-[#B0F648]/16 border-[#B0F648]/50 text-[#B0F648]"
+                : topBar.engineChipTone === "amber"
+                ? "bg-[#FBBF24]/16 border-[#FBBF24]/50 text-[#FBBF24]"
+                : topBar.engineChipTone === "red"
+                ? "bg-[#FF5A6E]/18 border-[#FF5A6E]/55 text-[#FF7A8A]"
+                : "bg-[#192E58]/60 border-[rgba(186,214,255,0.2)] text-[#B6C5E0]"
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                topBar.engineChipTone === "lime"
+                  ? "bg-[#B0F648] shadow-[0_0_8px_#B0F648]"
+                  : topBar.engineChipTone === "amber"
+                  ? "bg-[#FBBF24]"
+                  : topBar.engineChipTone === "red"
+                  ? "bg-[#FF5A6E]"
+                  : "bg-[#8496B8]"
+              }`}
+            />
+            <span>{topBar.engineStateLabel}</span>
+            <span className="opacity-60">·</span>
+            <span className="text-[#F4F7FF]/90">{topBar.modeShort}</span>
           </div>
 
           {/* Hard Safety Lock Badge */}
           <div
             data-testid="demo-lock-badge"
             title={UI_COPY.brand.demoLockTooltip}
-            className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-[#B0F648]/16 border border-[#B0F648]/50 text-[#C2F076] font-mono text-[11px] font-bold"
+            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-[#B0F648]/14 border border-[#B0F648]/45 text-[#C2F076] font-mono text-[11px] font-bold whitespace-nowrap"
           >
             <Lock className="w-3 h-3 text-[#B0F648] shrink-0" />
             <span>{UI_COPY.brand.demoLockChip}</span>
@@ -447,10 +642,10 @@ export const DashboardScreen: React.FC<
             <div
               data-testid="control-service-status-pill"
               title={`Control Service on ${serviceStatus.baseUrl}${serviceStatus.lastError ? ` · ${serviceStatus.lastError}` : ""}`}
-              className="iea-pill-control inline-flex items-center space-x-1.5 px-3 py-1 font-mono text-[11px]"
+              className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 font-mono text-[11px] whitespace-nowrap"
             >
               <span
-                className={`w-2 h-2 rounded-full ${
+                className={`w-2 h-2 rounded-full shrink-0 ${
                   serviceStatus.status === "ONLINE"
                     ? "bg-[#B0F648] shadow-[0_0_8px_#B0F648]"
                     : serviceStatus.status === "STARTING"
@@ -478,7 +673,7 @@ export const DashboardScreen: React.FC<
                 <button
                   type="button"
                   onClick={() => onReconnectService()}
-                  className="ml-1 px-2 py-0.5 rounded-full bg-[#B0F648] text-[#081321] font-bold text-[10px] hover:bg-[#C2F076]"
+                  className="ml-1 px-2 py-0.5 rounded-full bg-[#B0F648] text-[#081321] font-bold text-[10px] hover:bg-[#C2F076] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648]"
                 >
                   Reconnect
                 </button>
@@ -489,10 +684,10 @@ export const DashboardScreen: React.FC<
           {/* ZMQ Bridge Ports 5555 / 5556 (Real TCP Probe Status) */}
           <div
             title={`ZMQ/TCP Bridge Sockets: Port 5555 (${effectiveStatus.mt5.zmq_bridge?.port_5555 ? "LISTENING" : "IDLE"}) & Port 5556 (${effectiveStatus.mt5.zmq_bridge?.port_5556 ? "LISTENING" : "IDLE"})`}
-            className="iea-pill-control inline-flex items-center space-x-1.5 px-3 py-1 font-mono text-[11px]"
+            className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 font-mono text-[11px] whitespace-nowrap"
           >
             <span
-              className={`w-2 h-2 rounded-full ${
+              className={`w-2 h-2 rounded-full shrink-0 ${
                 effectiveStatus.mt5.zmq_bridge?.port_5555
                   ? "bg-[#B0F648] shadow-[0_0_8px_#B0F648]"
                   : "bg-[#8496B8]"
@@ -516,78 +711,219 @@ export const DashboardScreen: React.FC<
             }
             aria-label="Telegram status and quick connectivity test"
             title="Telegram notification dispatcher ready (click to test)"
-            className="iea-pill-control inline-flex items-center space-x-1.5 px-3 py-1 text-[11px] text-[#F4F7FF]"
+            className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 text-[11px] text-[#F4F7FF] whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EEAD4]"
           >
-            <Send className="w-3 h-3 text-[#5EEAD4]" />
+            <Send className="w-3 h-3 text-[#5EEAD4] shrink-0" />
             <span className="text-[#B0F648] font-semibold">TG Ready</span>
           </button>
 
           {/* Live UTC Clock */}
           <div
             title="Live UTC Terminal Clock"
-            className="iea-pill-control inline-flex items-center space-x-1.5 px-3 py-1 text-[11px]"
+            className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 text-[11px] whitespace-nowrap"
           >
-            <Clock className="w-3 h-3 text-[#8496B8]" />
+            <Clock className="w-3 h-3 text-[#8496B8] shrink-0" />
             <span className="font-mono text-[#F4F7FF] tabular-nums" data-testid="utc-clock">
               {utcClockText}
             </span>
           </div>
         </div>
 
-        {/* Right: Safety-Critical Controls (Mobile read-only shows two-step Pause only) */}
-        <div className="flex items-center gap-2">
+        {/* Right: Ordered Action Group [Connect MT5] [Start] [Pause / Resume] [Stop]  |  [Close All] */}
+        <div
+          aria-label="Engine and MT5 Controls"
+          className="flex flex-wrap items-center gap-1.5 shrink-0"
+        >
+          {/* 1. Connect MT5 (or quiet Connected + Disconnect) */}
+          {!readOnlyMobile && (
+            <div className="relative inline-flex items-center">
+              {topBar.connectBtn.showDisconnect ? (
+                <div className="inline-flex items-center rounded-full bg-[#192E58]/55 border border-[#5EEAD4]/35 text-xs overflow-hidden">
+                  <span
+                    data-testid="btn-connect-mt5-connected"
+                    title={topBar.connectBtn.tooltip}
+                    className="px-2.5 py-1 text-[#5EEAD4] font-semibold inline-flex items-center space-x-1 whitespace-nowrap"
+                  >
+                    <Plug className="w-3 h-3 shrink-0" />
+                    <span>Connected</span>
+                  </span>
+                  <button
+                    type="button"
+                    data-testid="btn-disconnect-mt5"
+                    disabled={!topBar.connectBtn.disconnectEnabled}
+                    onClick={handleDisconnectMt5Click}
+                    aria-label="Disconnect MT5"
+                    title={topBar.connectBtn.disconnectTooltip}
+                    className="px-2 py-1 border-l border-[#5EEAD4]/25 text-[#B6C5E0] hover:text-[#FF7A8A] hover:bg-[#FF5A6E]/15 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center space-x-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EEAD4]"
+                  >
+                    {busyAction === "Disconnect MT5" ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Unplug className="w-3 h-3" />
+                    )}
+                    <span className="text-[11px]">Disconnect</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="btn-connect-mt5"
+                  disabled={!topBar.connectBtn.enabled}
+                  onClick={handleConnectMt5Click}
+                  aria-label="Connect MT5 terminal"
+                  title={topBar.connectBtn.tooltip}
+                  className="px-3 py-1.5 rounded-full bg-[#5EEAD4]/14 hover:bg-[#5EEAD4]/24 border border-[#5EEAD4]/55 disabled:opacity-40 disabled:cursor-not-allowed text-[#5EEAD4] text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EEAD4]"
+                >
+                  {topBar.mt5Syncing || busyAction === "Connect MT5" || busyAction === "Scan MT5" ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                  ) : (
+                    <Plug className="w-3.5 h-3.5 shrink-0" />
+                  )}
+                  <span>{topBar.connectBtn.label}</span>
+                  {mt5PickerTerminals && mt5PickerTerminals.length > 1 && (
+                    <ChevronDown className="w-3 h-3 shrink-0" />
+                  )}
+                </button>
+              )}
+
+              {/* Multi-terminal picker popover */}
+              {mt5PickerTerminals && mt5PickerTerminals.length > 1 && (
+                <div
+                  role="menu"
+                  aria-label="Select MT5 Terminal"
+                  className="absolute right-0 top-full mt-2 z-50 w-72 iea-glass-card p-2 shadow-2xl border border-[#5EEAD4]/40 space-y-1"
+                >
+                  <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#8496B8]">
+                    <span>Select MT5 Terminal ({mt5PickerTerminals.length})</span>
+                    <button
+                      type="button"
+                      onClick={() => setMt5PickerTerminals(null)}
+                      className="text-[#B6C5E0] hover:text-white"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  {mt5PickerTerminals.map((t) => (
+                    <button
+                      key={t.executablePath}
+                      type="button"
+                      onClick={() => connectToTerminalPath(t.executablePath)}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-[#5EEAD4]/15 text-xs transition flex items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EEAD4]"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-semibold text-[#F4F7FF] truncate">{t.name}</div>
+                        <div className="text-[10px] font-mono text-[#8496B8] truncate">
+                          {t.executablePath}
+                        </div>
+                      </div>
+                      {t.isRunning && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-[#B0F648]/20 text-[#B0F648] text-[9px] font-mono font-bold shrink-0">
+                          RUN
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 2. Start */}
+          {!readOnlyMobile && (
+            <button
+              type="button"
+              data-testid="btn-start-engine"
+              disabled={!topBar.startBtn.enabled}
+              onClick={handleStartEngineClick}
+              aria-label="Start trading engine"
+              title={topBar.startBtn.tooltip}
+              className="px-3 py-1.5 rounded-full bg-[#B0F648] hover:bg-[#C2F076] disabled:bg-[#B0F648]/25 disabled:text-[#B0F648]/60 disabled:border disabled:border-[#B0F648]/30 disabled:cursor-not-allowed text-[#081321] text-xs font-extrabold inline-flex items-center space-x-1.5 whitespace-nowrap shadow-[0_2px_12px_rgba(176,246,72,0.28)] disabled:shadow-none transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648]"
+            >
+              {busyAction === "Start" ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+              ) : (
+                <Play className="w-3.5 h-3.5 shrink-0 fill-current" />
+              )}
+              <span>{topBar.startBtn.label}</span>
+            </button>
+          )}
+
+          {/* 3. Pause / Resume toggle */}
           <button
             type="button"
-            disabled={busyAction !== null}
+            data-testid="btn-pause-resume-engine"
+            disabled={!topBar.pauseResumeBtn.enabled}
             onClick={() =>
               readOnlyMobile
                 ? setConfirmModal({ type: "PAUSE", step: 1 })
-                : executeControlAction(
-                    eng.pause_flag_active ? "Resume" : "Pause",
-                    () =>
-                      eng.pause_flag_active
-                        ? controlClient.resumeEntries()
-                        : controlClient.pauseEntries()
+                : executeControlAction(topBar.pauseResumeBtn.label, () =>
+                    topBar.pauseResumeBtn.action === "RESUME"
+                      ? controlClient.resumeEntries()
+                      : controlClient.pauseEntries()
                   )
             }
-            aria-label={eng.pause_flag_active ? "Resume new trade entries" : "Pause new trade entries"}
-            title={
-              eng.pause_flag_active
-                ? "Resume automated trade entries"
-                : "Pause new trade entries (existing SL/TP stay active)"
+            aria-label={
+              topBar.pauseResumeBtn.action === "RESUME"
+                ? "Resume new trade entries"
+                : "Pause new trade entries"
             }
-            className="px-3.5 py-1.5 rounded-full bg-[#FBBF24]/20 hover:bg-[#FBBF24]/30 border border-[#FBBF24]/55 disabled:opacity-40 text-[#FBBF24] text-xs font-semibold inline-flex items-center space-x-1.5 transition duration-200"
+            title={topBar.pauseResumeBtn.tooltip}
+            className={`px-3 py-1.5 rounded-full border disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition duration-200 focus-visible:outline-none focus-visible:ring-2 ${
+              topBar.pauseResumeBtn.tone === "lime"
+                ? "bg-[#B0F648]/20 hover:bg-[#B0F648]/30 border-[#B0F648]/55 text-[#B0F648] focus-visible:ring-[#B0F648]"
+                : "bg-[#FBBF24]/20 hover:bg-[#FBBF24]/30 border-[#FBBF24]/55 text-[#FBBF24] focus-visible:ring-[#FBBF24]"
+            }`}
           >
-            <Pause className="w-3.5 h-3.5" />
-            <span>{eng.pause_flag_active ? "Resume" : "Pause"}</span>
+            {busyAction === "Pause" || busyAction === "Resume" ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+            ) : topBar.pauseResumeBtn.action === "RESUME" ? (
+              <Play className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <Pause className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span>{topBar.pauseResumeBtn.label}</span>
           </button>
 
+          {/* 4. Stop */}
           {!readOnlyMobile && (
-            <>
-              <button
-                type="button"
-                disabled={busyAction !== null}
-                onClick={() => executeControlAction("Stop", () => controlClient.stopEngine())}
-                aria-label="Stop trading engine"
-                title="Stop trading engine process (open positions remain protected)"
-                className="iea-pill-control px-3.5 py-1.5 disabled:opacity-40 text-[#F4F7FF] text-xs font-semibold inline-flex items-center space-x-1.5 transition duration-200"
-              >
-                <Square className="w-3.5 h-3.5 text-[#FF5A6E]" />
-                <span>Stop</span>
-              </button>
+            <button
+              type="button"
+              data-testid="btn-stop-engine"
+              disabled={!topBar.stopBtn.enabled}
+              onClick={() => setConfirmModal({ type: "STOP", step: 1 })}
+              aria-label="Stop trading engine"
+              title={topBar.stopBtn.tooltip}
+              className="iea-pill-control px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed text-[#F4F7FF] text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F4F7FF]"
+            >
+              {busyAction === "Stop" ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-[#FF5A6E]" />
+              ) : (
+                <Square className="w-3.5 h-3.5 shrink-0 text-[#FF5A6E]" />
+              )}
+              <span>{topBar.stopBtn.label}</span>
+            </button>
+          )}
 
+          {/* 5. Visually separated Close All on far right */}
+          {!readOnlyMobile && (
+            <div className="ml-1.5 pl-2.5 border-l border-[rgba(186,214,255,0.2)]">
               <button
                 type="button"
-                disabled={busyAction !== null}
+                data-testid="btn-close-all"
+                disabled={!topBar.closeAllBtn.enabled}
                 onClick={() => setConfirmModal({ type: "CLOSE_ALL", step: 1 })}
                 aria-label="Close all bot-owned positions (two-step confirmation)"
-                title="Close all bot-owned positions at market (2-step confirmation)"
-                className="px-4 py-1.5 rounded-full bg-gradient-to-r from-[#FF5A6E] to-[#E11D48] hover:brightness-110 disabled:opacity-40 text-white text-xs font-bold inline-flex items-center space-x-1.5 shadow-[0_4px_16px_rgba(255,90,110,0.4)] transition duration-200"
+                title={topBar.closeAllBtn.tooltip}
+                className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#FF5A6E] to-[#E11D48] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold inline-flex items-center space-x-1.5 whitespace-nowrap shadow-[0_4px_16px_rgba(255,90,110,0.4)] disabled:shadow-none transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A6E]"
               >
-                <XCircle className="w-3.5 h-3.5" />
-                <span>Close All</span>
+                {busyAction === "Close All" ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                ) : (
+                  <XCircle className="w-3.5 h-3.5 shrink-0" />
+                )}
+                <span>{topBar.closeAllBtn.label}</span>
               </button>
-            </>
+            </div>
           )}
         </div>
       </section>
@@ -779,6 +1115,8 @@ export const DashboardScreen: React.FC<
             selectedTimeframe={selectedTimeframe}
             feedStatus={feedStatus}
             waitingReason={candleWaitingReason}
+            drawingsFeed={drawingsFeed}
+            drawingsError={drawingsError}
             onSelectSymbol={setSelectedSymbol}
             onSelectTimeframe={setSelectedTimeframe}
             onCaptureScreenshot={handleSaveScreenshot}
@@ -997,7 +1335,7 @@ export const DashboardScreen: React.FC<
       </section>
 
       {/* =====================================================================
-          TWO-STEP CONFIRMATION MODAL (Close All Bot Positions)
+          CONFIRMATION MODAL (Start Demo / Stop / Close All / Mobile Pause)
       ====================================================================== */}
       {confirmModal && (
         <div
@@ -1006,35 +1344,72 @@ export const DashboardScreen: React.FC<
           aria-labelledby="two-step-confirm-title"
           className="fixed inset-0 z-50 bg-[#050C1A]/80 backdrop-blur-md flex items-center justify-center p-4"
         >
-          <div className="iea-glass-card border-[#FF5A6E]/60 p-5 max-w-sm w-full space-y-3 shadow-2xl">
-            <div className="flex items-center space-x-2 text-[#FF5A6E]">
-              <ShieldAlert className="w-5 h-5 shrink-0" />
+          <div
+            className={`iea-glass-card p-5 max-w-sm w-full space-y-3 shadow-2xl ${
+              confirmModal.type === "START_DEMO"
+                ? "border-[#B0F648]/55"
+                : confirmModal.type === "STOP"
+                ? "border-[#FBBF24]/55"
+                : "border-[#FF5A6E]/60"
+            }`}
+          >
+            <div
+              className={`flex items-center space-x-2 ${
+                confirmModal.type === "START_DEMO"
+                  ? "text-[#B0F648]"
+                  : confirmModal.type === "STOP"
+                  ? "text-[#FBBF24]"
+                  : "text-[#FF5A6E]"
+              }`}
+            >
+              {confirmModal.type === "START_DEMO" ? (
+                <Play className="w-5 h-5 shrink-0" />
+              ) : (
+                <ShieldAlert className="w-5 h-5 shrink-0" />
+              )}
               <h3 id="two-step-confirm-title" className="text-sm font-bold text-[#F4F7FF]">
-                {confirmModal.type === "PAUSE"
-                  ? `${eng.pause_flag_active ? "Resume" : "Pause"} new entries? (${confirmModal.step}/2)`
+                {confirmModal.type === "START_DEMO"
+                  ? `Start engine in ${topBar.operatingMode}?`
+                  : confirmModal.type === "STOP"
+                  ? "Stop trading engine?"
+                  : confirmModal.type === "PAUSE"
+                  ? `${topBar.pauseResumeBtn.label} new entries? (${confirmModal.step}/2)`
                   : `Close all bot trades? (${confirmModal.step}/2)`}
               </h3>
             </div>
 
-            {confirmModal.step === 1 ? (
+            {confirmModal.type === "START_DEMO" ? (
+              <p className="text-xs text-[#B6C5E0]">
+                The engine will run in{" "}
+                <strong className="text-[#B0F648] font-mono">{topBar.operatingMode}</strong> on DEMO{" "}
+                <span className="font-mono">{dash.maskedAccount}</span> and may place DEMO orders.
+                LIVE trading remains locked.
+              </p>
+            ) : confirmModal.type === "STOP" ? (
+              <p className="text-xs text-[#B6C5E0]">
+                Stop the trading engine process? Any open positions in MT5 will keep their existing
+                broker SL/TP levels.
+              </p>
+            ) : confirmModal.step === 1 ? (
               <p className="text-xs text-[#B6C5E0]">
                 {confirmModal.type === "PAUSE" ? (
                   <>
-                    {eng.pause_flag_active ? "Resume" : "Pause"} automated entries on DEMO{" "}
+                    {topBar.pauseResumeBtn.label} automated entries on DEMO{" "}
                     <span className="font-mono">{dash.maskedAccount}</span>? Existing SL/TP stay active.
                   </>
                 ) : (
                   <>
                     Close{" "}
                     <strong className="text-[#F4F7FF]">{botOpenCount} bot positions</strong> at market on
-                    DEMO <span className="font-mono">{dash.maskedAccount}</span>?
+                    DEMO <span className="font-mono">{dash.maskedAccount}</span>? Positions will be
+                    reconciled with MT5 before confirming.
                   </>
                 )}
               </p>
             ) : (
               <div className="p-3 rounded-xl bg-[#FF5A6E]/18 border border-[#FF5A6E]/50 text-xs text-[#FFD9DF] font-semibold">
                 {confirmModal.type === "PAUSE"
-                  ? `Final step: Confirm ${eng.pause_flag_active ? "resuming" : "pausing"} entries.`
+                  ? `Final step: Confirm ${topBar.pauseResumeBtn.label.toLowerCase()}ing entries.`
                   : `Final step: Confirm immediate market closure on ${dash.maskedAccount}.`}
               </div>
             )}
@@ -1043,21 +1418,29 @@ export const DashboardScreen: React.FC<
               <button
                 type="button"
                 onClick={() => setConfirmModal(null)}
-                className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF]"
+                className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F4F7FF]"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmTwoStep}
-                className="px-4 py-1.5 rounded-full bg-gradient-to-r from-[#FF5A6E] to-[#E11D48] hover:brightness-110 text-xs font-bold text-white"
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 ${
+                  confirmModal.type === "START_DEMO"
+                    ? "bg-[#B0F648] hover:bg-[#C2F076] text-[#081321] focus-visible:ring-[#B0F648]"
+                    : confirmModal.type === "STOP"
+                    ? "bg-[#FBBF24] hover:brightness-110 text-[#081321] focus-visible:ring-[#FBBF24]"
+                    : "bg-gradient-to-r from-[#FF5A6E] to-[#E11D48] hover:brightness-110 text-white focus-visible:ring-[#FF5A6E]"
+                }`}
               >
-                {confirmModal.step === 1
+                {confirmModal.type === "START_DEMO"
+                  ? `Start (${topBar.modeShort})`
+                  : confirmModal.type === "STOP"
+                  ? "Stop Engine"
+                  : confirmModal.step === 1
                   ? "Next →"
                   : confirmModal.type === "PAUSE"
-                  ? eng.pause_flag_active
-                    ? "Resume"
-                    : "Pause"
+                  ? topBar.pauseResumeBtn.label
                   : "Close All"}
               </button>
             </div>

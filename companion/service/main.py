@@ -136,6 +136,9 @@ def main(argv: list[str] | None = None) -> int:
         stop_event.wait(0.5)
         while not stop_event.is_set():
             try:
+                if ctx.mt5_sync.is_manually_disconnected():
+                    stop_event.wait(2.0)
+                    continue
                 if ctx.mt5_sync.connection_status != "CONNECTED":
                     ok = ctx.mt5_sync.connect()
                     if ok:

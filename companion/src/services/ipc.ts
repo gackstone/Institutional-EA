@@ -563,6 +563,12 @@ export const controlClient = {
   getSelfCheck: () => callControl<SelfCheckReport>("GET", "/api/health/selfcheck"),
 
   // Top-bar Safety Controls
+  startEngine: (dryRun?: boolean) =>
+    callControl<{ success: boolean; message: string; state: string; pid?: number; adopted?: boolean }>(
+      "POST",
+      "/api/engine/start",
+      dryRun === undefined ? {} : { dry_run: dryRun }
+    ),
   stopEngine: () => callControl<{ success: boolean; message: string; state: string }>("POST", "/api/engine/stop", {}),
   pauseEntries: () => callControl<{ success: boolean; message: string; state: string }>("POST", "/api/engine/pause", {}),
   resumeEntries: () => callControl<{ success: boolean; message: string; state: string }>("POST", "/api/engine/resume", {}),
@@ -575,6 +581,12 @@ export const controlClient = {
       "POST",
       "/api/mt5/connect",
       terminalPath ? { terminal_path: terminalPath } : {}
+    ),
+  disconnectMT5: () =>
+    callControl<{ success: boolean; error?: string | null; snapshot: ControlStatusPayload["mt5"] }>(
+      "POST",
+      "/api/mt5/disconnect",
+      {}
     ),
   syncMT5: (terminalPath?: string) =>
     callControl<{ success: boolean; error?: string | null; snapshot: ControlStatusPayload["mt5"] }>(
@@ -601,6 +613,13 @@ export const controlClient = {
       fetched_at: string;
     }>("GET", `/api/market/candles?${qs.toString()}`);
   },
+  getChartDrawings: (symbol: string, tf: string, count = 160) => {
+    const qs = new URLSearchParams({ symbol, tf, count: String(count) });
+    return callControl<import("../utils/chartDrawingsSchema").EngineDrawingsFeed>(
+      "GET",
+      `/api/chart/drawings?${qs.toString()}`
+    );
+  },
 
   // Trade & Order Controls
   modifyPosition: (ticket: number, sl: number, tp: number) =>
@@ -608,7 +627,14 @@ export const controlClient = {
   closePosition: (ticket: number, confirmed: boolean) =>
     callControl<{ success: boolean; message: string }>("POST", "/api/trades/close", { ticket, confirmed }),
   closeAllBotPositions: (confirmed: boolean) =>
-    callControl<{ success: boolean; message: string; closed_count?: number }>("POST", "/api/trades/close-all-bot", { confirmed }),
+    callControl<{
+      success: boolean;
+      message: string;
+      closed_count?: number;
+      total_bot_positions?: number;
+      remaining_bot_positions?: number;
+      reconciled?: boolean;
+    }>("POST", "/api/trades/close-all-bot", { confirmed }),
   cancelPendingOrder: (ticket: number, confirmed: boolean) =>
     callControl<{ success: boolean; message: string }>("POST", "/api/orders/cancel", { ticket, confirmed }),
 

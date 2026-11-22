@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 from companion.database.repository import CompanionRepository
 from companion.service.configuration.config_service import ConfigurationService, ConfigurationValidationError
 from companion.service.events.event_bus import EventBus
+from companion.service.market.drawings_engine import ChartDrawingsService
 from companion.service.mt5.ea_deployer import deploy_ea_pipeline, extract_ea_version
 from companion.service.mt5.sync_service import MT5SyncService
 from companion.service.operations.ps_runner import OperationsRunner
@@ -63,6 +64,7 @@ class ControlServiceContext:
         self.config_service = config_service
         self.mt5_sync = mt5_sync
         self.engine = engine
+        self.chart_drawings = ChartDrawingsService(self.project_root, mt5_sync, repo)
         self.operations = operations
         self.btcusd_sample = btcusd_sample
         self.telegram_notifier = telegram_notifier
@@ -265,6 +267,11 @@ def create_request_handler(ctx: ControlServiceContext):
                 from_iso = query.get("from", [None])[0]
                 to_iso = query.get("to", [None])[0]
                 self._send_json(200, ctx.mt5_sync.get_candles(sym, tf, count, from_iso, to_iso))
+            elif path == "/api/chart/drawings":
+                sym = query.get("symbol", ["XAUUSD"])[0]
+                tf = query.get("tf", ["M5"])[0]
+                count = int(query.get("count", ["160"])[0])
+                self._send_json(200, ctx.chart_drawings.get_drawings(sym, tf, count))
             elif path == "/api/analytics/equity":
                 self._send_json(200, {
                     "snapshots": ctx.repo.get_balance_snapshots(limit=500),
@@ -403,6 +410,18 @@ def create_request_handler(ctx: ControlServiceContext):
                 ok = ctx.mt5_sync.connect(terminal_path=term_path)
                 snap = ctx.mt5_sync.sync_all(terminal_path=term_path) if ok else ctx.mt5_sync.get_snapshot()
                 self._send_json(200, {"success": ok, "error": ctx.mt5_sync.last_error, "snapshot": snap})
+            elif path == "/api/mt5/disconnect":
+                eng_status = ctx.engine.get_status()
+                eng_state = eng_status.get("engine_state") or eng_status.get("state") or "STOPPED"
+                if eng_state in ("RUNNING", "PAUSED", "STARTING"):
+                    self._send_json(200, {
+                        "success": False,
+                        "error": "Stop the engine before disconnecting MT5.",
+                        "snapshot": ctx.mt5_sync.get_snapshot(),
+                    })
+                else:
+                    snap = ctx.mt5_sync.disconnect()
+                    self._send_json(200, {"success": True, "error": None, "snapshot": snap})
             elif path == "/api/mt5/sync":
                 term_path = body.get("terminal_path")
                 snap = ctx.mt5_sync.sync_all(target_symbols=body.get("symbols"), terminal_path=term_path)

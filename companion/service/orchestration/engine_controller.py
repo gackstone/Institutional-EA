@@ -129,11 +129,19 @@ class EngineController:
                 return {"success": False, "message": msg, "state": self.engine_state}
 
             cfg = self.config_service.get_full_config()
-            op_mode = cfg.get("operating_mode", "DRY_RUN")
+            op_mode = str(cfg.get("operating_mode", "DRY_RUN")).upper()
+            if op_mode in ("LIVE", "REAL") or cfg.get("settings", {}).get("LIVE_TRADING_ENABLED", False):
+                msg = "Safety Lock: Live trading mode is permanently blocked (DEMO ONLY)."
+                return {"success": False, "message": msg, "state": self.engine_state}
+
+            snap = self.mt5_sync.get_snapshot()
+            if snap.get("connection_status") != "CONNECTED":
+                msg = "Connect MT5 first before starting the engine."
+                return {"success": False, "message": msg, "state": self.engine_state}
+
             use_dry_run = (op_mode in ("DRY_RUN", "OBSERVE")) if dry_run is None else dry_run
 
             if op_mode in ("DEMO_SCALPING", "DEMO_FAST", "DEMO_MANUAL_ASSIST") and not use_dry_run:
-                snap = self.mt5_sync.get_snapshot()
                 acc = snap.get("account", {})
                 if acc.get("account_number") and not acc.get("demo_verified", False):
                     msg = "Safety Lock: Connected MT5 account is not verified as DEMO. Refusing to start automated execution."
@@ -382,8 +390,32 @@ class EngineController:
                 resp = self.mt5_sync.bridge.close_order(ticket=int(p["ticket"]))
                 if isinstance(resp, dict) and resp.get("status") == "SUCCESS":
                     closed += 1
-        self.repo.record_audit("operator", "CLOSE_ALL_BOT_POSITIONS", "EngineController", f"Closed {closed}/{len(bot_positions)} bot-owned positions.")
-        return {"success": True, "closed_count": closed, "total_bot_positions": len(bot_positions)}
+
+        # Reconcile with real MT5 positions before reporting success
+        reconciled_snap = self.mt5_sync.sync_all()
+        remaining_bot = [
+            p for p in reconciled_snap.get("positions", []) if p.get("ownership") == "BOT"
+        ]
+        reconciled_ok = len(remaining_bot) == 0
+        msg = (
+            f"Closed {closed}/{len(bot_positions)} bot position(s) — reconciled with MT5 (0 remaining)."
+            if reconciled_ok
+            else f"Close All partially completed: {len(remaining_bot)} bot position(s) still open in MT5."
+        )
+        self.repo.record_audit(
+            "operator",
+            "CLOSE_ALL_BOT_POSITIONS",
+            "EngineController",
+            f"Closed {closed}/{len(bot_positions)} bot-owned positions; remaining={len(remaining_bot)}.",
+        )
+        return {
+            "success": reconciled_ok,
+            "closed_count": closed,
+            "total_bot_positions": len(bot_positions),
+            "remaining_bot_positions": len(remaining_bot),
+            "reconciled": True,
+            "message": msg,
+        }
 
     def modify_position_sl_tp(self, ticket: int, sl: float, tp: float) -> Dict[str, Any]:
         if not self.mt5_sync.bridge.is_connected():
@@ -464,8 +496,8 @@ class EngineController:
                         volume=float(p.get("volume", 0.0) or 0.0),
                         open_price=float(p.get("open_price", 0.0) or 0.0),
                         current_price=float(p.get("current_price", 0.0) or 0.0),
-                        stop_loss=float(p.get("sl", 0.0) or 0.0),
-                        take_profit=float(p.get("tp", 0.0) or 0.0),
+                        stop_loss=float(p.get("sl") or p.get("stop_loss") or 0.0),
+                        take_profit=float(p.get("tp") or p.get("take_profit") or 0.0),
                         profit=float(p.get("profit", 0.0) or 0.0),
                     )
                     for p in pos_list
@@ -478,14 +510,26 @@ class EngineController:
             except Exception:
                 pass
 
+            active_pid = self._get_active_engine_pid()
+            bridge_pid = self.bridge_proc.pid if self._is_proc_alive(self.bridge_proc) else None
+            op_mode = cfg.get("operating_mode", "DRY_RUN")
+            stop_active = self.stop_flag_path.exists()
+            pause_active = self.pause_flag_path.exists()
+
             return {
                 "state": self.engine_state,
-                "operating_mode": cfg.get("operating_mode", "DRY_RUN"),
+                "engine_state": self.engine_state,
+                "operating_mode": op_mode,
+                "dry_run": op_mode in ("DRY_RUN", "OBSERVE"),
                 "live_trading_locked": True,
-                "stop_flag_present": self.stop_flag_path.exists(),
-                "pause_flag_present": self.pause_flag_path.exists(),
-                "engine_pid": self._get_active_engine_pid(),
-                "bridge_pid": self.bridge_proc.pid if self._is_proc_alive(self.bridge_proc) else None,
+                "stop_flag_present": stop_active,
+                "stop_flag_active": stop_active,
+                "pause_flag_present": pause_active,
+                "pause_flag_active": pause_active,
+                "engine_running": active_pid is not None,
+                "bridge_running": bridge_pid is not None,
+                "engine_pid": active_pid,
+                "bridge_pid": bridge_pid,
                 "started_at": self.started_at,
                 "last_heartbeat": self.last_heartbeat,
                 "last_signal": self.last_signal,
