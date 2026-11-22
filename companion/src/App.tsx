@@ -333,8 +333,41 @@ export const App: React.FC = () => {
     [openPosCount, normalized.recentTrades.length]
   );
 
+  const isElectron = useMemo(() => IPC.isElectron(), []);
+  const titlebarHeightPx = isElectron ? 36 : 0;
+
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden iea-bg-atmosphere text-[#F4F7FF] antialiased font-sans select-none">
+    <div
+      style={{ "--iea-titlebar-h": `${titlebarHeightPx}px` } as React.CSSProperties}
+      className="relative flex h-screen w-screen overflow-hidden iea-bg-atmosphere text-[#F4F7FF] antialiased font-sans select-none"
+    >
+      {/* Electron-Only Native Title Bar Drag Strip (36px) paired with Windows titleBarOverlay */}
+      {isElectron && (
+        <div
+          data-testid="electron-titlebar-strip"
+          style={{
+            height: "36px",
+            paddingRight: "max(144px, calc(100% - env(titlebar-area-width, 100%)))",
+          }}
+          className="iea-drag-region fixed top-0 left-0 right-0 z-50 bg-[#0A152B]/95 backdrop-blur-xl border-b border-[rgba(186,214,255,0.14)] flex items-center justify-between px-3"
+        >
+          <div className="flex items-center space-x-2 min-w-0">
+            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-[#B0F648]/30 via-[#2F497C]/50 to-[#112B42]/80 border border-[#B0F648]/45 flex items-center justify-center shrink-0">
+              <Activity className="w-3 h-3 text-[#B0F648]" />
+            </div>
+            <span className="text-[11px] font-bold tracking-wide text-[#F4F7FF] truncate">
+              {UI_COPY.brand.title}
+            </span>
+            <span className="text-[10px] font-mono text-[#B0F648] opacity-90">
+              {UI_COPY.brand.subtitle}
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-[#8496B8] hidden sm:inline">
+            DEMO · LIVE_TRADING_ENABLED=false
+          </span>
+        </div>
+      )}
+
       {/* Ambient Blurred Light Orbs (Deep Navy-to-Royal-Blue + Lime Sheen) */}
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
         <div className="absolute -left-24 top-1/4 w-[420px] h-[420px] rounded-full bg-[#7196CB]/20 blur-[120px]" />
@@ -355,11 +388,12 @@ export const App: React.FC = () => {
         onFocusCapture={handleSidebarFocusIn}
         onBlurCapture={handleSidebarFocusOut}
         style={{
+          top: `${titlebarHeightPx}px`,
           width: isSidebarExpanded
             ? `${DESIGN_TOKENS.sidebar.expandedWidthPx}px`
             : `${DESIGN_TOKENS.sidebar.collapsedWidthPx}px`,
         }}
-        className="fixed top-0 bottom-0 left-0 z-40 iea-sidebar-rail flex flex-col justify-between overflow-hidden"
+        className="iea-no-drag fixed bottom-0 left-0 z-40 iea-sidebar-rail flex flex-col justify-between overflow-hidden"
       >
         {/* Top Brand Block + Navigation */}
         <div className="flex flex-col min-h-0 flex-1">
@@ -558,8 +592,11 @@ export const App: React.FC = () => {
           MAIN CONTENT AREA
       ====================================================================== */}
       <div
-        style={{ paddingLeft: `${DESIGN_TOKENS.sidebar.collapsedWidthPx}px` }}
-        className="relative z-10 flex-1 min-w-0 flex flex-col h-screen overflow-hidden"
+        style={{
+          paddingLeft: `${DESIGN_TOKENS.sidebar.collapsedWidthPx}px`,
+          paddingTop: `${titlebarHeightPx}px`,
+        }}
+        className="iea-no-drag relative z-10 flex-1 min-w-0 flex flex-col h-screen overflow-hidden"
       >
         {/* Consistent Glass Navigation Header Bar (when viewing any sub-screen) */}
         {activeScreen !== "dashboard" && (

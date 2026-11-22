@@ -1942,8 +1942,13 @@ function createWindow() {
     height: 880,
     minWidth: 1080,
     minHeight: 720,
-    frame: false,
-    backgroundColor: "#0b0e14",
+    titleBarStyle: "hidden",
+    titleBarOverlay: {
+      color: "#0A152B",
+      symbolColor: "#F4F7FF",
+      height: 36
+    },
+    backgroundColor: "#091426",
     title: "Institutional EA",
     icon: path.join(__dirname, "icon.png"),
     webPreferences: {
