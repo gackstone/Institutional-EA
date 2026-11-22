@@ -46,7 +46,7 @@ import {
   deriveTopBarControlState,
   sanitizeControlError,
 } from "../../utils/topBarControlState";
-import { getSymbolChipSpec } from "../../styles/designTokens";
+import { getNeutralSymbolChipSpec } from "../../styles/designTokens";
 import { UI_COPY } from "../../constants/uiCopy";
 import { LiveTradingChart } from "../LiveTradingChart";
 import { PanelErrorBoundary } from "../ErrorBoundary";
@@ -497,16 +497,16 @@ export const DashboardScreen: React.FC<
   };
 
   return (
-    <div className="max-w-[1920px] mx-auto space-y-3.5 text-[#F4F7FF]">
+    <div className="max-w-[1920px] mx-auto space-y-3.5 text-[#F5F5F2]">
       {/* Compact Connection / Stale / Emergency Banner States */}
       {feedStatus === "DISCONNECTED" && (
         <div
           role="alert"
           title="Local Python Control Service unreachable on 127.0.0.1:8765"
-          className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-[#FF5A6E]/18 border border-[#FF5A6E]/50 backdrop-blur-xl text-xs text-[#F4F7FF]"
+          className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-[#F07178]/18 border border-[#F07178]/50 backdrop-blur-xl text-xs text-[#F5F5F2]"
         >
           <div className="flex items-center space-x-2">
-            <WifiOff className="w-4 h-4 text-[#FF5A6E] shrink-0" />
+            <WifiOff className="w-4 h-4 text-[#F07178] shrink-0" />
             <span>
               <strong>Svc Offline (127.0.0.1:8765)</strong> · Cached DEMO
             </span>
@@ -514,7 +514,7 @@ export const DashboardScreen: React.FC<
           <button
             type="button"
             onClick={() => onRefresh()}
-            className="px-3 py-1 rounded-full bg-[#FF5A6E] hover:bg-[#FF7A8A] text-white font-semibold transition"
+            className="px-3 py-1 rounded-full bg-[#F07178] hover:bg-[#F5989E] text-white font-semibold transition"
           >
             Reconnect
           </button>
@@ -525,16 +525,16 @@ export const DashboardScreen: React.FC<
         <div
           role="alert"
           title="Last MT5 sync heartbeat exceeded 15 seconds"
-          className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-[#FBBF24]/18 border border-[#FBBF24]/50 backdrop-blur-xl text-xs text-[#F4F7FF]"
+          className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-[#EAB354]/18 border border-[#EAB354]/50 backdrop-blur-xl text-xs text-[#F5F5F2]"
         >
           <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-4 h-4 text-[#FBBF24] shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-[#EAB354] shrink-0" />
             <strong>Stale Sync (&gt;15s)</strong>
           </div>
           <button
             type="button"
             onClick={() => onRefresh()}
-            className="px-3 py-1 rounded-full bg-[#FBBF24] text-[#081321] font-semibold transition"
+            className="px-3 py-1 rounded-full bg-[#EAB354] text-[#121110] font-semibold transition"
           >
             Sync
           </button>
@@ -545,18 +545,18 @@ export const DashboardScreen: React.FC<
         <div
           role="alert"
           title="Emergency STOP.flag kill switch is active; all new entries are blocked"
-          className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-[#FF5A6E]/22 border border-[#FF5A6E]/60 backdrop-blur-xl text-xs"
+          className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-[#F07178]/22 border border-[#F07178]/60 backdrop-blur-xl text-xs"
         >
           <div className="flex items-center space-x-2">
-            <ShieldAlert className="w-4 h-4 text-[#FF5A6E] shrink-0" />
-            <span className="font-bold text-[#FFD9DF]">STOP.flag ACTIVE · Entries Blocked</span>
+            <ShieldAlert className="w-4 h-4 text-[#F07178] shrink-0" />
+            <span className="font-bold text-[#F5B5B9]">STOP.flag ACTIVE · Entries Blocked</span>
           </div>
           <button
             type="button"
             onClick={() =>
               executeControlAction("Clear Stop", () => controlClient.clearEmergencyStop(true))
             }
-            className="px-3 py-1 rounded-full bg-[#B0F648] hover:bg-[#C2F076] text-[#081321] font-bold transition"
+            className="px-3 py-1 rounded-full bg-[#36B37E] hover:bg-[#3FC48B] text-[#121110] font-bold transition"
           >
             Clear Stop
           </button>
@@ -569,7 +569,7 @@ export const DashboardScreen: React.FC<
       <PanelErrorBoundary panelName="Top Control Bar">
       <section
         aria-label="Terminal Top Status Bar"
-        className="iea-glass-card relative flex flex-wrap items-center justify-between gap-2 px-3.5 py-2"
+        className="iea-card relative flex flex-wrap items-center justify-between gap-2 px-3.5 py-2"
       >
         <div className="flex flex-wrap items-center gap-1.5 text-xs min-w-0">
           {/* MT5 Connection + Masked Account */}
@@ -582,14 +582,14 @@ export const DashboardScreen: React.FC<
             className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 whitespace-nowrap"
           >
             {topBar.mt5Connected ? (
-              <Wifi className="w-3.5 h-3.5 text-[#B0F648] shrink-0" />
+              <Wifi className="w-3.5 h-3.5 text-[#6EE7B7] shrink-0" />
             ) : (
-              <WifiOff className="w-3.5 h-3.5 text-[#FF5A6E] shrink-0" />
+              <WifiOff className="w-3.5 h-3.5 text-[#F07178] shrink-0" />
             )}
-            <span className="font-medium text-[#F4F7FF]">MT5</span>
+            <span className="font-medium text-[#F5F5F2]">MT5</span>
             <span
               className={`font-mono font-bold ${
-                topBar.mt5Connected ? "text-[#B0F648]" : "text-[#8496B8]"
+                topBar.mt5Connected ? "text-[#6EE7B7]" : "text-[#8A8986]"
               }`}
               data-testid="masked-account-badge"
             >
@@ -605,37 +605,37 @@ export const DashboardScreen: React.FC<
             }`}
             className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full border font-mono text-[11px] font-bold whitespace-nowrap ${
               topBar.engineChipTone === "lime"
-                ? "bg-[#B0F648]/16 border-[#B0F648]/50 text-[#B0F648]"
+                ? "bg-[#6EE7B7]/16 border-[#6EE7B7]/50 text-[#6EE7B7]"
                 : topBar.engineChipTone === "amber"
-                ? "bg-[#FBBF24]/16 border-[#FBBF24]/50 text-[#FBBF24]"
+                ? "bg-[#EAB354]/16 border-[#EAB354]/50 text-[#EAB354]"
                 : topBar.engineChipTone === "red"
-                ? "bg-[#FF5A6E]/18 border-[#FF5A6E]/55 text-[#FF7A8A]"
-                : "bg-[#192E58]/60 border-[rgba(186,214,255,0.2)] text-[#B6C5E0]"
+                ? "bg-[#F07178]/18 border-[#F07178]/55 text-[#F5989E]"
+                : "bg-[#242320]/60 border-[rgba(255,255,253,0.11)] text-[#B4B3B0]"
             }`}
           >
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
                 topBar.engineChipTone === "lime"
-                  ? "bg-[#B0F648] shadow-[0_0_8px_#B0F648]"
+                  ? "bg-[#6EE7B7] "
                   : topBar.engineChipTone === "amber"
-                  ? "bg-[#FBBF24]"
+                  ? "bg-[#EAB354]"
                   : topBar.engineChipTone === "red"
-                  ? "bg-[#FF5A6E]"
-                  : "bg-[#8496B8]"
+                  ? "bg-[#F07178]"
+                  : "bg-[#8A8986]"
               }`}
             />
             <span>{topBar.engineStateLabel}</span>
             <span className="opacity-60">·</span>
-            <span className="text-[#F4F7FF]/90">{topBar.modeShort}</span>
+            <span className="text-[#F5F5F2]/90">{topBar.modeShort}</span>
           </div>
 
           {/* Hard Safety Lock Badge */}
           <div
             data-testid="demo-lock-badge"
             title={UI_COPY.brand.demoLockTooltip}
-            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-[#B0F648]/14 border border-[#B0F648]/45 text-[#C2F076] font-mono text-[11px] font-bold whitespace-nowrap"
+            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-[#6EE7B7]/14 border border-[#6EE7B7]/45 text-[#6EE7B7] font-mono text-[11px] font-bold whitespace-nowrap"
           >
-            <Lock className="w-3 h-3 text-[#B0F648] shrink-0" />
+            <Lock className="w-3 h-3 text-[#6EE7B7] shrink-0" />
             <span>{UI_COPY.brand.demoLockChip}</span>
           </div>
 
@@ -649,20 +649,20 @@ export const DashboardScreen: React.FC<
               <span
                 className={`w-2 h-2 rounded-full shrink-0 ${
                   serviceStatus.status === "ONLINE"
-                    ? "bg-[#B0F648] shadow-[0_0_8px_#B0F648]"
+                    ? "bg-[#6EE7B7] "
                     : serviceStatus.status === "STARTING"
-                    ? "bg-[#FBBF24]"
-                    : "bg-[#FF5A6E]"
+                    ? "bg-[#EAB354]"
+                    : "bg-[#F07178]"
                 }`}
               />
-              <span className="text-[#B6C5E0]">SVC</span>
+              <span className="text-[#B4B3B0]">SVC</span>
               <span
                 className={`font-bold ${
                   serviceStatus.status === "ONLINE"
-                    ? "text-[#B0F648]"
+                    ? "text-[#6EE7B7]"
                     : serviceStatus.status === "STARTING"
-                    ? "text-[#FBBF24]"
-                    : "text-[#FF5A6E]"
+                    ? "text-[#EAB354]"
+                    : "text-[#F07178]"
                 }`}
               >
                 {serviceStatus.status === "ONLINE"
@@ -675,7 +675,7 @@ export const DashboardScreen: React.FC<
                 <button
                   type="button"
                   onClick={() => onReconnectService()}
-                  className="ml-1 px-2 py-0.5 rounded-full bg-[#B0F648] text-[#081321] font-bold text-[10px] hover:bg-[#C2F076] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648]"
+                  className="ml-1 px-2 py-0.5 rounded-full bg-[#F5F5F2] text-[#121110] font-bold text-[10px] hover:bg-[#FFFFFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6EE7B7]"
                 >
                   Reconnect
                 </button>
@@ -691,14 +691,14 @@ export const DashboardScreen: React.FC<
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
                 effectiveStatus.mt5.zmq_bridge?.port_5555
-                  ? "bg-[#B0F648] shadow-[0_0_8px_#B0F648]"
-                  : "bg-[#8496B8]"
+                  ? "bg-[#6EE7B7] "
+                  : "bg-[#8A8986]"
               }`}
             />
-            <span className="text-[#B6C5E0]">ZMQ</span>
+            <span className="text-[#B4B3B0]">ZMQ</span>
             <span
               className={`font-bold ${
-                effectiveStatus.mt5.zmq_bridge?.port_5555 ? "text-[#B0F648]" : "text-[#8496B8]"
+                effectiveStatus.mt5.zmq_bridge?.port_5555 ? "text-[#6EE7B7]" : "text-[#8A8986]"
               }`}
             >
               {effectiveStatus.mt5.zmq_bridge?.port_5555 ? "5555 UP" : "5555 IDLE"}
@@ -713,10 +713,10 @@ export const DashboardScreen: React.FC<
             }
             aria-label="Telegram status and quick connectivity test"
             title="Telegram notification dispatcher ready (click to test)"
-            className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 text-[11px] text-[#F4F7FF] whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EEAD4]"
+            className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 text-[11px] text-[#F5F5F2] whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EC2C6]"
           >
-            <Send className="w-3 h-3 text-[#5EEAD4] shrink-0" />
-            <span className="text-[#B0F648] font-semibold">TG Ready</span>
+            <Send className="w-3 h-3 text-[#5EC2C6] shrink-0" />
+            <span className="text-[#6EE7B7] font-semibold">TG Ready</span>
           </button>
 
           {/* Live UTC Clock */}
@@ -724,8 +724,8 @@ export const DashboardScreen: React.FC<
             title="Live UTC Terminal Clock"
             className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 text-[11px] whitespace-nowrap"
           >
-            <Clock className="w-3 h-3 text-[#8496B8] shrink-0" />
-            <span className="font-mono text-[#F4F7FF] tabular-nums" data-testid="utc-clock">
+            <Clock className="w-3 h-3 text-[#8A8986] shrink-0" />
+            <span className="font-mono text-[#F5F5F2] tabular-nums" data-testid="utc-clock">
               {utcClockText}
             </span>
           </div>
@@ -740,11 +740,11 @@ export const DashboardScreen: React.FC<
           {!readOnlyMobile && (
             <div className="relative inline-flex items-center">
               {topBar.connectBtn.showDisconnect ? (
-                <div className="inline-flex items-center rounded-full bg-[#192E58]/55 border border-[#5EEAD4]/35 text-xs overflow-hidden">
+                <div className="inline-flex items-center rounded-full bg-[#242320]/55 border border-[#5EC2C6]/35 text-xs overflow-hidden">
                   <span
                     data-testid="btn-connect-mt5-connected"
                     title={topBar.connectBtn.tooltip}
-                    className="px-2.5 py-1 text-[#5EEAD4] font-semibold inline-flex items-center space-x-1 whitespace-nowrap"
+                    className="px-2.5 py-1 text-[#5EC2C6] font-semibold inline-flex items-center space-x-1 whitespace-nowrap"
                   >
                     <Plug className="w-3 h-3 shrink-0" />
                     <span>Connected</span>
@@ -756,7 +756,7 @@ export const DashboardScreen: React.FC<
                     onClick={handleDisconnectMt5Click}
                     aria-label="Disconnect MT5"
                     title={topBar.connectBtn.disconnectTooltip}
-                    className="px-2 py-1 border-l border-[#5EEAD4]/25 text-[#B6C5E0] hover:text-[#FF7A8A] hover:bg-[#FF5A6E]/15 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center space-x-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EEAD4]"
+                    className="px-2 py-1 border-l border-[#5EC2C6]/25 text-[#B4B3B0] hover:text-[#F5989E] hover:bg-[#F07178]/15 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center space-x-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EC2C6]"
                   >
                     {busyAction === "Disconnect MT5" ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
@@ -774,7 +774,7 @@ export const DashboardScreen: React.FC<
                   onClick={handleConnectMt5Click}
                   aria-label="Connect MT5 terminal"
                   title={topBar.connectBtn.tooltip}
-                  className="px-3 py-1.5 rounded-full bg-[#5EEAD4]/14 hover:bg-[#5EEAD4]/24 border border-[#5EEAD4]/55 disabled:opacity-40 disabled:cursor-not-allowed text-[#5EEAD4] text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EEAD4]"
+                  className="px-3 py-1.5 rounded-full bg-[#5EC2C6]/14 hover:bg-[#5EC2C6]/24 border border-[#5EC2C6]/55 disabled:opacity-40 disabled:cursor-not-allowed text-[#5EC2C6] text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EC2C6]"
                 >
                   {topBar.mt5Syncing || busyAction === "Connect MT5" || busyAction === "Scan MT5" ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
@@ -793,14 +793,14 @@ export const DashboardScreen: React.FC<
                 <div
                   role="menu"
                   aria-label="Select MT5 Terminal"
-                  className="absolute right-0 top-full mt-2 z-50 w-72 iea-glass-card p-2 shadow-2xl border border-[#5EEAD4]/40 space-y-1"
+                  className="absolute right-0 top-full mt-2 z-50 w-72 iea-card p-2 shadow-2xl border border-[#5EC2C6]/40 space-y-1"
                 >
-                  <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#8496B8]">
+                  <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#8A8986]">
                     <span>Select MT5 Terminal ({mt5PickerTerminals.length})</span>
                     <button
                       type="button"
                       onClick={() => setMt5PickerTerminals(null)}
-                      className="text-[#B6C5E0] hover:text-white"
+                      className="text-[#B4B3B0] hover:text-white"
                     >
                       Close
                     </button>
@@ -810,16 +810,16 @@ export const DashboardScreen: React.FC<
                       key={t.executablePath}
                       type="button"
                       onClick={() => connectToTerminalPath(t.executablePath)}
-                      className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-[#5EEAD4]/15 text-xs transition flex items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EEAD4]"
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-[#5EC2C6]/15 text-xs transition flex items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EC2C6]"
                     >
                       <div className="min-w-0">
-                        <div className="font-semibold text-[#F4F7FF] truncate">{t.name}</div>
-                        <div className="text-[10px] font-mono text-[#8496B8] truncate">
+                        <div className="font-semibold text-[#F5F5F2] truncate">{t.name}</div>
+                        <div className="text-[10px] font-mono text-[#8A8986] truncate">
                           {t.executablePath}
                         </div>
                       </div>
                       {t.isRunning && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-[#B0F648]/20 text-[#B0F648] text-[9px] font-mono font-bold shrink-0">
+                        <span className="px-1.5 py-0.5 rounded-full bg-[#6EE7B7]/20 text-[#6EE7B7] text-[9px] font-mono font-bold shrink-0">
                           RUN
                         </span>
                       )}
@@ -839,7 +839,7 @@ export const DashboardScreen: React.FC<
               onClick={handleStartEngineClick}
               aria-label="Start trading engine"
               title={topBar.startBtn.tooltip}
-              className="px-3 py-1.5 rounded-full bg-[#B0F648] hover:bg-[#C2F076] disabled:bg-[#B0F648]/25 disabled:text-[#B0F648]/60 disabled:border disabled:border-[#B0F648]/30 disabled:cursor-not-allowed text-[#081321] text-xs font-extrabold inline-flex items-center space-x-1.5 whitespace-nowrap shadow-[0_2px_12px_rgba(176,246,72,0.28)] disabled:shadow-none transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648]"
+              className="px-3 py-1.5 rounded-full bg-[#36B37E] hover:bg-[#3FC48B] disabled:bg-[#6EE7B7]/25 disabled:text-[#6EE7B7]/60 disabled:border disabled:border-[#6EE7B7]/30 disabled:cursor-not-allowed text-[#121110] text-xs font-extrabold inline-flex items-center space-x-1.5 whitespace-nowrap  disabled:shadow-none transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6EE7B7]"
             >
               {busyAction === "Start" ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
@@ -872,8 +872,8 @@ export const DashboardScreen: React.FC<
             title={topBar.pauseResumeBtn.tooltip}
             className={`px-3 py-1.5 rounded-full border disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition duration-200 focus-visible:outline-none focus-visible:ring-2 ${
               topBar.pauseResumeBtn.tone === "lime"
-                ? "bg-[#B0F648]/20 hover:bg-[#B0F648]/30 border-[#B0F648]/55 text-[#B0F648] focus-visible:ring-[#B0F648]"
-                : "bg-[#FBBF24]/20 hover:bg-[#FBBF24]/30 border-[#FBBF24]/55 text-[#FBBF24] focus-visible:ring-[#FBBF24]"
+                ? "bg-[#6EE7B7]/20 hover:bg-[#6EE7B7]/30 border-[#6EE7B7]/55 text-[#6EE7B7] focus-visible:ring-[#6EE7B7]"
+                : "bg-[#EAB354]/20 hover:bg-[#EAB354]/30 border-[#EAB354]/55 text-[#EAB354] focus-visible:ring-[#EAB354]"
             }`}
           >
             {busyAction === "Pause" || busyAction === "Resume" ? (
@@ -895,12 +895,12 @@ export const DashboardScreen: React.FC<
               onClick={() => setConfirmModal({ type: "STOP", step: 1 })}
               aria-label="Stop trading engine"
               title={topBar.stopBtn.tooltip}
-              className="iea-pill-control px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed text-[#F4F7FF] text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F4F7FF]"
+              className="px-3 py-1.5 rounded-full bg-[#D94854]/12 hover:bg-[#D94854]/20 border border-[#F07178]/35 disabled:opacity-40 disabled:cursor-not-allowed text-[#F5989E] text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F07178]"
             >
               {busyAction === "Stop" ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-[#FF5A6E]" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-[#F07178]" />
               ) : (
-                <Square className="w-3.5 h-3.5 shrink-0 text-[#FF5A6E]" />
+                <Square className="w-3.5 h-3.5 shrink-0 text-[#F07178]" />
               )}
               <span>{topBar.stopBtn.label}</span>
             </button>
@@ -908,7 +908,7 @@ export const DashboardScreen: React.FC<
 
           {/* 5. Visually separated Close All on far right */}
           {!readOnlyMobile && (
-            <div className="ml-1.5 pl-2.5 border-l border-[rgba(186,214,255,0.2)]">
+            <div className="ml-1.5 pl-2.5 border-l border-[rgba(255,255,253,0.11)]">
               <button
                 type="button"
                 data-testid="btn-close-all"
@@ -916,7 +916,7 @@ export const DashboardScreen: React.FC<
                 onClick={() => setConfirmModal({ type: "CLOSE_ALL", step: 1 })}
                 aria-label="Close all bot-owned positions (two-step confirmation)"
                 title={topBar.closeAllBtn.tooltip}
-                className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#FF5A6E] to-[#E11D48] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold inline-flex items-center space-x-1.5 whitespace-nowrap shadow-[0_4px_16px_rgba(255,90,110,0.4)] disabled:shadow-none transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A6E]"
+                className="px-3.5 py-1.5 rounded-full bg-[#D94854] hover:bg-[#E35662] disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold inline-flex items-center space-x-1.5 whitespace-nowrap  disabled:shadow-none transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F07178]"
               >
                 {busyAction === "Close All" ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
@@ -941,16 +941,16 @@ export const DashboardScreen: React.FC<
       >
         {/* 1. Bal / Eq */}
         <div
-          className="iea-glass-card p-4 flex flex-col justify-between min-h-[112px]"
+          className="iea-card p-4 flex flex-col justify-between min-h-[112px]"
           title={`${UI_COPY.kpis.balEq.tooltip} · ${provenanceLabel}`}
         >
-          <div className="flex items-center justify-between text-xs text-[#B6C5E0]">
+          <div className="flex items-center justify-between text-xs text-[#B4B3B0]">
             <span className="font-medium">{UI_COPY.kpis.balEq.label}</span>
             <span
               className={`font-mono text-[10px] px-2 py-0.5 rounded-full border ${
                 dash.provenance.stale
-                  ? "text-[#FBBF24] bg-[#FBBF24]/15 border-[#FBBF24]/35"
-                  : "text-[#B0F648] bg-[#B0F648]/14 border-[#B0F648]/30"
+                  ? "text-[#EAB354] bg-[#EAB354]/15 border-[#EAB354]/35"
+                  : "text-[#6EE7B7] bg-[#6EE7B7]/14 border-[#6EE7B7]/30"
               }`}
             >
               {dash.connected
@@ -958,12 +958,12 @@ export const DashboardScreen: React.FC<
                 : "Waiting"}
             </span>
           </div>
-          <div className="text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight text-[#F4F7FF] mt-2">
+          <div className="text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight text-[#F5F5F2] mt-2">
             {kpis.equity !== null
               ? `$${kpis.equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
               : "—"}
           </div>
-          <div className="text-[11px] font-mono tabular-nums text-[#8496B8] mt-1.5 flex items-center justify-between">
+          <div className="text-[11px] font-mono tabular-nums text-[#8A8986] mt-1.5 flex items-center justify-between">
             <span>
               {kpis.balance !== null
                 ? `Bal $${kpis.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -972,7 +972,7 @@ export const DashboardScreen: React.FC<
             {kpis.floatingPnl !== null && (
               <span
                 className={
-                  kpis.floatingPnl >= 0 ? "text-[#B0F648] font-semibold" : "text-[#FF5A6E] font-semibold"
+                  kpis.floatingPnl >= 0 ? "text-[#6EE7B7] font-semibold" : "text-[#F07178] font-semibold"
                 }
               >
                 {kpis.floatingPnl >= 0 ? "+" : ""}${kpis.floatingPnl.toFixed(2)}
@@ -983,24 +983,24 @@ export const DashboardScreen: React.FC<
 
         {/* 2. Today P&L (Primary Accent Highlight) */}
         <div
-          className="iea-glass-card-lime p-4 flex flex-col justify-between min-h-[112px]"
+          className="iea-card p-4 flex flex-col justify-between min-h-[112px]"
           title={`${UI_COPY.kpis.todayPnl.tooltip} · ${provenanceLabel}`}
         >
-          <div className="flex items-center justify-between text-xs text-[#C2F076]">
+          <div className="flex items-center justify-between text-xs text-[#6EE7B7]">
             <span className="font-medium">{UI_COPY.kpis.todayPnl.label}</span>
             {(kpis.todayPnlUsd ?? 0) >= 0 ? (
-              <TrendingUp className="w-4 h-4 text-[#B0F648]" />
+              <TrendingUp className="w-4 h-4 text-[#6EE7B7]" />
             ) : (
-              <TrendingDown className="w-4 h-4 text-[#FF5A6E]" />
+              <TrendingDown className="w-4 h-4 text-[#F07178]" />
             )}
           </div>
           <div
             className={`text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight mt-2 ${
               kpis.todayPnlUsd === null
-                ? "text-[#8496B8]"
+                ? "text-[#8A8986]"
                 : kpis.todayPnlUsd >= 0
-                ? "text-[#B0F648]"
-                : "text-[#FF5A6E]"
+                ? "text-[#6EE7B7]"
+                : "text-[#F07178]"
             }`}
           >
             {kpis.todayPnlUsd !== null ? (
@@ -1017,7 +1017,7 @@ export const DashboardScreen: React.FC<
               "—"
             )}
           </div>
-          <div className="text-[11px] font-mono tabular-nums text-[#B6C5E0] mt-1.5">
+          <div className="text-[11px] font-mono tabular-nums text-[#B4B3B0] mt-1.5">
             {kpis.balance !== null
               ? `1R = $${(kpis.balance * 0.005).toFixed(2)} · ${provenanceLabel}`
               : provenanceLabel}
@@ -1026,24 +1026,24 @@ export const DashboardScreen: React.FC<
 
         {/* 3. Daily Loss */}
         <div
-          className="iea-glass-card p-4 flex flex-col justify-between min-h-[112px]"
+          className="iea-card p-4 flex flex-col justify-between min-h-[112px]"
           title={UI_COPY.kpis.dailyLoss.tooltip}
         >
-          <div className="flex items-center justify-between text-xs text-[#B6C5E0]">
+          <div className="flex items-center justify-between text-xs text-[#B4B3B0]">
             <span className="font-medium">{UI_COPY.kpis.dailyLoss.label}</span>
-            <span className="font-mono tabular-nums text-[11px] text-[#F4F7FF]">
+            <span className="font-mono tabular-nums text-[11px] text-[#F5F5F2]">
               {kpis.dailyLossUsedPct.toFixed(2)}% / {kpis.dailyLossLimitPct.toFixed(1)}%
             </span>
           </div>
-          <div className="text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight text-[#F4F7FF] mt-2">
+          <div className="text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight text-[#F5F5F2] mt-2">
             ${kpis.dailyLossUsedUsd.toFixed(0)}{" "}
-            <span className="text-xs text-[#8496B8] font-normal">
+            <span className="text-xs text-[#8A8986] font-normal">
               / ${kpis.dailyLossLimitUsd.toFixed(0)}
             </span>
           </div>
-          <div className="w-full h-1.5 bg-[#091426]/80 rounded-full overflow-hidden mt-2 border border-[rgba(186,214,255,0.12)]">
+          <div className="w-full h-1.5 bg-[#0E0D0B]/80 rounded-full overflow-hidden mt-2 border border-[rgba(255,255,253,0.07)]">
             <div
-              className="h-full bg-[#B0F648] rounded-full shadow-[0_0_8px_#B0F648]"
+              className="h-full bg-[#6EE7B7] rounded-full "
               style={{
                 width: `${Math.min(100, (kpis.dailyLossUsedPct / kpis.dailyLossLimitPct) * 100)}%`,
               }}
@@ -1053,24 +1053,24 @@ export const DashboardScreen: React.FC<
 
         {/* 4. DD vs Cap */}
         <div
-          className="iea-glass-card p-4 flex flex-col justify-between min-h-[112px]"
+          className="iea-card p-4 flex flex-col justify-between min-h-[112px]"
           title={UI_COPY.kpis.ddCap.tooltip}
         >
-          <div className="flex items-center justify-between text-xs text-[#B6C5E0]">
+          <div className="flex items-center justify-between text-xs text-[#B4B3B0]">
             <span className="font-medium">{UI_COPY.kpis.ddCap.label}</span>
-            <span className="font-mono text-[10px] text-[#B0F648] bg-[#B0F648]/14 px-2 py-0.5 rounded-full">
+            <span className="font-mono text-[10px] text-[#6EE7B7] bg-[#6EE7B7]/14 px-2 py-0.5 rounded-full">
               SAFE
             </span>
           </div>
-          <div className="text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight text-[#F4F7FF] mt-2">
+          <div className="text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight text-[#F5F5F2] mt-2">
             {kpis.totalDrawdownUsedPct.toFixed(2)}%{" "}
-            <span className="text-xs text-[#8496B8] font-normal">
+            <span className="text-xs text-[#8A8986] font-normal">
               / {kpis.totalDrawdownCapPct.toFixed(1)}%
             </span>
           </div>
-          <div className="w-full h-1.5 bg-[#091426]/80 rounded-full overflow-hidden mt-2 border border-[rgba(186,214,255,0.12)]">
+          <div className="w-full h-1.5 bg-[#0E0D0B]/80 rounded-full overflow-hidden mt-2 border border-[rgba(255,255,253,0.07)]">
             <div
-              className="h-full bg-[#5EEAD4] rounded-full"
+              className="h-full bg-[#5EC2C6] rounded-full"
               style={{
                 width: `${Math.min(100, (kpis.totalDrawdownUsedPct / kpis.totalDrawdownCapPct) * 100)}%`,
               }}
@@ -1080,24 +1080,24 @@ export const DashboardScreen: React.FC<
 
         {/* 5. Open Exp (Simplified — spans 2 cols at sm so there is never an empty hole) */}
         <div
-          className="iea-glass-card p-4 flex flex-col justify-between min-h-[112px] sm:col-span-2 lg:col-span-1"
+          className="iea-card p-4 flex flex-col justify-between min-h-[112px] sm:col-span-2 lg:col-span-1"
           title={UI_COPY.kpis.openExp.tooltip}
         >
-          <div className="flex items-center justify-between text-xs text-[#B6C5E0]">
+          <div className="flex items-center justify-between text-xs text-[#B4B3B0]">
             <span className="font-medium">{UI_COPY.kpis.openExp.label}</span>
-            <span className="font-mono text-[10px] text-[#5EEAD4] bg-[#5EEAD4]/14 px-2 py-0.5 rounded-full">
+            <span className="font-mono text-[10px] text-[#5EC2C6] bg-[#5EC2C6]/14 px-2 py-0.5 rounded-full">
               {activePositions.length} Open
             </span>
           </div>
-          <div className="text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight text-[#F4F7FF] mt-2">
+          <div className="text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight text-[#F5F5F2] mt-2">
             {activePositions.length}{" "}
-            <span className="text-xs text-[#8496B8] font-normal">
+            <span className="text-xs text-[#8A8986] font-normal">
               Pos · {kpis.pendingOrdersCount} Ord
             </span>
           </div>
-          <div className="text-[11px] font-mono tabular-nums text-[#8496B8] mt-1.5 flex items-center justify-between">
+          <div className="text-[11px] font-mono tabular-nums text-[#8A8986] mt-1.5 flex items-center justify-between">
             <span>Bot {botOpenCount}</span>
-            <span className="text-[#B0F648]">SL Guarded</span>
+            <span className="text-[#6EE7B7]">SL Guarded</span>
           </div>
         </div>
       </section>
@@ -1137,19 +1137,19 @@ export const DashboardScreen: React.FC<
       <PanelErrorBoundary panelName="Positions Table">
       <section
         aria-label="Open Positions and Pending Orders"
-        className="iea-glass-card p-4 md:p-5 space-y-3"
+        className="iea-card p-4 md:p-5 space-y-3"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center space-x-3">
             <h2
-              className="text-sm font-semibold text-[#F4F7FF]"
+              className="text-sm font-semibold text-[#F5F5F2]"
               title="Active MT5 positions & pending orders (Rule R9.3 Tighten-Only SL)"
             >
               Open Positions &amp; Orders ({activePositions.length})
             </h2>
             <span
               title="All open positions carry verified server-side Stop Loss protection"
-              className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-[#B0F648]/14 border border-[#B0F648]/35 text-[#B0F648] font-mono text-[10px] font-semibold"
+              className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-[#6EE7B7]/14 border border-[#6EE7B7]/35 text-[#6EE7B7] font-mono text-[10px] font-semibold"
             >
               <ShieldCheck className="w-3 h-3" />
               <span>SL Guarded</span>
@@ -1157,21 +1157,21 @@ export const DashboardScreen: React.FC<
           </div>
 
           <div className="flex items-center space-x-3 text-xs">
-            <span className="text-[#B6C5E0]">
-              Pending Ord: <strong className="font-mono text-[#F4F7FF]">{kpis.pendingOrdersCount}</strong>
+            <span className="text-[#B4B3B0]">
+              Pending Ord: <strong className="font-mono text-[#F5F5F2]">{kpis.pendingOrdersCount}</strong>
             </span>
             <button
               type="button"
               onClick={() => onNavigate("positions")}
-              className="iea-pill-control px-3 py-1 text-[11px] text-[#B0F648] hover:text-[#C2F076] font-semibold"
+              className="iea-pill-control px-3 py-1 text-[11px] text-[#6EE7B7] hover:text-[#6EE7B7] font-semibold"
             >
               Full View →
             </button>
           </div>
         </div>
 
-        <div className="overflow-x-auto max-h-[340px] overflow-y-auto rounded-2xl border border-[rgba(186,214,255,0.12)]">
-          <table className="w-full text-left text-xs iea-glass-table">
+        <div className="overflow-x-auto max-h-[340px] overflow-y-auto rounded-2xl border border-[rgba(255,255,253,0.07)]">
+          <table className="w-full text-left text-xs iea-table">
             <thead className="sticky top-0 z-10 backdrop-blur-md">
               <tr>
                 <th className="py-2.5 pl-4 pr-3">Instrument</th>
@@ -1186,7 +1186,7 @@ export const DashboardScreen: React.FC<
             <tbody className="font-mono tabular-nums">
               {activePositions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-[#8496B8] font-sans">
+                  <td colSpan={7} className="py-8 text-center text-[#8A8986] font-sans">
                     No open positions.
                   </td>
                 </tr>
@@ -1209,7 +1209,7 @@ export const DashboardScreen: React.FC<
                     volumeLots: pos.volume,
                     contractValuePerPoint: contractVal,
                   });
-                  const chip = getSymbolChipSpec(pos.symbol);
+                  const chip = getNeutralSymbolChipSpec(pos.symbol);
 
                   return (
                     <tr key={pos.ticket}>
@@ -1225,11 +1225,11 @@ export const DashboardScreen: React.FC<
                               type="button"
                               onClick={() => setSelectedSymbol(symClean)}
                               title={`Focus ${symClean} on chart`}
-                              className="font-bold text-[#F4F7FF] hover:text-[#B0F648] transition"
+                              className="font-bold text-[#F5F5F2] hover:text-[#6EE7B7] transition"
                             >
                               {pos.symbol}
                             </button>
-                            <div className="text-[10px] font-sans text-[#8496B8]">#{pos.ticket}</div>
+                            <div className="text-[10px] font-sans text-[#8A8986]">#{pos.ticket}</div>
                           </div>
                         </div>
                       </td>
@@ -1238,33 +1238,33 @@ export const DashboardScreen: React.FC<
                         <span
                           className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
                             dir === "BUY"
-                              ? "bg-[#B0F648]/18 text-[#B0F648]"
-                              : "bg-[#FF5A6E]/20 text-[#FF5A6E]"
+                              ? "bg-[#6EE7B7]/18 text-[#6EE7B7]"
+                              : "bg-[#F07178]/20 text-[#F07178]"
                           }`}
                         >
                           {dir} {pos.volume.toFixed(2)}L
                         </span>
                       </td>
 
-                      <td className="py-2.5 pr-3 text-[#B6C5E0]">
-                        <span className="text-[#F4F7FF]">{pos.open_price.toFixed(digits)}</span>
-                        <span className="text-[#8496B8] mx-1">→</span>
-                        <span className="text-[#F4F7FF] font-semibold">
+                      <td className="py-2.5 pr-3 text-[#B4B3B0]">
+                        <span className="text-[#F5F5F2]">{pos.open_price.toFixed(digits)}</span>
+                        <span className="text-[#8A8986] mx-1">→</span>
+                        <span className="text-[#F5F5F2] font-semibold">
                           {pos.current_price.toFixed(digits)}
                         </span>
                       </td>
 
-                      <td className="py-2.5 pr-3 text-[#FF7A8A] font-semibold">
+                      <td className="py-2.5 pr-3 text-[#F5989E] font-semibold">
                         {pos.sl > 0 ? pos.sl.toFixed(digits) : "—"}
                       </td>
 
-                      <td className="py-2.5 pr-3 text-[#B0F648] font-semibold">
+                      <td className="py-2.5 pr-3 text-[#6EE7B7] font-semibold">
                         {pos.tp > 0 ? pos.tp.toFixed(digits) : "—"}
                       </td>
 
                       <td
                         className={`py-2.5 pr-3 font-bold ${
-                          pos.profit >= 0 ? "text-[#B0F648]" : "text-[#FF5A6E]"
+                          pos.profit >= 0 ? "text-[#6EE7B7]" : "text-[#F07178]"
                         }`}
                       >
                         {pos.profit >= 0 ? "+" : ""}${pos.profit.toFixed(2)}{" "}
@@ -1276,7 +1276,7 @@ export const DashboardScreen: React.FC<
 
                       <td className="py-2.5 pr-4 text-right font-sans">
                         {readOnlyMobile ? (
-                          <span className="text-[10px] text-[#8496B8] font-mono">READ-ONLY</span>
+                          <span className="text-[10px] text-[#8A8986] font-mono">READ-ONLY</span>
                         ) : (
                           <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                             <button
@@ -1284,9 +1284,9 @@ export const DashboardScreen: React.FC<
                               onClick={() => handlePartialClose50(pos)}
                               aria-label={`Partial close 50% of ticket ${pos.ticket}`}
                               title="Partial Close 50% volume"
-                              className="px-2.5 py-1 rounded-full bg-[#192F5A] hover:bg-[#234078] border border-[rgba(186,214,255,0.18)] text-[#F4F7FF] text-[10px] font-semibold inline-flex items-center space-x-1 transition"
+                              className="px-2.5 py-1 rounded-full bg-[#242320] hover:bg-[#2B2A26] border border-[rgba(255,255,253,0.10)] text-[#F5F5F2] text-[10px] font-semibold inline-flex items-center space-x-1 transition"
                             >
-                              <Scissors className="w-2.5 h-2.5 text-[#5EEAD4]" />
+                              <Scissors className="w-2.5 h-2.5 text-[#5EC2C6]" />
                               <span>50%</span>
                             </button>
 
@@ -1295,7 +1295,7 @@ export const DashboardScreen: React.FC<
                               onClick={() => handleMoveToBreakEven(pos)}
                               aria-label={`Move stop loss to break-even for ticket ${pos.ticket}`}
                               title="Lock Stop Loss at Break-Even+"
-                              className="px-2.5 py-1 rounded-full bg-[#5EEAD4]/15 hover:bg-[#5EEAD4]/25 border border-[#5EEAD4]/40 text-[#5EEAD4] text-[10px] font-semibold transition"
+                              className="px-2.5 py-1 rounded-full bg-[#5EC2C6]/15 hover:bg-[#5EC2C6]/25 border border-[#5EC2C6]/40 text-[#5EC2C6] text-[10px] font-semibold transition"
                             >
                               BE+
                             </button>
@@ -1305,7 +1305,7 @@ export const DashboardScreen: React.FC<
                               onClick={() => openTightenSlModal(pos)}
                               aria-label={`Tighten stop loss for ticket ${pos.ticket}`}
                               title="Tighten Stop Loss (Rule R9.3)"
-                              className="px-2.5 py-1 rounded-full bg-[#B0F648]/16 hover:bg-[#B0F648]/28 border border-[#B0F648]/45 text-[#C2F076] text-[10px] font-semibold transition"
+                              className="px-2.5 py-1 rounded-full bg-[#6EE7B7]/16 hover:bg-[#6EE7B7]/28 border border-[#6EE7B7]/45 text-[#6EE7B7] text-[10px] font-semibold transition"
                             >
                               SL+
                             </button>
@@ -1315,7 +1315,7 @@ export const DashboardScreen: React.FC<
                               disabled
                               aria-disabled="true"
                               title="Hard Safety Rule R9.3: Widening or removing Stop Loss is permanently disabled"
-                              className="px-2.5 py-1 rounded-full bg-[#0A152B]/60 border border-[rgba(186,214,255,0.1)] text-[#8496B8] text-[10px] font-medium cursor-not-allowed opacity-60 inline-flex items-center space-x-1"
+                              className="px-2.5 py-1 rounded-full bg-[#161513]/60 border border-[rgba(255,255,253,0.07)] text-[#8A8986] text-[10px] font-medium cursor-not-allowed opacity-60 inline-flex items-center space-x-1"
                             >
                               <Lock className="w-2.5 h-2.5" />
                               <span>Widen</span>
@@ -1326,7 +1326,7 @@ export const DashboardScreen: React.FC<
                               onClick={() => handleCloseSinglePosition(pos)}
                               aria-label={`Close position ticket ${pos.ticket}`}
                               title="Close position at market"
-                              className="px-2.5 py-1 rounded-full bg-[#FF5A6E]/90 hover:bg-[#FF5A6E] text-white text-[10px] font-bold transition"
+                              className="px-2.5 py-1 rounded-full bg-[#F07178]/90 hover:bg-[#F07178] text-white text-[10px] font-bold transition"
                             >
                               Close
                             </button>
@@ -1351,24 +1351,24 @@ export const DashboardScreen: React.FC<
           role="dialog"
           aria-modal="true"
           aria-labelledby="two-step-confirm-title"
-          className="fixed inset-0 z-50 bg-[#050C1A]/80 backdrop-blur-md flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-[#0E0D0B]/80 backdrop-blur-md flex items-center justify-center p-4"
         >
           <div
-            className={`iea-glass-card p-5 max-w-sm w-full space-y-3 shadow-2xl ${
+            className={`iea-card p-5 max-w-sm w-full space-y-3 shadow-2xl ${
               confirmModal.type === "START_DEMO"
-                ? "border-[#B0F648]/55"
+                ? "border-[#6EE7B7]/55"
                 : confirmModal.type === "STOP"
-                ? "border-[#FBBF24]/55"
-                : "border-[#FF5A6E]/60"
+                ? "border-[#EAB354]/55"
+                : "border-[#F07178]/60"
             }`}
           >
             <div
               className={`flex items-center space-x-2 ${
                 confirmModal.type === "START_DEMO"
-                  ? "text-[#B0F648]"
+                  ? "text-[#6EE7B7]"
                   : confirmModal.type === "STOP"
-                  ? "text-[#FBBF24]"
-                  : "text-[#FF5A6E]"
+                  ? "text-[#EAB354]"
+                  : "text-[#F07178]"
               }`}
             >
               {confirmModal.type === "START_DEMO" ? (
@@ -1376,7 +1376,7 @@ export const DashboardScreen: React.FC<
               ) : (
                 <ShieldAlert className="w-5 h-5 shrink-0" />
               )}
-              <h3 id="two-step-confirm-title" className="text-sm font-bold text-[#F4F7FF]">
+              <h3 id="two-step-confirm-title" className="text-sm font-bold text-[#F5F5F2]">
                 {confirmModal.type === "START_DEMO"
                   ? `Start engine in ${topBar.operatingMode}?`
                   : confirmModal.type === "STOP"
@@ -1388,19 +1388,19 @@ export const DashboardScreen: React.FC<
             </div>
 
             {confirmModal.type === "START_DEMO" ? (
-              <p className="text-xs text-[#B6C5E0]">
+              <p className="text-xs text-[#B4B3B0]">
                 The engine will run in{" "}
-                <strong className="text-[#B0F648] font-mono">{topBar.operatingMode}</strong> on DEMO{" "}
+                <strong className="text-[#6EE7B7] font-mono">{topBar.operatingMode}</strong> on DEMO{" "}
                 <span className="font-mono">{dash.maskedAccount}</span> and may place DEMO orders.
                 LIVE trading remains locked.
               </p>
             ) : confirmModal.type === "STOP" ? (
-              <p className="text-xs text-[#B6C5E0]">
+              <p className="text-xs text-[#B4B3B0]">
                 Stop the trading engine process? Any open positions in MT5 will keep their existing
                 broker SL/TP levels.
               </p>
             ) : confirmModal.step === 1 ? (
-              <p className="text-xs text-[#B6C5E0]">
+              <p className="text-xs text-[#B4B3B0]">
                 {confirmModal.type === "PAUSE" ? (
                   <>
                     {topBar.pauseResumeBtn.label} automated entries on DEMO{" "}
@@ -1409,14 +1409,14 @@ export const DashboardScreen: React.FC<
                 ) : (
                   <>
                     Close{" "}
-                    <strong className="text-[#F4F7FF]">{botOpenCount} bot positions</strong> at market on
+                    <strong className="text-[#F5F5F2]">{botOpenCount} bot positions</strong> at market on
                     DEMO <span className="font-mono">{dash.maskedAccount}</span>? Positions will be
                     reconciled with MT5 before confirming.
                   </>
                 )}
               </p>
             ) : (
-              <div className="p-3 rounded-xl bg-[#FF5A6E]/18 border border-[#FF5A6E]/50 text-xs text-[#FFD9DF] font-semibold">
+              <div className="p-3 rounded-xl bg-[#F07178]/18 border border-[#F07178]/50 text-xs text-[#F5B5B9] font-semibold">
                 {confirmModal.type === "PAUSE"
                   ? `Final step: Confirm ${topBar.pauseResumeBtn.label.toLowerCase()}ing entries.`
                   : `Final step: Confirm immediate market closure on ${dash.maskedAccount}.`}
@@ -1427,7 +1427,7 @@ export const DashboardScreen: React.FC<
               <button
                 type="button"
                 onClick={() => setConfirmModal(null)}
-                className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F4F7FF]"
+                className="iea-pill-control px-4 py-1.5 text-xs text-[#F5F5F2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5F5F2]"
               >
                 Cancel
               </button>
@@ -1436,10 +1436,10 @@ export const DashboardScreen: React.FC<
                 onClick={handleConfirmTwoStep}
                 className={`px-4 py-1.5 rounded-full text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 ${
                   confirmModal.type === "START_DEMO"
-                    ? "bg-[#B0F648] hover:bg-[#C2F076] text-[#081321] focus-visible:ring-[#B0F648]"
+                    ? "bg-[#36B37E] hover:bg-[#3FC48B] text-[#121110] focus-visible:ring-[#6EE7B7]"
                     : confirmModal.type === "STOP"
-                    ? "bg-[#FBBF24] hover:brightness-110 text-[#081321] focus-visible:ring-[#FBBF24]"
-                    : "bg-gradient-to-r from-[#FF5A6E] to-[#E11D48] hover:brightness-110 text-white focus-visible:ring-[#FF5A6E]"
+                    ? "bg-[#EAB354] hover:brightness-110 text-[#121110] focus-visible:ring-[#EAB354]"
+                    : "bg-[#D94854] hover:bg-[#E35662] text-white focus-visible:ring-[#F07178]"
                 }`}
               >
                 {confirmModal.type === "START_DEMO"
@@ -1465,27 +1465,27 @@ export const DashboardScreen: React.FC<
           role="dialog"
           aria-modal="true"
           aria-labelledby="tighten-sl-modal-title"
-          className="fixed inset-0 z-50 bg-[#050C1A]/80 backdrop-blur-md flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-[#0E0D0B]/80 backdrop-blur-md flex items-center justify-center p-4"
         >
-          <div className="iea-glass-card p-5 max-w-sm w-full space-y-3 shadow-2xl">
+          <div className="iea-card p-5 max-w-sm w-full space-y-3 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h3 id="tighten-sl-modal-title" className="text-sm font-bold text-[#F4F7FF]">
+              <h3 id="tighten-sl-modal-title" className="text-sm font-bold text-[#F5F5F2]">
                 Tighten SL · #{slModalPos.ticket}
               </h3>
-              <span className="px-2 py-0.5 rounded-full bg-[#B0F648]/20 text-[#B0F648] text-[10px] font-mono font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-[#6EE7B7]/20 text-[#6EE7B7] text-[10px] font-mono font-bold">
                 R9.3 TIGHTEN-ONLY
               </span>
             </div>
 
-            <div className="text-xs text-[#B6C5E0] iea-glass-tile p-2.5 font-mono flex items-center justify-between">
+            <div className="text-xs text-[#B4B3B0] iea-inset p-2.5 font-mono flex items-center justify-between">
               <span>In: {slModalPos.open_price}</span>
               <span>Now: {slModalPos.current_price}</span>
-              <span className="text-[#FF7A8A]">SL: {slModalPos.sl}</span>
+              <span className="text-[#F5989E]">SL: {slModalPos.sl}</span>
             </div>
 
             <div className="space-y-2 text-xs">
               <label className="block">
-                <span className="text-[#B6C5E0] font-semibold">
+                <span className="text-[#B4B3B0] font-semibold">
                   New SL ({slModalPos.direction === "BUY" ? `>= ${slModalPos.sl}` : `<= ${slModalPos.sl}`})
                 </span>
                 <input
@@ -1493,24 +1493,24 @@ export const DashboardScreen: React.FC<
                   step="any"
                   value={proposedSlInput}
                   onChange={(e) => setProposedSlInput(e.target.value)}
-                  className="w-full mt-1 bg-[#091426]/80 border border-[rgba(186,214,255,0.22)] rounded-xl px-3 py-1.5 text-[#F4F7FF] font-mono"
+                  className="w-full mt-1 bg-[#0E0D0B]/80 border border-[rgba(255,255,253,0.12)] rounded-xl px-3 py-1.5 text-[#F5F5F2] font-mono"
                 />
               </label>
 
               <label className="block">
-                <span className="text-[#B6C5E0] font-semibold">TP Target</span>
+                <span className="text-[#B4B3B0] font-semibold">TP Target</span>
                 <input
                   type="number"
                   step="any"
                   value={proposedTpInput}
                   onChange={(e) => setProposedTpInput(e.target.value)}
-                  className="w-full mt-1 bg-[#091426]/80 border border-[rgba(186,214,255,0.22)] rounded-xl px-3 py-1.5 text-[#F4F7FF] font-mono"
+                  className="w-full mt-1 bg-[#0E0D0B]/80 border border-[rgba(255,255,253,0.12)] rounded-xl px-3 py-1.5 text-[#F5F5F2] font-mono"
                 />
               </label>
             </div>
 
             {!slValidation.allowed && (
-              <div className="p-2.5 rounded-xl bg-[#FF5A6E]/20 border border-[#FF5A6E]/50 text-[11px] text-[#FFD9DF]">
+              <div className="p-2.5 rounded-xl bg-[#F07178]/20 border border-[#F07178]/50 text-[11px] text-[#F5B5B9]">
                 {slValidation.reason}
               </div>
             )}
@@ -1519,7 +1519,7 @@ export const DashboardScreen: React.FC<
               <button
                 type="button"
                 onClick={() => setSlModalPos(null)}
-                className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF]"
+                className="iea-pill-control px-4 py-1.5 text-xs text-[#F5F5F2]"
               >
                 Cancel
               </button>
@@ -1527,7 +1527,7 @@ export const DashboardScreen: React.FC<
                 type="button"
                 disabled={!slValidation.allowed || busyAction !== null}
                 onClick={handleApplyTightenSl}
-                className="px-4 py-1.5 rounded-full bg-[#B0F648] hover:bg-[#C2F076] disabled:opacity-40 text-xs font-extrabold text-[#081321]"
+                className="px-4 py-1.5 rounded-full bg-[#36B37E] hover:bg-[#3FC48B] disabled:opacity-40 text-xs font-extrabold text-[#121110]"
               >
                 Apply SL
               </button>

@@ -171,28 +171,28 @@ export const TradeReplayModal: React.FC<TradeReplayModalProps> = ({ ticket, onCl
       role="dialog"
       aria-modal="true"
       aria-label={`Trade Replay #${ticket}`}
-      className="fixed inset-0 z-50 bg-[#050C1A]/85 backdrop-blur-md flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-[#0E0D0B]/85 backdrop-blur-md flex items-center justify-center p-4"
     >
-      <div className="iea-glass-card w-full max-w-5xl max-h-[92vh] overflow-y-auto p-5 space-y-4 shadow-2xl">
+      <div className="iea-card w-full max-w-5xl max-h-[92vh] overflow-y-auto p-5 space-y-4 shadow-2xl">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[rgba(186,214,255,0.14)] pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[rgba(255,255,253,0.08)] pb-3">
           <div>
-            <h2 className="text-base font-semibold text-[#F4F7FF]">
+            <h2 className="text-base font-semibold text-[#F5F5F2]">
               Trade Replay · #{ticket} {trade ? `(${trade.symbol} ${trade.direction} ${trade.volume}L)` : ""}
             </h2>
-            <p className="text-[11px] font-mono text-[#8496B8] mt-0.5">
+            <p className="text-[11px] font-mono text-[#8A8986] mt-0.5">
               Source: MT5 Historical Candles + Bot Execution Events
             </p>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="inline-flex bg-[#091426]/80 border border-[rgba(186,214,255,0.16)] rounded-full p-0.5">
+            <div className="inline-flex bg-[#0E0D0B]/80 border border-[rgba(255,255,253,0.10)] rounded-full p-0.5">
               {(["M1", "M5", "M15", "H1"] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setTf(t)}
                   className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-bold ${
-                    tf === t ? "bg-[#B0F648] text-[#081321]" : "text-[#B6C5E0] hover:text-white"
+                    tf === t ? "bg-[#F5F5F2] text-[#121110]" : "text-[#B4B3B0] hover:text-white"
                   }`}
                 >
                   {t}
@@ -203,7 +203,7 @@ export const TradeReplayModal: React.FC<TradeReplayModalProps> = ({ ticket, onCl
               type="button"
               onClick={onClose}
               aria-label="Close trade replay"
-              className="p-1.5 rounded-full bg-white/5 hover:bg-white/15 text-[#F4F7FF]"
+              className="p-1.5 rounded-full bg-white/5 hover:bg-white/15 text-[#F5F5F2]"
             >
               <X className="w-4 h-4" />
             </button>
@@ -213,25 +213,25 @@ export const TradeReplayModal: React.FC<TradeReplayModalProps> = ({ ticket, onCl
         {/* Trade Summary Strip */}
         {trade && (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs font-mono">
-            <div className="iea-glass-tile p-2.5">
-              <div className="text-[10px] font-sans text-[#8496B8]">Entry</div>
-              <div className="text-[#F4F7FF] font-bold">{trade.open_price}</div>
+            <div className="iea-inset p-2.5">
+              <div className="text-[10px] font-sans text-[#8A8986]">Entry</div>
+              <div className="text-[#F5F5F2] font-bold">{trade.open_price}</div>
             </div>
-            <div className="iea-glass-tile p-2.5">
-              <div className="text-[10px] font-sans text-[#8496B8]">Exit</div>
-              <div className="text-[#F4F7FF] font-bold">{trade.close_price || "—"}</div>
+            <div className="iea-inset p-2.5">
+              <div className="text-[10px] font-sans text-[#8A8986]">Exit</div>
+              <div className="text-[#F5F5F2] font-bold">{trade.close_price || "—"}</div>
             </div>
-            <div className="iea-glass-tile p-2.5">
-              <div className="text-[10px] font-sans text-[#8496B8]">SL</div>
-              <div className="text-[#FF7A8A] font-bold">{trade.sl || "—"}</div>
+            <div className="iea-inset p-2.5">
+              <div className="text-[10px] font-sans text-[#8A8986]">SL</div>
+              <div className="text-[#F5989E] font-bold">{trade.sl || "—"}</div>
             </div>
-            <div className="iea-glass-tile p-2.5">
-              <div className="text-[10px] font-sans text-[#8496B8]">TP</div>
-              <div className="text-[#B0F648] font-bold">{trade.tp || "—"}</div>
+            <div className="iea-inset p-2.5">
+              <div className="text-[10px] font-sans text-[#8A8986]">TP</div>
+              <div className="text-[#6EE7B7] font-bold">{trade.tp || "—"}</div>
             </div>
-            <div className="iea-glass-tile p-2.5">
-              <div className="text-[10px] font-sans text-[#8496B8]">Realized P&amp;L</div>
-              <div className={trade.profit >= 0 ? "text-[#B0F648] font-bold" : "text-[#FF5A6E] font-bold"}>
+            <div className="iea-inset p-2.5">
+              <div className="text-[10px] font-sans text-[#8A8986]">Realized P&amp;L</div>
+              <div className={trade.profit >= 0 ? "text-[#6EE7B7] font-bold" : "text-[#F07178] font-bold"}>
                 {trade.profit >= 0 ? "+" : ""}${trade.profit.toFixed(2)}
               </div>
             </div>
@@ -239,20 +239,20 @@ export const TradeReplayModal: React.FC<TradeReplayModalProps> = ({ ticket, onCl
         )}
 
         {/* Replay Chart Canvas */}
-        <div className="relative rounded-2xl overflow-hidden border border-[rgba(186,214,255,0.14)] bg-[#0B1528] min-h-[360px]">
+        <div className="relative rounded-2xl overflow-hidden border border-[rgba(255,255,253,0.08)] bg-[#161513] min-h-[360px]">
           <div ref={containerRef} className="w-full h-[360px]" />
           {loading && (
-            <div className="absolute inset-0 bg-[#0B1528]/85 flex items-center justify-center text-xs text-[#B6C5E0]">
+            <div className="absolute inset-0 bg-[#161513]/85 flex items-center justify-center text-xs text-[#B4B3B0]">
               Loading real MT5 historical candles for trade #{ticket}...
             </div>
           )}
           {!loading && error && (
-            <div className="absolute inset-0 bg-[#0B1528]/90 flex items-center justify-center text-xs text-[#FF7A8A] px-4 text-center">
+            <div className="absolute inset-0 bg-[#161513]/90 flex items-center justify-center text-xs text-[#F5989E] px-4 text-center">
               {error}
             </div>
           )}
           {!loading && !error && payload && payload.candles.length === 0 && (
-            <div className="absolute inset-0 bg-[#0B1528]/90 flex items-center justify-center text-xs text-[#8496B8] px-4 text-center">
+            <div className="absolute inset-0 bg-[#161513]/90 flex items-center justify-center text-xs text-[#8A8986] px-4 text-center">
               Waiting for MT5 historical candles for this trade window ({tf}). Ensure MT5 terminal is connected.
             </div>
           )}
@@ -260,12 +260,12 @@ export const TradeReplayModal: React.FC<TradeReplayModalProps> = ({ ticket, onCl
 
         {/* Playback Controls */}
         {payload && payload.candles.length > 0 && (
-          <div className="iea-glass-tile p-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="iea-inset p-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center space-x-2">
               <button
                 type="button"
                 onClick={() => setBarIndex((i) => Math.max(0, i - 1))}
-                className="iea-pill-control p-2 text-[#F4F7FF]"
+                className="iea-pill-control p-2 text-[#F5F5F2]"
                 title="Step back 1 bar"
               >
                 <SkipBack className="w-3.5 h-3.5" />
@@ -273,7 +273,7 @@ export const TradeReplayModal: React.FC<TradeReplayModalProps> = ({ ticket, onCl
               <button
                 type="button"
                 onClick={() => setPlaying((p) => !p)}
-                className="px-4 py-1.5 rounded-full bg-[#B0F648] hover:bg-[#C2F076] text-[#081321] text-xs font-extrabold inline-flex items-center space-x-1.5"
+                className="px-4 py-1.5 rounded-full bg-[#36B37E] hover:bg-[#3FC48B] text-[#121110] text-xs font-extrabold inline-flex items-center space-x-1.5"
               >
                 {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                 <span>{playing ? "Pause" : "Play"}</span>
@@ -281,7 +281,7 @@ export const TradeReplayModal: React.FC<TradeReplayModalProps> = ({ ticket, onCl
               <button
                 type="button"
                 onClick={() => setBarIndex((i) => Math.min(payload.candles.length - 1, i + 1))}
-                className="iea-pill-control p-2 text-[#F4F7FF]"
+                className="iea-pill-control p-2 text-[#F5F5F2]"
                 title="Step forward 1 bar"
               >
                 <SkipForward className="w-3.5 h-3.5" />
@@ -291,7 +291,7 @@ export const TradeReplayModal: React.FC<TradeReplayModalProps> = ({ ticket, onCl
                 onClick={() =>
                   setSpeed((s) => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length])
                 }
-                className="iea-pill-control px-3 py-1.5 text-xs font-mono text-[#5EEAD4] inline-flex items-center space-x-1"
+                className="iea-pill-control px-3 py-1.5 text-xs font-mono text-[#5EC2C6] inline-flex items-center space-x-1"
                 title="Playback speed"
               >
                 <FastForward className="w-3 h-3" />
@@ -306,10 +306,10 @@ export const TradeReplayModal: React.FC<TradeReplayModalProps> = ({ ticket, onCl
                 max={payload.candles.length - 1}
                 value={barIndex}
                 onChange={(e) => setBarIndex(Number(e.target.value))}
-                className="w-full accent-[#B0F648]"
+                className="w-full accent-[#6EE7B7]"
                 aria-label="Replay timeline scrubber"
               />
-              <span className="text-[11px] font-mono text-[#B6C5E0] shrink-0">
+              <span className="text-[11px] font-mono text-[#B4B3B0] shrink-0">
                 {barIndex + 1}/{payload.candles.length}
                 {currentBar ? ` · ${new Date(currentBar.time * 1000).toISOString().slice(11, 16)} UTC` : ""}
               </span>
@@ -319,29 +319,29 @@ export const TradeReplayModal: React.FC<TradeReplayModalProps> = ({ ticket, onCl
 
         {/* Execution Events & Saved Trade Screenshots */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-          <div className="iea-glass-tile p-3.5 space-y-2">
-            <h3 className="font-semibold text-[#F4F7FF]">Real Trade Events ({payload?.events.length ?? 0})</h3>
+          <div className="iea-inset p-3.5 space-y-2">
+            <h3 className="font-semibold text-[#F5F5F2]">Real Trade Events ({payload?.events.length ?? 0})</h3>
             {!payload || payload.events.length === 0 ? (
-              <div className="text-[#8496B8] py-2">No execution lifecycle events recorded for this ticket.</div>
+              <div className="text-[#8A8986] py-2">No execution lifecycle events recorded for this ticket.</div>
             ) : (
               <div className="space-y-1.5 max-h-40 overflow-y-auto font-mono text-[11px]">
                 {payload.events.map((ev) => (
-                  <div key={ev.id} className="flex items-center justify-between bg-[#091426]/65 px-2.5 py-1.5 rounded-lg">
-                    <span className="text-[#B0F648] font-bold">{ev.event_type}</span>
-                    <span className="text-[#8496B8]">{new Date(ev.created_at).toLocaleTimeString()}</span>
+                  <div key={ev.id} className="flex items-center justify-between bg-[#0E0D0B]/65 px-2.5 py-1.5 rounded-lg">
+                    <span className="text-[#6EE7B7] font-bold">{ev.event_type}</span>
+                    <span className="text-[#8A8986]">{new Date(ev.created_at).toLocaleTimeString()}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="iea-glass-tile p-3.5 space-y-2">
-            <h3 className="font-semibold text-[#F4F7FF] flex items-center space-x-1.5">
-              <Camera className="w-3.5 h-3.5 text-[#5EEAD4]" />
+          <div className="iea-inset p-3.5 space-y-2">
+            <h3 className="font-semibold text-[#F5F5F2] flex items-center space-x-1.5">
+              <Camera className="w-3.5 h-3.5 text-[#5EC2C6]" />
               <span>Trade Chart Screenshots ({payload?.screenshots.length ?? 0})</span>
             </h3>
             {!payload || payload.screenshots.length === 0 ? (
-              <div className="text-[#8496B8] py-2">No chart screenshots saved for this trade yet.</div>
+              <div className="text-[#8A8986] py-2">No chart screenshots saved for this trade yet.</div>
             ) : (
               <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto">
                 {payload.screenshots.map((sh) => {
@@ -354,11 +354,11 @@ export const TradeReplayModal: React.FC<TradeReplayModalProps> = ({ ticket, onCl
                       href={srcUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="block rounded-xl overflow-hidden border border-[rgba(186,214,255,0.16)] bg-[#091426]"
+                      className="block rounded-xl overflow-hidden border border-[rgba(255,255,253,0.10)] bg-[#0E0D0B]"
                     >
                       <img src={srcUrl} alt={`${sh.symbol} ${sh.stage}`} className="w-full h-24 object-cover" />
-                      <div className="px-2 py-1 text-[10px] font-mono text-[#B6C5E0] flex justify-between">
-                        <span className="text-[#B0F648] font-bold">{sh.stage}</span>
+                      <div className="px-2 py-1 text-[10px] font-mono text-[#B4B3B0] flex justify-between">
+                        <span className="text-[#6EE7B7] font-bold">{sh.stage}</span>
                         <span>{new Date(sh.created_at).toLocaleTimeString()}</span>
                       </div>
                     </a>
