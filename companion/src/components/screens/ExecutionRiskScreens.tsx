@@ -38,7 +38,7 @@ export const PositionsScreen: React.FC<{
   };
 
   const handleClose = async (ticket: number) => {
-    if (!window.confirm(`Close position #${ticket} at market price?`)) return;
+    if (!window.confirm(`Close position #${ticket} at market?`)) return;
     setBusy(true);
     try {
       const res = await controlClient.closePosition(ticket, true);
@@ -52,7 +52,7 @@ export const PositionsScreen: React.FC<{
   };
 
   const handleCloseAllBot = async () => {
-    if (!window.confirm("Close ALL bot-owned positions on MT5? Manual/Other EA positions will NOT be touched.")) return;
+    if (!window.confirm("Close all bot trades? Manual trades stay untouched.")) return;
     setBusy(true);
     try {
       const res = await controlClient.closeAllBotPositions(true);
@@ -66,14 +66,14 @@ export const PositionsScreen: React.FC<{
   };
 
   const handleCancelOrder = async (ticket: number) => {
-    if (!window.confirm(`Cancel pending order #${ticket}?`)) return;
+    if (!window.confirm(`Cancel order #${ticket}?`)) return;
     setBusy(true);
     try {
       const res = await controlClient.cancelPendingOrder(ticket, true);
       onActionMessage(res.message, !res.success);
       await onRefresh();
     } catch (e: any) {
-      onActionMessage(`Cancel order failed: ${e.message}`, true);
+      onActionMessage(`Cancel failed: ${e.message}`, true);
     } finally {
       setBusy(false);
     }
@@ -83,16 +83,15 @@ export const PositionsScreen: React.FC<{
     <div className="space-y-4">
       <div className="iea-glass-card p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-light text-[#F4F7FF]">Open MT5 Positions ({positions.length})</h2>
-            <p className="text-xs text-[#8496B8]">Reconciled by Magic Number ownership (BOT / MANUAL / OTHER_EA).</p>
-          </div>
+          <h2 className="text-lg font-light text-[#F4F7FF]" title="MT5 positions reconciled by Magic Number">
+            Open Pos ({positions.length})
+          </h2>
           <button
             disabled={busy || positions.filter((p) => p.ownership === "BOT").length === 0}
             onClick={handleCloseAllBot}
             className="px-4 py-1.5 bg-gradient-to-r from-[#FF5A6E] to-[#E11D48] hover:brightness-110 disabled:opacity-40 text-white text-xs font-bold rounded-full shadow-[0_4px_16px_rgba(255,90,110,0.35)]"
           >
-            Close All Bot Positions
+            Close Bot Pos
           </button>
         </div>
 
@@ -101,21 +100,21 @@ export const PositionsScreen: React.FC<{
             <thead>
               <tr>
                 <th className="py-3 pl-4 pr-3">#</th>
-                <th className="py-3 pr-3">Instrument</th>
+                <th className="py-3 pr-3">Instr</th>
                 <th className="py-3 pr-3">Owner</th>
-                <th className="py-3 pr-3">Direction</th>
-                <th className="py-3 pr-3">Volume</th>
-                <th className="py-3 pr-3">Entry → Current</th>
+                <th className="py-3 pr-3">Side</th>
+                <th className="py-3 pr-3">Lot</th>
+                <th className="py-3 pr-3">In → Now</th>
                 <th className="py-3 pr-3">SL / TP</th>
-                <th className="py-3 pr-3">Floating P&amp;L</th>
-                <th className="py-3 pr-4 text-right">Actions</th>
+                <th className="py-3 pr-3">P&amp;L</th>
+                <th className="py-3 pr-4 text-right">Cmd</th>
               </tr>
             </thead>
             <tbody className="font-mono">
               {positions.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-8 text-center text-[#8496B8] font-sans">
-                    No open positions on MT5.
+                    0 open positions.
                   </td>
                 </tr>
               ) : (
@@ -190,9 +189,9 @@ export const PositionsScreen: React.FC<{
 
       {/* Pending Orders */}
       <div className="iea-glass-card p-5">
-        <h3 className="text-sm font-semibold text-[#F4F7FF] mb-3">Pending Orders ({pendingOrders.length})</h3>
+        <h3 className="text-sm font-semibold text-[#F4F7FF] mb-3">Pending Ord ({pendingOrders.length})</h3>
         {pendingOrders.length === 0 ? (
-          <div className="text-xs text-[#8496B8] py-3">No active pending orders.</div>
+          <div className="text-xs text-[#8496B8] py-3">0 pending orders.</div>
         ) : (
           <div className="space-y-2">
             {pendingOrders.map((o: any) => {
@@ -206,7 +205,7 @@ export const PositionsScreen: React.FC<{
                       {chip.shortCode}
                     </span>
                     <span className="text-[#F4F7FF]">
-                      #{o.ticket} · <strong>{o.symbol}</strong> · Vol {o.volume} @ {o.price} (SL {o.sl} / TP {o.tp})
+                      #{o.ticket} · <strong>{o.symbol}</strong> · {o.volume}L @ {o.price} (SL {o.sl} / TP {o.tp})
                     </span>
                   </div>
                   <button
@@ -226,10 +225,10 @@ export const PositionsScreen: React.FC<{
       {editing && (
         <div className="fixed inset-0 bg-[#050C1A]/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="iea-glass-card p-5 w-full max-w-sm space-y-3.5 shadow-2xl">
-            <h3 className="text-sm font-bold text-[#F4F7FF]">Modify SL/TP — Ticket #{editing.ticket} ({editing.symbol})</h3>
+            <h3 className="text-sm font-bold text-[#F4F7FF]">SL/TP · #{editing.ticket} ({editing.symbol})</h3>
             <div className="space-y-2.5 text-xs">
               <label className="block">
-                <span className="text-[#B6C5E0]">Stop Loss</span>
+                <span className="text-[#B6C5E0]">SL</span>
                 <input
                   type="number"
                   step="any"
@@ -239,7 +238,7 @@ export const PositionsScreen: React.FC<{
                 />
               </label>
               <label className="block">
-                <span className="text-[#B6C5E0]">Take Profit</span>
+                <span className="text-[#B6C5E0]">TP</span>
                 <input
                   type="number"
                   step="any"
@@ -254,7 +253,7 @@ export const PositionsScreen: React.FC<{
                 Cancel
               </button>
               <button disabled={busy} onClick={submitModify} className="px-4 py-1.5 bg-[#B0F648] hover:bg-[#C2F076] text-[#081321] text-xs font-extrabold rounded-full">
-                Apply SL/TP
+                Apply
               </button>
             </div>
           </div>
@@ -274,22 +273,21 @@ export const TradeHistoryScreen: React.FC<{ trades: TradeHistoryRecord[]; onRelo
   return (
     <div className="iea-glass-card p-5 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-light text-[#F4F7FF]">Persisted Trade History ({filtered.length})</h2>
-          <p className="text-xs text-[#8496B8] mt-0.5">Historical closed positions stored in embedded SQLite</p>
-        </div>
+        <h2 className="text-lg font-light text-[#F4F7FF]" title="Closed trades persisted in SQLite">
+          Trade Hist ({filtered.length})
+        </h2>
         <div className="flex items-center space-x-2">
           <div className="iea-pill-control px-3 py-1 flex items-center space-x-1.5 text-xs">
-            <span className="text-[#8496B8]">Filter:</span>
+            <span className="text-[#8496B8]">Instr:</span>
             <select
               value={symbolFilter}
               onChange={(e) => setSymbolFilter(e.target.value)}
               className="bg-transparent text-xs text-[#F4F7FF] font-semibold focus:outline-none"
             >
-              <option value="ALL" className="bg-[#0A152B]">All Symbols</option>
-              <option value="XAU" className="bg-[#0A152B]">Gold (XAU)</option>
-              <option value="JPY" className="bg-[#0A152B]">USDJPY (JPY)</option>
-              <option value="BTC" className="bg-[#0A152B]">Bitcoin (BTC)</option>
+              <option value="ALL" className="bg-[#0A152B]">All</option>
+              <option value="XAU" className="bg-[#0A152B]">XAUUSD</option>
+              <option value="JPY" className="bg-[#0A152B]">USDJPY</option>
+              <option value="BTC" className="bg-[#0A152B]">BTCUSD</option>
             </select>
           </div>
           <button onClick={() => onReload()} className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF] font-semibold">
@@ -303,20 +301,20 @@ export const TradeHistoryScreen: React.FC<{ trades: TradeHistoryRecord[]; onRelo
           <thead>
             <tr>
               <th className="py-3 pl-4 pr-3">#</th>
-              <th className="py-3 pr-3">Instrument</th>
-              <th className="py-3 pr-3">Direction</th>
-              <th className="py-3 pr-3">Volume</th>
-              <th className="py-3 pr-3">Open Price</th>
-              <th className="py-3 pr-3">Close Price</th>
-              <th className="py-3 pr-3">Net Profit</th>
-              <th className="py-3 pr-4">Status</th>
+              <th className="py-3 pr-3">Instr</th>
+              <th className="py-3 pr-3">Side</th>
+              <th className="py-3 pr-3">Lot</th>
+              <th className="py-3 pr-3">In</th>
+              <th className="py-3 pr-3">Out</th>
+              <th className="py-3 pr-3">P&amp;L</th>
+              <th className="py-3 pr-4">Result</th>
             </tr>
           </thead>
           <tbody className="font-mono">
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-8 text-center text-[#8496B8] font-sans">
-                  No historical trades recorded in SQLite yet.
+                  0 closed trades.
                 </td>
               </tr>
             ) : (
@@ -381,7 +379,7 @@ export const RiskManagerScreen: React.FC<{
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-light text-[#F4F7FF] flex items-center space-x-2">
             <ShieldCheck className="w-5 h-5 text-[#B0F648]" />
-            <span>Authoritative PortfolioRiskEngine</span>
+            <span>Risk Engine</span>
           </h2>
           <button onClick={() => onReload()} className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF] font-semibold">
             Refresh
@@ -391,7 +389,7 @@ export const RiskManagerScreen: React.FC<{
           <div className="iea-glass-tile p-3.5">
             <div className="text-[#8496B8]">Kill Switch</div>
             <div className={`text-base font-mono font-bold mt-1 ${riskState.kill_switch_active ? "text-[#FF5A6E]" : "text-[#B0F648]"}`}>
-              {riskState.kill_switch_active ? "ACTIVE" : "ARMED / CLEAR"}
+              {riskState.kill_switch_active ? "ACTIVE" : "CLEAR"}
             </div>
           </div>
           <div className="iea-glass-tile p-3.5">
@@ -399,35 +397,35 @@ export const RiskManagerScreen: React.FC<{
             <div className="text-base font-mono font-bold text-[#F4F7FF] mt-1">${Number(riskState.daily_pnl ?? 0).toFixed(2)}</div>
           </div>
           <div className="iea-glass-tile p-3.5">
-            <div className="text-[#8496B8]">Consecutive Losses</div>
+            <div className="text-[#8496B8]">Loss Streak</div>
             <div className="text-base font-mono font-bold text-[#F4F7FF] mt-1">{riskState.consecutive_losses ?? 0}</div>
           </div>
           <div className="iea-glass-tile p-3.5">
-            <div className="text-[#8496B8]">Trading Paused</div>
+            <div className="text-[#8496B8]">Paused</div>
             <div className="text-base font-mono font-bold text-[#F4F7FF] mt-1">{String(riskState.trading_paused ?? false).toUpperCase()}</div>
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mt-3">
           <div className="iea-glass-tile p-3.5">
-            <div className="text-[#8496B8]">Dynamic Risk Capacity</div>
+            <div className="text-[#8496B8]">Free Risk Cap</div>
             <div className="text-base font-mono font-bold text-[#B0F648] mt-1">
-              {Number(cap.available_risk_capacity_pct ?? 4.85).toFixed(2)}% (${Number(cap.available_risk_capacity_usd ?? 1235.78).toFixed(2)})
+              {Number(cap.available_risk_capacity_pct ?? 4.85).toFixed(2)}% (${Number(cap.available_risk_capacity_usd ?? 1235.78).toFixed(0)})
             </div>
           </div>
           <div className="iea-glass-tile p-3.5">
-            <div className="text-[#8496B8]">Portfolio Risk Utilization</div>
+            <div className="text-[#8496B8]">Risk Used / Cap</div>
             <div className="text-base font-mono font-bold text-[#F4F7FF] mt-1">
               {Number(cap.current_portfolio_risk_pct ?? 1.15).toFixed(2)}% / {Number(cap.aggregate_risk_budget_pct ?? 6).toFixed(1)}%
             </div>
           </div>
           <div className="iea-glass-tile p-3.5">
-            <div className="text-[#8496B8]">Margin Utilization</div>
+            <div className="text-[#8496B8]">Margin Used</div>
             <div className="text-base font-mono font-bold text-[#5EEAD4] mt-1">
-              {Number(cap.margin_utilization_pct ?? 3.4).toFixed(2)}% (Free ${Number(cap.free_margin ?? 24863.1).toFixed(2)})
+              {Number(cap.margin_utilization_pct ?? 3.4).toFixed(2)}%
             </div>
           </div>
           <div className="iea-glass-tile p-3.5">
-            <div className="text-[#8496B8]">Open Positions (By Symbol)</div>
+            <div className="text-[#8496B8]">Pos by Instr</div>
             <div className="text-base font-mono font-bold text-[#F4F7FF] mt-1">
               {cap.total_open_positions ?? 4} ({Object.entries(byInst).map(([k, v]) => `${k}:${v}`).join(", ") || "XAU:2, JPY:1, BTC:1"})
             </div>
@@ -436,9 +434,9 @@ export const RiskManagerScreen: React.FC<{
       </div>
 
       <div className="iea-glass-card p-5">
-        <h3 className="text-sm font-semibold text-[#F4F7FF] mb-3">Recent Risk Gate Decisions</h3>
+        <h3 className="text-sm font-semibold text-[#F4F7FF] mb-3">Gate Decisions</h3>
         {decisions.length === 0 ? (
-          <div className="text-xs text-[#8496B8] py-4">No risk evaluations logged yet.</div>
+          <div className="text-xs text-[#8496B8] py-4">0 evaluations logged.</div>
         ) : (
           <div className="space-y-2 text-xs">
             {decisions.slice(0, 20).map((d) => (
@@ -448,7 +446,7 @@ export const RiskManagerScreen: React.FC<{
                   <span className="font-mono font-bold text-[#F4F7FF]">{d.symbol} {d.direction}</span>
                   <span className="text-[#B6C5E0]">{d.reason}</span>
                 </div>
-                <span className="font-mono text-[#B0F648]">{d.lot_size.toFixed(2)} lot</span>
+                <span className="font-mono text-[#B0F648]">{d.lot_size.toFixed(2)}L</span>
               </div>
             ))}
           </div>
@@ -469,11 +467,11 @@ export const InstrumentsScreen: React.FC<{
     <div className="iea-glass-card p-5 space-y-4">
       <div className="flex items-center space-x-2">
         <Layers className="w-5 h-5 text-[#B0F648]" />
-        <h2 className="text-lg font-light text-[#F4F7FF]">Approved Instrument Profiles</h2>
+        <h2 className="text-lg font-light text-[#F4F7FF]">Instruments</h2>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
         {entries.length === 0 ? (
-          <div className="text-xs text-[#8496B8]">No instrument profiles loaded from config/instruments.json.</div>
+          <div className="text-xs text-[#8496B8]">0 profiles loaded.</div>
         ) : (
           entries.map(([sym, cfg]) => {
             const live = liveSpecs[sym] || liveSpecs[`${sym}.m`];
@@ -490,7 +488,7 @@ export const InstrumentsScreen: React.FC<{
                     <span className="font-mono font-bold text-sm text-[#F4F7FF]">{sym}</span>
                   </div>
                   <span className="px-2.5 py-0.5 bg-[#B0F648]/18 text-[#B0F648] border border-[#B0F648]/35 rounded-full text-[10px] font-mono font-bold">
-                    {live ? `BID ${live.bid}` : "CONFIGURED"}
+                    {live ? `BID ${live.bid}` : "CFG"}
                   </span>
                 </div>
                 <pre className="text-[11px] text-[#B6C5E0] font-mono bg-[#091426]/75 p-3 rounded-xl border border-[rgba(186,214,255,0.1)] overflow-x-auto max-h-48">

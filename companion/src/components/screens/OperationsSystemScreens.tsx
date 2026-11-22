@@ -26,7 +26,7 @@ export const ConfigurationScreen: React.FC<{
   const [fullConfig, setFullConfig] = useState<Record<string, any>>({});
   const [versions, setVersions] = useState<ConfigVersionRecord[]>([]);
   const [editorText, setEditorText] = useState("");
-  const [summary, setSummary] = useState("Updated via Companion Control Centre");
+  const [summary, setSummary] = useState("Config update");
   const [previewInfo, setPreviewInfo] = useState<{
     valid: boolean;
     errors: string[];
@@ -70,7 +70,7 @@ export const ConfigurationScreen: React.FC<{
       const res = await controlClient.previewConfig({ [section]: parsed });
       setPreviewInfo(res);
     } catch (e: any) {
-      onActionMessage(`Invalid JSON or preview failed: ${e.message}`, true);
+      onActionMessage(`Preview failed: ${e.message}`, true);
     }
   };
 
@@ -80,8 +80,8 @@ export const ConfigurationScreen: React.FC<{
       const parsed = JSON.parse(editorText);
       const res = await controlClient.applyConfig({ [section]: parsed }, summary);
       onActionMessage(
-        `Config v${res.version} applied (${res.changed_keys.length} changes).${
-          res.requires_restart ? " Engine restart required!" : ""
+        `Applied v${res.version} (${res.changed_keys.length} keys).${
+          res.requires_restart ? " Restart required." : ""
         }`
       );
       await loadAll();
@@ -93,11 +93,11 @@ export const ConfigurationScreen: React.FC<{
   };
 
   const handleRollback = async (ver: number) => {
-    if (!window.confirm(`Rollback configuration to v${ver}?`)) return;
+    if (!window.confirm(`Rollback to v${ver}?`)) return;
     setBusy(true);
     try {
       const res = await controlClient.rollbackConfig(ver);
-      onActionMessage(`Rolled back to v${ver} -> new v${res.version}.`);
+      onActionMessage(`Rolled back v${ver} -> v${res.version}.`);
       await loadAll();
     } catch (e: any) {
       onActionMessage(`Rollback failed: ${e.message}`, true);
@@ -112,7 +112,7 @@ export const ConfigurationScreen: React.FC<{
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center space-x-2">
             <FolderCog className="w-5 h-5 text-[#B0F648]" />
-            <h2 className="text-lg font-light text-[#F4F7FF]">Authoritative Configuration Editor</h2>
+            <h2 className="text-lg font-light text-[#F4F7FF]">Config Editor</h2>
           </div>
           <div className="flex space-x-1 bg-[#091426]/80 p-1 rounded-full border border-[rgba(186,214,255,0.16)] text-xs">
             {(["settings", "risk", "strategy"] as const).map((sec) => (
@@ -144,35 +144,35 @@ export const ConfigurationScreen: React.FC<{
             type="text"
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
-            placeholder="Change summary..."
-            className="flex-1 min-w-[180px] bg-[#071020]/80 border border-[rgba(186,214,255,0.16)] rounded-full px-4 py-1.5 text-xs text-[#F4F7FF]"
+            placeholder="Note..."
+            className="flex-1 min-w-[160px] bg-[#071020]/80 border border-[rgba(186,214,255,0.16)] rounded-full px-4 py-1.5 text-xs text-[#F4F7FF]"
           />
           <button onClick={handlePreview} className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF] font-semibold">
-            Preview Diff
+            Diff
           </button>
           <button
             disabled={busy}
             onClick={handleApply}
             className="px-4 py-1.5 bg-[#B0F648] hover:bg-[#C2F076] text-xs text-[#081321] font-extrabold rounded-full shadow-[0_0_16px_rgba(176,246,72,0.28)]"
           >
-            Validate &amp; Apply
+            Apply
           </button>
         </div>
 
         {previewInfo && (
           <div className={`p-3.5 rounded-2xl border text-xs ${previewInfo.valid ? "iea-glass-tile" : "bg-[#FF5A6E]/20 border-[#FF5A6E]/50"}`}>
-            <div>Valid: <strong className="text-[#B0F648]">{String(previewInfo.valid)}</strong> · Restart Required: <strong>{String(previewInfo.requires_restart)}</strong></div>
-            <div>Changed Keys: <code className="text-[#5EEAD4]">{previewInfo.changed_keys.join(", ") || "None"}</code></div>
+            <div>Valid: <strong className="text-[#B0F648]">{String(previewInfo.valid)}</strong> · Restart: <strong>{String(previewInfo.requires_restart)}</strong></div>
+            <div>Keys: <code className="text-[#5EEAD4]">{previewInfo.changed_keys.join(", ") || "None"}</code></div>
             {previewInfo.errors.length > 0 && <div className="text-[#FF7A8A] mt-1">{previewInfo.errors.join("; ")}</div>}
           </div>
         )}
       </div>
 
       <div className="iea-glass-card p-5 space-y-3">
-        <h3 className="text-sm font-semibold text-[#F4F7FF]">Version History</h3>
+        <h3 className="text-sm font-semibold text-[#F4F7FF]">Versions</h3>
         <div className="space-y-2 max-h-[420px] overflow-y-auto">
           {versions.length === 0 ? (
-            <div className="text-xs text-[#8496B8] py-4">v1 · Default DEMO baseline configuration active.</div>
+            <div className="text-xs text-[#8496B8] py-4">v1 · Baseline DEMO config.</div>
           ) : (
             versions.map((v) => (
               <div key={v.id} className="iea-glass-tile p-3 text-xs space-y-1">
@@ -184,7 +184,7 @@ export const ConfigurationScreen: React.FC<{
                     className="text-[11px] text-[#FBBF24] hover:underline inline-flex items-center space-x-1"
                   >
                     <RotateCcw className="w-3 h-3" />
-                    <span>Rollback</span>
+                    <span>Revert</span>
                   </button>
                 </div>
                 <div className="text-[#F4F7FF]">{v.change_summary}</div>
@@ -211,7 +211,7 @@ export const MT5ConnectionScreen: React.FC<{
       const list = await IPC.scanMT5Terminals();
       setTerminals(list);
     } catch (e: any) {
-      onActionMessage(`Terminal scan failed: ${e.message}`, true);
+      onActionMessage(`Scan failed: ${e.message}`, true);
     }
   };
 
@@ -223,10 +223,10 @@ export const MT5ConnectionScreen: React.FC<{
     setBusy(true);
     try {
       const res = await controlClient.connectMT5();
-      onActionMessage(res.success ? "Connected & synced with MT5." : "MT5 connection failed — check Error Centre.", !res.success);
+      onActionMessage(res.success ? "MT5 synced." : "MT5 connect failed.", !res.success);
       await onRefresh();
     } catch (e: any) {
-      onActionMessage(`MT5 connect error: ${e.message}`, true);
+      onActionMessage(`MT5 error: ${e.message}`, true);
     } finally {
       setBusy(false);
     }
@@ -240,32 +240,32 @@ export const MT5ConnectionScreen: React.FC<{
         <div>
           <h2 className="text-lg font-light text-[#F4F7FF] flex items-center space-x-2">
             <Link2 className="w-5 h-5 text-[#B0F648]" />
-            <span>MetaTrader 5 Terminal Synchronization</span>
+            <span>MT5 Terminals</span>
           </h2>
           <p className="text-xs text-[#B6C5E0] mt-1">
-            Status: <strong className="text-[#B0F648]">{status?.mt5.connection_status}</strong> · Account:{" "}
+            Conn: <strong className="text-[#B0F648]">{status?.mt5.connection_status}</strong> · Mode:{" "}
             <strong className="text-[#F4F7FF]">{acct?.trade_mode || "DEMO"}</strong> · Margin:{" "}
             <strong className="text-[#5EEAD4]">{acct?.margin_mode_str || "HEDGING"}</strong>
           </p>
         </div>
         <div className="flex space-x-2.5">
           <button onClick={scan} className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF] font-semibold">
-            Scan Terminals
+            Scan
           </button>
           <button
             disabled={busy}
             onClick={handleConnect}
             className="px-4 py-1.5 bg-[#B0F648] hover:bg-[#C2F076] text-xs text-[#081321] font-extrabold rounded-full shadow-[0_0_16px_rgba(176,246,72,0.28)]"
           >
-            Connect &amp; Sync MT5
+            Sync MT5
           </button>
         </div>
       </div>
 
       <div className="iea-glass-card p-5 space-y-3">
-        <h3 className="text-sm font-semibold text-[#F4F7FF]">Detected Windows MT5 Terminals ({terminals.length})</h3>
+        <h3 className="text-sm font-semibold text-[#F4F7FF]">Terminals ({terminals.length})</h3>
         {terminals.length === 0 ? (
-          <div className="text-xs text-[#8496B8] py-4">No MT5 terminals found in standard paths.</div>
+          <div className="text-xs text-[#8496B8] py-4">0 terminals detected.</div>
         ) : (
           terminals.map((t) => (
             <div key={t.id} className="iea-glass-tile flex flex-wrap items-center justify-between gap-3 p-4 text-xs">
@@ -273,14 +273,14 @@ export const MT5ConnectionScreen: React.FC<{
                 <div className="font-bold text-[#F4F7FF]">
                   {t.name}{" "}
                   {t.isRunning ? (
-                    <span className="text-[#B0F648] font-mono">(Running PID {t.pid})</span>
+                    <span className="text-[#B0F648] font-mono">(PID {t.pid})</span>
                   ) : (
                     <span className="text-[#8496B8]">(Stopped)</span>
                   )}
                 </div>
                 <div className="font-mono text-[11px] text-[#B6C5E0] mt-0.5">{t.executablePath}</div>
                 <div className="text-[11px] text-[#8496B8] mt-0.5">
-                  EA Installed: <strong className="text-[#5EEAD4]">{t.eaInstalled ? `Yes (v${t.eaVersion})` : "No"}</strong>
+                  EA: <strong className="text-[#5EEAD4]">{t.eaInstalled ? `v${t.eaVersion}` : "None"}</strong>
                 </div>
               </div>
               <div className="flex space-x-2">
@@ -302,7 +302,7 @@ export const MT5ConnectionScreen: React.FC<{
                   }}
                   className="px-3.5 py-1.5 bg-[#B0F648] hover:bg-[#C2F076] text-[#081321] font-extrabold rounded-full"
                 >
-                  Launch MT5
+                  Launch
                 </button>
               </div>
             </div>
@@ -319,14 +319,14 @@ export const OperationsCentreScreen: React.FC<{
   const [ops, setOps] = useState<AllowlistedOpInfo[]>([
     {
       op_id: "selfcheck",
-      name: "System Self-Check & Preflight Probe",
-      description: "Verifies ZMQ ports 5555/5556, SQLite schema, and DEMO lock safety flags.",
+      name: "System Self-Check",
+      description: "Verify ZMQ 5555/5556, SQLite & DEMO lock.",
       timeout_sec: 30,
     },
     {
       op_id: "sync_instruments",
-      name: "Synchronize MT5 Broker Symbol Specifications",
-      description: "Refreshes contract size, digits, and stops levels for XAUUSD, USDJPY, BTCUSD.",
+      name: "Sync Symbol Specs",
+      description: "Refresh XAUUSD, USDJPY & BTCUSD contract specs.",
       timeout_sec: 20,
     },
   ]);
@@ -353,10 +353,10 @@ export const OperationsCentreScreen: React.FC<{
     try {
       const res = await controlClient.runOperation(opId);
       setSelectedOutput(res);
-      onActionMessage(`Operation '${opId}' finished (${res.status || "SUCCESS"}).`, false);
+      onActionMessage(`Op '${opId}' -> ${res.status || "OK"}`, false);
       await loadOps();
     } catch (e: any) {
-      onActionMessage(`Operation failed: ${e.message}`, true);
+      onActionMessage(`Op failed: ${e.message}`, true);
     } finally {
       setRunningOp(null);
     }
@@ -368,7 +368,7 @@ export const OperationsCentreScreen: React.FC<{
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-light text-[#F4F7FF] flex items-center space-x-2">
             <Terminal className="w-5 h-5 text-[#B0F648]" />
-            <span>Approved Operations Runner (Fixed Allowlist)</span>
+            <span>Ops Runner</span>
           </h2>
           <button onClick={loadOps} className="iea-pill-control p-1.5 text-[#B6C5E0] hover:text-white">
             <RefreshCw className="w-3.5 h-3.5" />
@@ -388,7 +388,7 @@ export const OperationsCentreScreen: React.FC<{
                 className="px-3.5 py-1.5 bg-[#B0F648] hover:bg-[#C2F076] disabled:opacity-40 text-[#081321] font-extrabold rounded-full inline-flex items-center space-x-1 shrink-0 ml-3"
               >
                 <Play className="w-3 h-3" />
-                <span>{runningOp === op.op_id ? "Running..." : "Run"}</span>
+                <span>{runningOp === op.op_id ? "..." : "Run"}</span>
               </button>
             </div>
           ))}
@@ -396,24 +396,24 @@ export const OperationsCentreScreen: React.FC<{
       </div>
 
       <div className="iea-glass-card p-5 space-y-3.5">
-        <h3 className="text-sm font-semibold text-[#F4F7FF]">Execution Output &amp; Audit History</h3>
+        <h3 className="text-sm font-semibold text-[#F4F7FF]">Output &amp; Audit</h3>
         {selectedOutput && (
           <div className="bg-[#071020]/85 border border-[rgba(186,214,255,0.16)] rounded-2xl p-3.5 text-xs space-y-1.5">
             <div className="flex justify-between font-mono">
               <span className="text-[#5EEAD4]">{selectedOutput.op_id}</span>
               <span className={selectedOutput.status === "SUCCESS" ? "text-[#B0F648]" : "text-[#FF5A6E]"}>
-                {selectedOutput.status || "SUCCESS"} ({selectedOutput.duration_ms ?? 120} ms)
+                {selectedOutput.status || "OK"} ({selectedOutput.duration_ms ?? 120}ms)
               </span>
             </div>
             <pre className="text-[11px] text-[#B6C5E0] font-mono whitespace-pre-wrap max-h-44 overflow-y-auto">
-              {selectedOutput.stdout || selectedOutput.stderr || "Allowlisted operation completed cleanly (exit code 0)."}
+              {selectedOutput.stdout || selectedOutput.stderr || "Exit 0"}
             </pre>
           </div>
         )}
 
         <div className="space-y-2 max-h-[260px] overflow-y-auto text-xs">
           {audits.length === 0 ? (
-            <div className="text-xs text-[#8496B8] py-4">Click Run on any allowlisted operation to view stdout and audit output.</div>
+            <div className="text-xs text-[#8496B8] py-4">0 runs recorded.</div>
           ) : (
             audits.map((a) => (
               <button
@@ -443,10 +443,10 @@ export const ErrorCentreScreen: React.FC<{
   const visible = errors.filter((e) => filter === "ALL" || e.status === filter);
 
   const handleResolve = async (id: number) => {
-    const note = window.prompt("Resolution note:", "Verified and resolved by operator") || "Resolved by operator";
+    const note = window.prompt("Note:", "Resolved") || "Resolved";
     try {
       await controlClient.resolveError(id, note);
-      onActionMessage(`Error #${id} marked RESOLVED.`);
+      onActionMessage(`Err #${id} resolved.`);
       await onReload();
     } catch (e: any) {
       onActionMessage(`Resolve failed: ${e.message}`, true);
@@ -458,7 +458,7 @@ export const ErrorCentreScreen: React.FC<{
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-light text-[#F4F7FF] flex items-center space-x-2">
           <AlertOctagon className="w-5 h-5 text-[#B0F648]" />
-          <span>Error Centre ({visible.length})</span>
+          <span>Errors ({visible.length})</span>
         </h2>
         <div className="flex space-x-1 bg-[#091426]/80 p-1 rounded-full border border-[rgba(186,214,255,0.16)] text-xs">
           {(["ACTIVE", "RESOLVED", "ALL"] as const).map((f) => (
@@ -479,7 +479,7 @@ export const ErrorCentreScreen: React.FC<{
         {visible.length === 0 ? (
           <div className="text-xs text-[#B6C5E0] py-10 text-center flex flex-col items-center space-y-2 iea-glass-tile">
             <CheckCircle2 className="w-6 h-6 text-[#B0F648]" />
-            <span>No {filter.toLowerCase()} errors. All trading subsystems healthy.</span>
+            <span>0 {filter.toLowerCase()} errors.</span>
           </div>
         ) : (
           visible.map((err) => (
@@ -500,7 +500,7 @@ export const ErrorCentreScreen: React.FC<{
                 )}
               </div>
               <div className="text-[#F4F7FF] font-medium">{err.message}</div>
-              <div className="text-[#8496B8]">Recovery: {err.recommended_recovery}</div>
+              <div className="text-[#8496B8]">Fix: {err.recommended_recovery}</div>
             </div>
           ))
         )}

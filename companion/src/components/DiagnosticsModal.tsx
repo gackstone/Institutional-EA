@@ -59,8 +59,7 @@ export const DiagnosticsModal: React.FC<DiagnosticsModalProps> = ({ isOpen, onCl
               <Activity className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-institutional-ea-text">System Pre-Flight Diagnostics</h3>
-              <p className="text-[11px] text-institutional-ea-textMuted">Comprehensive hardware, runtime, network & trading checks</p>
+              <h3 className="font-bold text-sm text-institutional-ea-text">Diagnostics</h3>
             </div>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-institutional-ea-secondary rounded-md text-institutional-ea-textMuted hover:text-institutional-ea-text transition">

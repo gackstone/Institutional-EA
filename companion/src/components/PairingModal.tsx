@@ -87,8 +87,7 @@ export const PairingModal: React.FC<PairingModalProps> = ({
               <Cloud className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-institutional-ea-text">Institutional EA Cloud Pairing</h3>
-              <p className="text-[11px] text-institutional-ea-textMuted">Connect to remote AI coach & mobile telemetry</p>
+              <h3 className="font-bold text-sm text-institutional-ea-text">Cloud Pairing</h3>
             </div>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-institutional-ea-secondary rounded-md text-institutional-ea-textMuted hover:text-institutional-ea-text transition">
