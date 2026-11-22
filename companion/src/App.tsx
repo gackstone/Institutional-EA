@@ -70,10 +70,12 @@ import {
   normalizeLogEntries,
 } from "./services/dashboardDataAdapter";
 import { DESIGN_TOKENS } from "./styles/designTokens";
+import { UI_COPY } from "./constants/uiCopy";
 
 interface NavScreenItem {
   id: ScreenId;
   label: string;
+  tooltip: string;
   badge?: string | number;
   icon: React.ComponentType<{ className?: string }>;
 }
@@ -365,29 +367,29 @@ export const App: React.FC = () => {
   const activeErrorCount = effectiveStatus.health.active_error_count;
   const openPosCount = effectiveStatus.mt5.positions.length;
 
-  // All 16 screens grouped under Monitor / Control / Diagnose
+  // All 16 screens grouped under Monitor / Control / Diagnose using centralized UI_COPY short forms
   const navGroups: NavGroupSpec[] = useMemo(
     () => [
       {
         group: "Monitor",
         items: [
-          { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, badge: "LIVE" },
-          { id: "market", label: "Market Watch", icon: TrendingUp, badge: 3 },
-          { id: "signals", label: "Signals Pipeline", icon: Zap },
-          { id: "positions", label: "Positions & Orders", icon: Layers, badge: openPosCount },
-          { id: "history", label: "Trade History", icon: History, badge: normalized.recentTrades.length },
-          { id: "analytics", label: "Analytics", icon: BarChart3 },
+          { id: "dashboard", ...UI_COPY.nav.screens.dashboard, icon: LayoutDashboard, badge: "LIVE" },
+          { id: "market", ...UI_COPY.nav.screens.market, icon: TrendingUp, badge: 3 },
+          { id: "signals", ...UI_COPY.nav.screens.signals, icon: Zap },
+          { id: "positions", ...UI_COPY.nav.screens.positions, icon: Layers, badge: openPosCount },
+          { id: "history", ...UI_COPY.nav.screens.history, icon: History, badge: normalized.recentTrades.length },
+          { id: "analytics", ...UI_COPY.nav.screens.analytics, icon: BarChart3 },
         ],
       },
       {
         group: "Control",
         items: [
-          { id: "engine", label: "Engine Control", icon: Cpu },
-          { id: "risk", label: "Risk Manager", icon: Shield },
-          { id: "instruments", label: "Instruments", icon: Activity },
-          { id: "configuration", label: "Configuration", icon: FolderCog },
-          { id: "mt5", label: "MT5 Terminal", icon: Link2 },
-          { id: "operations", label: "Operations", icon: Terminal },
+          { id: "engine", ...UI_COPY.nav.screens.engine, icon: Cpu },
+          { id: "risk", ...UI_COPY.nav.screens.risk, icon: Shield },
+          { id: "instruments", ...UI_COPY.nav.screens.instruments, icon: Activity },
+          { id: "configuration", ...UI_COPY.nav.screens.configuration, icon: FolderCog },
+          { id: "mt5", ...UI_COPY.nav.screens.mt5, icon: Link2 },
+          { id: "operations", ...UI_COPY.nav.screens.operations, icon: Terminal },
         ],
       },
       {
@@ -395,13 +397,13 @@ export const App: React.FC = () => {
         items: [
           {
             id: "errors",
-            label: "Error Centre",
+            ...UI_COPY.nav.screens.errors,
             icon: AlertOctagon,
             badge: activeErrorCount > 0 ? activeErrorCount : undefined,
           },
-          { id: "logs", label: "Event Logs", icon: FileText },
-          { id: "health", label: "System Health", icon: Database },
-          { id: "settings", label: "Settings", icon: SettingsIcon },
+          { id: "logs", ...UI_COPY.nav.screens.logs, icon: FileText },
+          { id: "health", ...UI_COPY.nav.screens.health, icon: Database },
+          { id: "settings", ...UI_COPY.nav.screens.settings, icon: SettingsIcon },
         ],
       },
     ],
@@ -524,7 +526,7 @@ export const App: React.FC = () => {
                       }}
                       aria-current={active ? "page" : undefined}
                       aria-label={item.label}
-                      title={item.label}
+                      title={`${item.label} — ${item.tooltip}`}
                       className={`group relative w-full h-9 flex items-center rounded-xl text-xs transition-all duration-150 ${
                         isSidebarExpanded ? "px-2.5 justify-between" : "px-0 justify-center"
                       } ${
@@ -603,23 +605,33 @@ export const App: React.FC = () => {
           {isSidebarExpanded ? (
             <div className="space-y-1.5 whitespace-nowrap">
               <div className="flex items-center justify-between text-[10px] font-mono">
-                <span className="inline-flex items-center space-x-1 text-[#B0F648] font-bold">
+                <span className="inline-flex items-center space-x-1 text-[#B0F648] font-bold" title={UI_COPY.brand.demoLockTooltip}>
                   <Lock className="w-3 h-3" />
-                  <span>DEMO LOCK ACTIVE</span>
+                  <span>{UI_COPY.brand.demoLockShort}</span>
                 </span>
                 <span className="text-[#8496B8]">127.0.0.1:8765</span>
               </div>
               <div className="text-[10px] text-[#B6C5E0] flex items-center justify-between">
-                <span>Feed: {feedStatus}</span>
-                <button
-                  type="button"
-                  onClick={() => refreshStatus()}
-                  aria-label="Refresh terminal telemetry"
-                  className="text-[#B0F648] hover:text-[#C2F076] inline-flex items-center space-x-1 font-medium"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  <span>Sync</span>
-                </button>
+                <span>{feedStatus}</span>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveScreen("settings")}
+                    title="Open Short-Form Glossary (Settings > Glossary)"
+                    className="text-[#5EEAD4] hover:underline font-mono font-bold"
+                  >
+                    ? Glossary
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => refreshStatus()}
+                    aria-label="Refresh terminal telemetry"
+                    className="text-[#B0F648] hover:text-[#C2F076] inline-flex items-center space-x-1 font-medium"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Sync</span>
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
