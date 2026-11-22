@@ -371,7 +371,6 @@ export function resolveLabelCollisions(
   });
 
   const n = sorted.length;
-  const availableSpan = Math.max(1, bottomLimit - topLimit);
   // If more labels than vertical space allows at full minGapPx, compress gap gracefully so none clip
   const effectiveGap = n > 1 ? Math.min(minGapPx, availableSpan / (n - 1)) : minGapPx;
 
