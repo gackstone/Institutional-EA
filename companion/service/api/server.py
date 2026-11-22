@@ -403,6 +403,18 @@ def create_request_handler(ctx: ControlServiceContext):
                 ok = ctx.mt5_sync.connect(terminal_path=term_path)
                 snap = ctx.mt5_sync.sync_all(terminal_path=term_path) if ok else ctx.mt5_sync.get_snapshot()
                 self._send_json(200, {"success": ok, "error": ctx.mt5_sync.last_error, "snapshot": snap})
+            elif path == "/api/mt5/disconnect":
+                eng_status = ctx.engine.get_status()
+                eng_state = eng_status.get("engine_state") or eng_status.get("state") or "STOPPED"
+                if eng_state in ("RUNNING", "PAUSED", "STARTING"):
+                    self._send_json(200, {
+                        "success": False,
+                        "error": "Stop the engine before disconnecting MT5.",
+                        "snapshot": ctx.mt5_sync.get_snapshot(),
+                    })
+                else:
+                    snap = ctx.mt5_sync.disconnect()
+                    self._send_json(200, {"success": True, "error": None, "snapshot": snap})
             elif path == "/api/mt5/sync":
                 term_path = body.get("terminal_path")
                 snap = ctx.mt5_sync.sync_all(target_symbols=body.get("symbols"), terminal_path=term_path)

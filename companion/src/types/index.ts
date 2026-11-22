@@ -69,6 +69,11 @@ export interface ActivePosition {
   currentPrice: number;
   sl: number;
   tp: number;
+  stop_loss?: number;
+  take_profit?: number;
+  initial_stop_loss?: number;
+  open_time?: string | null;
+  open_timestamp?: number | null;
   profit: number;
   nativeProfit?: number;
   normalizedProfit?: number;
@@ -221,11 +226,14 @@ export interface ControlPosition {
 export interface ControlStatusPayload {
   engine: {
     engine_state: string;
+    state?: string;
     operating_mode: OperatingMode;
     dry_run: boolean;
     live_trading_locked: boolean;
     stop_flag_active: boolean;
+    stop_flag_present?: boolean;
     pause_flag_active: boolean;
+    pause_flag_present?: boolean;
     bridge_running: boolean;
     bridge_pid: number | null;
     engine_running: boolean;

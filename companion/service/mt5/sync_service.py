@@ -60,6 +60,9 @@ class MT5SyncService:
 
         self._lock = threading.RLock()
         self.connection_status: str = "DISCONNECTED"  # CONNECTED | DISCONNECTED | SYNCHRONIZING | ERROR
+        self._manually_disconnected: bool = False
+        self._initial_sl: Dict[int, float] = {}
+        self.broker_utc_offset_seconds: int = 0
         self.last_sync_at: Optional[str] = None
         self.last_error: Optional[str] = None
         self.reconnect_attempts: int = 0
@@ -198,9 +201,49 @@ class MT5SyncService:
         }
         return dict(self.zmq_status)
 
+    def is_manually_disconnected(self) -> bool:
+        with self._lock:
+            return self._manually_disconnected
+
+    def disconnect(self) -> Dict[str, Any]:
+        """Disconnects MT5 and pauses background auto-reconnect until Connect is called."""
+        with self._lock:
+            self._manually_disconnected = True
+            mt5 = self._get_mt5()
+            if mt5 is not None:
+                try:
+                    mt5.shutdown()
+                except Exception:
+                    pass
+            try:
+                if self.bridge.is_connected():
+                    self.bridge.disconnect()
+            except Exception:
+                pass
+            self.connection_status = "DISCONNECTED"
+            self.last_error = None
+            self.reconnect_attempts = 0
+            self.positions = []
+            self.pending_orders = []
+            self.reconciliation_report = {
+                "status": "NOT_SYNCED",
+                "bot_owned_count": 0,
+                "manual_count": 0,
+                "other_ea_count": 0,
+                "unexpected_tickets": [],
+                "unprotected_bot_tickets": [],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            self.repo.record_connection_event("MT5", "DISCONNECTED", "Disconnected by operator")
+            self.events.log("MT5", "INFO", "Disconnected from MT5 terminal by operator")
+            snap = self.get_snapshot()
+            self.events.publish_event("mt5_sync", snap)
+            return snap
+
     def connect(self, terminal_path: Optional[str] = None) -> bool:
         """Connects via direct MetaTrader5 Python API first (fast, non-blocking), or Bridge IPC if listening."""
         with self._lock:
+            self._manually_disconnected = False
             self.connection_status = "SYNCHRONIZING"
             if terminal_path:
                 self.terminal_path = terminal_path
@@ -210,6 +253,22 @@ class MT5SyncService:
             if mt5 is not None:
                 ok, err = self._init_mt5(mt5, terminal_path=terminal_path)
                 if ok:
+                    info = None
+                    try:
+                        info = mt5.account_info()
+                    except Exception:
+                        info = None
+                    if info is not None and int(getattr(info, "trade_mode", 0)) != 0:
+                        # Hard DEMO Lock: refuse non-demo (LIVE/CONTEST) accounts
+                        try:
+                            mt5.shutdown()
+                        except Exception:
+                            pass
+                        self.connection_status = "DISCONNECTED"
+                        self.last_error = "DEMO Lock: Non-demo MT5 account refused. Switch to a DEMO account."
+                        self.repo.record_connection_event("MT5_DIRECT", "REFUSED_NON_DEMO", self.last_error)
+                        self.events.log("MT5", "ERROR", self.last_error)
+                        return False
                     self.connection_status = "CONNECTED"
                     self.reconnect_attempts = 0
                     self.last_error = None
@@ -229,6 +288,21 @@ class MT5SyncService:
             if should_try_bridge:
                 try:
                     if self.bridge.connect():
+                        acc_check = None
+                        try:
+                            acc_check = self.bridge.get_account()
+                        except Exception:
+                            acc_check = None
+                        if acc_check is not None and str(getattr(acc_check, "trade_mode", "DEMO")).upper() != "DEMO":
+                            try:
+                                self.bridge.disconnect()
+                            except Exception:
+                                pass
+                            self.connection_status = "DISCONNECTED"
+                            self.last_error = "DEMO Lock: Non-demo MT5 account refused. Switch to a DEMO account."
+                            self.repo.record_connection_event("MT5_BRIDGE", "REFUSED_NON_DEMO", self.last_error)
+                            self.events.log("MT5", "ERROR", self.last_error)
+                            return False
                         self.connection_status = "CONNECTED"
                         self.reconnect_attempts = 0
                         self.last_error = None
@@ -311,6 +385,12 @@ class MT5SyncService:
                         pos_list = mt5.positions_get() or []
                         for p in pos_list:
                             from src.core.contracts import OrderType
+                            raw_t = int(getattr(p, "time", 0) or 0)
+                            open_dt = (
+                                datetime.fromtimestamp(raw_t, tz=timezone.utc)
+                                if raw_t > 0
+                                else datetime.now(timezone.utc)
+                            )
                             raw_positions.append(
                                 Position(
                                     ticket=int(p.ticket),
@@ -326,6 +406,7 @@ class MT5SyncService:
                                     swap=float(getattr(p, "swap", 0.0)),
                                     magic=int(getattr(p, "magic", 0)),
                                     comment=str(getattr(p, "comment", "")),
+                                    open_time=open_dt,
                                 )
                             )
                         ord_list = mt5.orders_get() or []
@@ -614,15 +695,36 @@ class MT5SyncService:
                 )
             self._previous_sl_tp[int(p.ticket)] = cur
 
+            # Track first non-zero SL seen for each ticket so moved stops (BE/trailing) are preserved
+            ticket_id = int(p.ticket)
+            sl_val = float(p.stop_loss)
+            tp_val = float(p.take_profit)
+            if ticket_id not in self._initial_sl and sl_val > 0.0:
+                self._initial_sl[ticket_id] = sl_val
+            initial_sl_val = self._initial_sl.get(ticket_id, sl_val)
+            open_time_val = getattr(p, "open_time", None)
+            if isinstance(open_time_val, datetime):
+                open_time_iso = open_time_val.astimezone(timezone.utc).isoformat()
+                open_time_ts = int(open_time_val.timestamp())
+            else:
+                open_time_iso = None
+                open_time_ts = None
+
             item = {
-                "ticket": int(p.ticket),
+                "ticket": ticket_id,
                 "symbol": p.symbol,
                 "direction": p.order_type.value if hasattr(p.order_type, "value") else str(p.order_type),
                 "volume": float(p.volume),
                 "open_price": float(p.open_price),
                 "current_price": float(p.current_price),
-                "stop_loss": float(p.stop_loss),
-                "take_profit": float(p.take_profit),
+                "stop_loss": sl_val,
+                "take_profit": tp_val,
+                "sl": sl_val,
+                "tp": tp_val,
+                "initial_stop_loss": initial_sl_val,
+                "open_time": open_time_iso,
+                "open_timestamp": open_time_ts,
+                "protected": sl_val > 0.0,
                 "profit": round(float(p.profit), 2),
                 "commission": round(float(getattr(p, "commission", 0.0)), 2),
                 "swap": round(float(getattr(p, "swap", 0.0)), 2),

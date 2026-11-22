@@ -320,24 +320,48 @@ export function buildNormalizedDashboardData(
     !lastSyncAt ||
     now.getTime() - new Date(lastSyncAt).getTime() > STALE_SYNC_THRESHOLD_MS;
 
+  const rawEng = rawStatus?.engine as Record<string, any> | undefined;
+  const resolvedEngineState = String(
+    rawEng?.engine_state || rawEng?.state || "STOPPED"
+  ).toUpperCase();
+  const resolvedStopFlag = Boolean(
+    rawEng?.stop_flag_active ?? rawEng?.stop_flag_present ?? false
+  );
+  const resolvedPauseFlag = Boolean(
+    rawEng?.pause_flag_active ?? rawEng?.pause_flag_present ?? false
+  );
+  const resolvedOpMode = (rawEng?.operating_mode || "DEMO_SCALPING") as OperatingMode;
+  const resolvedEnginePid = rawEng?.engine_pid ?? null;
+  const resolvedBridgePid = rawEng?.bridge_pid ?? null;
+
   const emptyStatus: ControlStatusPayload = {
     engine: {
-      engine_state: rawStatus?.engine?.engine_state || "STOPPED",
-      operating_mode: (rawStatus?.engine?.operating_mode || "DEMO_SCALPING") as OperatingMode,
-      dry_run: Boolean(rawStatus?.engine?.dry_run ?? false),
+      engine_state: resolvedEngineState,
+      state: resolvedEngineState,
+      operating_mode: resolvedOpMode,
+      dry_run: Boolean(
+        rawEng?.dry_run ?? (resolvedOpMode === "DRY_RUN" || resolvedOpMode === "OBSERVE")
+      ),
       live_trading_locked: true,
-      stop_flag_active: Boolean(rawStatus?.engine?.stop_flag_active ?? false),
-      pause_flag_active: Boolean(rawStatus?.engine?.pause_flag_active ?? false),
-      bridge_running: Boolean(rawStatus?.engine?.bridge_running ?? false),
-      bridge_pid: rawStatus?.engine?.bridge_pid ?? null,
-      engine_running: Boolean(rawStatus?.engine?.engine_running ?? false),
-      engine_pid: rawStatus?.engine?.engine_pid ?? null,
-      started_at: rawStatus?.engine?.started_at ?? null,
-      last_heartbeat: rawStatus?.engine?.last_heartbeat ?? null,
-      last_signal: rawStatus?.engine?.last_signal ?? null,
-      last_trade: rawStatus?.engine?.last_trade ?? null,
-      last_execution_error: rawStatus?.engine?.last_execution_error ?? null,
-      portfolio_capacity: rawStatus?.engine?.portfolio_capacity,
+      stop_flag_active: resolvedStopFlag,
+      stop_flag_present: resolvedStopFlag,
+      pause_flag_active: resolvedPauseFlag,
+      pause_flag_present: resolvedPauseFlag,
+      bridge_running: Boolean(rawEng?.bridge_running ?? resolvedBridgePid !== null),
+      bridge_pid: resolvedBridgePid,
+      engine_running: Boolean(
+        rawEng?.engine_running ??
+          (resolvedEnginePid !== null ||
+            resolvedEngineState === "RUNNING" ||
+            resolvedEngineState === "PAUSED")
+      ),
+      engine_pid: resolvedEnginePid,
+      started_at: rawEng?.started_at ?? null,
+      last_heartbeat: rawEng?.last_heartbeat ?? null,
+      last_signal: rawEng?.last_signal ?? null,
+      last_trade: rawEng?.last_trade ?? null,
+      last_execution_error: rawEng?.last_execution_error ?? null,
+      portfolio_capacity: rawEng?.portfolio_capacity,
     },
     mt5: {
       connection_status: rawStatus?.mt5?.connection_status || "DISCONNECTED",
