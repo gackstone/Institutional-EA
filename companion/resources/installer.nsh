@@ -8,15 +8,19 @@
 !define MUI_FINISHPAGE_RUN_TEXT "Launch Institutional EA"
 
 !macro customInit
-  ; Clean upgrade: automatically remove legacy MT5-001 / MT5-OO1 shortcuts and install directory if present
+  ; Clean upgrade: automatically remove legacy MT5-001 / MT5-OO1 / old Institutional EA Companion shortcuts and installs if present
   Delete "$DESKTOP\MT5-001 Companion.lnk"
   Delete "$DESKTOP\MT5-OO1 Companion.lnk"
+  Delete "$DESKTOP\Institutional EA Companion.lnk"
   Delete "$SMPROGRAMS\MT5-001 Companion.lnk"
   Delete "$SMPROGRAMS\MT5-OO1 Companion.lnk"
+  Delete "$SMPROGRAMS\Institutional EA Companion.lnk"
   IfFileExists "$LOCALAPPDATA\Programs\mt5-001-companion\Uninstall MT5-001 Companion.exe" 0 +2
     ExecWait '"$LOCALAPPDATA\Programs\mt5-001-companion\Uninstall MT5-001 Companion.exe" /S'
   IfFileExists "$LOCALAPPDATA\Programs\MT5-OO1 Companion\Uninstall MT5-OO1 Companion.exe" 0 +2
     ExecWait '"$LOCALAPPDATA\Programs\MT5-OO1 Companion\Uninstall MT5-OO1 Companion.exe" /S'
+  IfFileExists "$LOCALAPPDATA\Programs\Institutional EA Companion\Uninstall Institutional EA Companion.exe" 0 +2
+    ExecWait '"$LOCALAPPDATA\Programs\Institutional EA Companion\Uninstall Institutional EA Companion.exe" /S'
 !macroend
 
 !macro customUnInstall
