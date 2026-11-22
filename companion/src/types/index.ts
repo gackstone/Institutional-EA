@@ -160,6 +160,8 @@ export interface CompanionConfig {
 export type ScreenId =
   | "dashboard"
   | "positions"
+  | "signals"
+  | "alerts"
   | "history"
   | "analytics"
   | "mt5"
@@ -177,6 +179,7 @@ export type OperatingMode =
   | "BTCUSD_DEMO_SAMPLE_MODE";
 
 export interface ControlSymbolSpec {
+  canonical?: string;
   symbol: string;
   bid: number;
   ask: number;
@@ -187,6 +190,16 @@ export interface ControlSymbolSpec {
   volume_max: number;
   volume_step: number;
   stops_level: number;
+  trade_mode?: number;
+  trade_mode_label?: string;
+  tick_volume?: number;
+  tick_time_utc?: string | null;
+  tick_age_sec?: number | null;
+  stale?: boolean;
+  market_closed?: boolean;
+  entries_blocked?: boolean;
+  freshness_reason?: string;
+  source?: "MT5";
 }
 
 export interface ControlPosition {
@@ -324,4 +337,80 @@ export interface AuditLogRecord {
   component: string;
   details: string;
   created_at: string;
+}
+
+export interface BalanceSnapshotRecord {
+  id: number;
+  balance: number;
+  equity: number;
+  floating_pnl: number;
+  source: string;
+  created_at: string;
+}
+
+export interface TradeScreenshotRecord {
+  id: number;
+  ticket: number;
+  symbol: string;
+  stage: string;
+  filename: string;
+  created_at: string;
+}
+
+export interface SignalRecord {
+  id: number;
+  signal_id: string;
+  symbol: string;
+  direction: string;
+  score: number;
+  entry_price: number;
+  stop_loss: number;
+  take_profit: number;
+  rr: number;
+  status: "WATCHING" | "TAKEN" | "REJECTED" | string;
+  rejection_reason: string;
+  created_at: string;
+}
+
+export interface AlertEventRecord {
+  id: number;
+  alert_type: string;
+  severity: string;
+  symbol: string;
+  message: string;
+  telegram_status: string;
+  dedup_key: string;
+  created_at: string;
+}
+
+export interface AlertSettings {
+  enabled_types: Record<string, boolean>;
+  telegram_enabled: boolean;
+  quiet_hours_enabled: boolean;
+  quiet_start_utc: string;
+  quiet_end_utc: string;
+  rate_limit_per_min: number;
+  dedup_window_sec: number;
+}
+
+export interface TradeReplayPayload {
+  trade: TradeHistoryRecord;
+  events: Array<{
+    id: number;
+    event_type: string;
+    symbol: string;
+    ticket: number;
+    details_json: string;
+    created_at: string;
+  }>;
+  screenshots: TradeScreenshotRecord[];
+  candles: Array<{
+    time: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+  }>;
+  source: string;
 }

@@ -15,7 +15,14 @@ import {
   OperationAuditRecord,
   ControlLogEntry,
   TradeHistoryRecord,
-  AuditLogRecord
+  AuditLogRecord,
+  BalanceSnapshotRecord,
+  TradeScreenshotRecord,
+  SignalRecord,
+  AlertEventRecord,
+  AlertSettings,
+  TradeReplayPayload,
+  ControlSymbolSpec
 } from "../types";
 
 declare global {
@@ -292,20 +299,21 @@ export const IPC = {
   getAccountMetrics: async (): Promise<AccountMetrics> => {
     if (window.electronAPI) return window.electronAPI.getAccountMetrics();
     return {
-      accountNumber: 50198422,
-      broker: "MetaQuotes-Demo",
-      balance: 50000.0,
-      equity: 50420.5,
-      profit: 420.5,
-      dailyPnl: 420.5,
-      margin: 125.0,
-      freeMargin: 50295.5,
-      marginLevel: 40336.4,
+      accountNumber: 0,
+      broker: "Not Connected",
+      balance: 0,
+      equity: 0,
+      profit: 0,
+      dailyPnl: 0,
+      margin: 0,
+      freeMargin: 0,
+      marginLevel: 0,
       currency: "USD",
-      leverage: 100,
+      leverage: 0,
       tradeMode: "DEMO",
       profile: "DEMO",
-      positionsCount: 1,
+      positionsCount: 0,
+      mt5Connected: false,
     };
   },
 
@@ -380,14 +388,7 @@ export const IPC = {
 
   startTelegramPairing: async (botToken?: string): Promise<{ success: boolean; message: string; chatId?: string; senderName?: string }> => {
     if (window.electronAPI) return window.electronAPI.startTelegramPairing(botToken);
-    mockTelegram = {
-      isPaired: true,
-      botTokenMasked: "782914***ABCD",
-      chatIdMasked: "981***22",
-      botUsername: "@MyMT5TradingBot",
-      enabled: true
-    };
-    return { success: true, message: "Telegram paired in simulation." };
+    return { success: false, message: "Telegram pairing requires the desktop Companion app." };
   },
 
   disconnectTelegram: async (): Promise<{ success: boolean; message: string }> => {
@@ -485,30 +486,16 @@ async function callControl<T = any>(method: "GET" | "POST", apiPath: string, bod
   if (window.electronAPI?.controlRequest) {
     return window.electronAPI.controlRequest(method, apiPath, body);
   }
-  try {
-    const resp = await fetch(`http://127.0.0.1:8765${apiPath}`, {
-      method,
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    if (!resp.ok) {
-      const errText = await resp.text();
-      throw new Error(errText || `HTTP ${resp.status}`);
-    }
-    return resp.json();
-  } catch (err) {
-    // Browser / offline DEMO simulation fallback when local Control Service daemon is not running
-    // // TODO(real-data): Requires running companion Control Service on 127.0.0.1:8765 for live execution.
-    if (method === "POST") {
-      return {
-        success: true,
-        message: `Executed ${apiPath} (DEMO Simulation Fallback)`,
-        state: apiPath.includes("stop") ? "STOPPED" : apiPath.includes("pause") ? "PAUSED" : "RUNNING",
-        closed_count: 3,
-      } as unknown as T;
-    }
-    throw err;
+  const resp = await fetch(`http://127.0.0.1:8765${apiPath}`, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(errText || `HTTP ${resp.status}`);
   }
+  return resp.json();
 }
 
 export const controlClient = {
@@ -521,8 +508,23 @@ export const controlClient = {
   clearEmergencyStop: (confirmed = false) =>
     callControl<{ success: boolean; message: string; state?: string }>("POST", "/api/engine/clear-emergency-stop", { confirmed }),
 
-  // MT5 Connection
+  // MT5 Connection & Real Market Candles
   connectMT5: () => callControl<{ success: boolean; snapshot: ControlStatusPayload["mt5"] }>("POST", "/api/mt5/connect", {}),
+  getCandles: (symbol: string, tf: string, count = 120, fromIso?: string, toIso?: string) => {
+    const qs = new URLSearchParams({ symbol, tf, count: String(count) });
+    if (fromIso) qs.set("from", fromIso);
+    if (toIso) qs.set("to", toIso);
+    return callControl<{
+      symbol: string;
+      broker_symbol: string;
+      timeframe: string;
+      candles: Array<{ time: number; open: number; high: number; low: number; close: number; volume: number }>;
+      quote: ControlSymbolSpec | null;
+      source: "MT5";
+      connected: boolean;
+      fetched_at: string;
+    }>("GET", `/api/market/candles?${qs.toString()}`);
+  },
 
   // Trade & Order Controls
   modifyPosition: (ticket: number, sl: number, tp: number) =>
@@ -533,6 +535,40 @@ export const controlClient = {
     callControl<{ success: boolean; message: string; closed_count?: number }>("POST", "/api/trades/close-all-bot", { confirmed }),
   cancelPendingOrder: (ticket: number, confirmed: boolean) =>
     callControl<{ success: boolean; message: string }>("POST", "/api/orders/cancel", { ticket, confirmed }),
+
+  // Trade Replay & Chart Screenshots
+  getTradeReplay: (ticket: number, tf = "M5") =>
+    callControl<TradeReplayPayload>("GET", `/api/trades/replay?ticket=${encodeURIComponent(String(ticket))}&tf=${encodeURIComponent(tf)}`),
+  getTradeScreenshots: (ticket?: number) =>
+    callControl<{ screenshots: TradeScreenshotRecord[] }>(
+      "GET",
+      ticket !== undefined ? `/api/trades/screenshots?ticket=${ticket}` : "/api/trades/screenshots"
+    ),
+  saveTradeScreenshot: (ticket: number, symbol: string, stage: string, dataUrl: string) =>
+    callControl<{ success: boolean; filename?: string }>("POST", "/api/trades/screenshots", {
+      ticket,
+      symbol,
+      stage,
+      data_url: dataUrl,
+    }),
+
+  // Real Analytics, Signals & Alerts
+  getAnalyticsEquity: () =>
+    callControl<{ snapshots: BalanceSnapshotRecord[]; trades: TradeHistoryRecord[]; source: string; fetched_at: string }>(
+      "GET",
+      "/api/analytics/equity"
+    ),
+  getSignals: () =>
+    callControl<{ signals: SignalRecord[]; decisions: Array<Record<string, any>>; source: string; fetched_at: string }>(
+      "GET",
+      "/api/signals"
+    ),
+  getAlerts: () =>
+    callControl<{ alerts: AlertEventRecord[]; settings: AlertSettings; source: string }>("GET", "/api/alerts"),
+  saveAlertSettings: (settings: Partial<AlertSettings>) =>
+    callControl<{ success: boolean; settings: AlertSettings }>("POST", "/api/alerts/settings", settings),
+  sendTestAlert: () =>
+    callControl<{ success: boolean; alert_id: number; telegram_status: string }>("POST", "/api/alerts/test", {}),
 
   // Operations Centre (Allowlisted PowerShell & Scripts)
   getOperations: () => callControl<{ operations: AllowlistedOpInfo[]; audits: OperationAuditRecord[] }>("GET", "/api/operations"),

@@ -27,8 +27,10 @@ export const UI_COPY = {
     screens: {
       dashboard: { label: "Dashboard", tooltip: "Main trading terminal & live chart" },
       positions: { label: "Positions & Orders", tooltip: "Open positions & pending orders" },
-      history: { label: "Trade History", tooltip: "Closed trade history" },
-      analytics: { label: "Analytics", tooltip: "Performance analytics & profit factor" },
+      signals: { label: "Live Signals", tooltip: "Real-time bot setups, scores & risk gate decisions" },
+      alerts: { label: "Alert Centre", tooltip: "In-app alerts & Telegram notification settings" },
+      history: { label: "Trade History", tooltip: "Closed trade history, screenshots & replay" },
+      analytics: { label: "Analytics", tooltip: "Real equity curve, P&L, cumulative R & drawdown" },
       mt5: { label: "MT5 Terminal", tooltip: "MetaTrader 5 terminal scan & EA deploy" },
       operations: { label: "Operations", tooltip: "Allowlisted operations runner" },
       logs: { label: "Event Logs", tooltip: "Structured runtime event logs" },
