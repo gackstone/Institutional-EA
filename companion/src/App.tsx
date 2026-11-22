@@ -4,10 +4,8 @@ import {
   AlertOctagon,
   BarChart3,
   CheckCircle2,
-  Cpu,
   Database,
   FileText,
-  FolderCog,
   History,
   Layers,
   LayoutDashboard,
@@ -17,27 +15,15 @@ import {
   Radio,
   RefreshCw,
   Settings as SettingsIcon,
-  Shield,
   Terminal,
-  TrendingUp,
   X,
-  Zap,
 } from "lucide-react";
+import { DashboardScreen } from "./components/screens/CoreTradingScreens";
 import {
-  DashboardScreen,
-  EngineScreen,
-  MarketWatchScreen,
-  SignalsScreen,
-} from "./components/screens/CoreTradingScreens";
-import {
-  InstrumentsScreen,
   PositionsScreen,
-  RiskManagerScreen,
   TradeHistoryScreen,
 } from "./components/screens/ExecutionRiskScreens";
 import {
-  ConfigurationScreen,
-  ErrorCentreScreen,
   MT5ConnectionScreen,
   OperationsCentreScreen,
 } from "./components/screens/OperationsSystemScreens";
@@ -53,14 +39,10 @@ import { DiagnosticsModal } from "./components/DiagnosticsModal";
 
 import {
   AuditLogRecord,
-  BTCUSDSampleStatus,
-  ControlErrorEvent,
   ControlLogEntry,
   ControlStatusPayload,
   PairingStatus,
-  RiskDecisionRecord,
   ScreenId,
-  TelegramStatus,
   TradeHistoryRecord,
 } from "./types";
 import { controlClient, IPC } from "./services/ipc";
@@ -85,9 +67,30 @@ interface NavGroupSpec {
   items: NavScreenItem[];
 }
 
+const VALID_SCREENS = new Set<ScreenId>([
+  "dashboard",
+  "positions",
+  "history",
+  "analytics",
+  "mt5",
+  "operations",
+  "logs",
+  "health",
+  "settings",
+]);
+
 export const App: React.FC = () => {
-  const [activeScreen, setActiveScreen] = useState<ScreenId>("dashboard");
+  const [activeScreen, setActiveScreenState] = useState<ScreenId>("dashboard");
   const [feedStatus, setFeedStatus] = useState<DataFeedStatus>("LOADING");
+
+  // Safe navigation: redirect any unknown/removed route to Dashboard
+  const setActiveScreen = useCallback((screen: ScreenId | string) => {
+    if (VALID_SCREENS.has(screen as ScreenId)) {
+      setActiveScreenState(screen as ScreenId);
+    } else {
+      setActiveScreenState("dashboard");
+    }
+  }, []);
 
   // Supabase-Style Hover + Focus-Within Overlay Sidebar State
   const [isSidebarHovered, setIsSidebarHovered] = useState<boolean>(false);
@@ -135,14 +138,9 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  // Authoritative Control Service state
+  // Authoritative Control Service state (kept screens only)
   const [rawStatus, setRawStatus] = useState<ControlStatusPayload | null>(null);
-  const [btcStatus, setBtcStatus] = useState<BTCUSDSampleStatus | null>(null);
   const [trades, setTrades] = useState<TradeHistoryRecord[]>([]);
-  const [decisions, setDecisions] = useState<RiskDecisionRecord[]>([]);
-  const [riskState, setRiskState] = useState<Record<string, any>>({});
-  const [instrumentsConfig, setInstrumentsConfig] = useState<Record<string, any>>({});
-  const [errors, setErrors] = useState<ControlErrorEvent[]>([]);
   const [controlLogs, setControlLogs] = useState<ControlLogEntry[]>([]);
   const [audits, setAudits] = useState<AuditLogRecord[]>([]);
 
@@ -160,13 +158,6 @@ export const App: React.FC = () => {
     deviceTokenMasked: null,
     pairedAt: null,
     apiUrl: "https://arcadefx.live/api/v1",
-  });
-  const [telegram, setTelegram] = useState<TelegramStatus>({
-    isPaired: false,
-    botTokenMasked: null,
-    chatIdMasked: null,
-    botUsername: null,
-    enabled: true,
   });
 
   const [isPairingOpen, setIsPairingOpen] = useState<boolean>(false);
@@ -195,38 +186,10 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  const refreshBtcStatus = useCallback(async () => {
-    try {
-      const b = await controlClient.getBtcSampleStatus();
-      setBtcStatus(b);
-    } catch {
-      // ignore offline
-    }
-  }, []);
-
   const reloadTrades = useCallback(async () => {
     try {
       const res = await controlClient.getTradeHistory();
       setTrades(res.trades || []);
-    } catch {
-      // fallback handled by normalized data
-    }
-  }, []);
-
-  const reloadDecisions = useCallback(async () => {
-    try {
-      const res = await controlClient.getRiskDecisions();
-      setDecisions(res.decisions || []);
-      setRiskState(res.risk_state || {});
-    } catch {
-      // fallback handled by normalized data
-    }
-  }, []);
-
-  const reloadErrors = useCallback(async () => {
-    try {
-      const res = await controlClient.getErrors();
-      setErrors(res.errors || []);
     } catch {
       // fallback handled by normalized data
     }
@@ -257,32 +220,14 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  const reloadConfigInstruments = useCallback(async () => {
-    try {
-      const cfg = await controlClient.getConfig();
-      setInstrumentsConfig(cfg.instruments || {});
-    } catch {
-      setInstrumentsConfig({
-        XAUUSD: { canonical: "XAUUSD", broker_symbol: "XAUUSD.m", schedule: "WEEKDAY_GOLD_MODE", digits: 2 },
-        USDJPY: { canonical: "USDJPY", broker_symbol: "USDJPY.m", schedule: "WEEKDAY_GOLD_MODE", digits: 3 },
-        BTCUSD: { canonical: "BTCUSD", broker_symbol: "BTCUSD.m", schedule: "WEEKEND_BTC_MODE", digits: 2 },
-      });
-    }
-  }, []);
-
   // Initial load + SSE connection to /api/events + periodic polling backup
   useEffect(() => {
     refreshStatus();
-    refreshBtcStatus();
     reloadTrades();
-    reloadDecisions();
-    reloadErrors();
     reloadLogs();
     reloadAudits();
-    reloadConfigInstruments();
 
     IPC.getPairingStatus().then(setPairing).catch(() => {});
-    IPC.getTelegramStatus().then(setTelegram).catch(() => {});
 
     let es: EventSource | null = null;
     let cancelled = false;
@@ -297,7 +242,9 @@ export const App: React.FC = () => {
           token = info.token || "";
         }
         if (cancelled) return;
-        const sseUrl = token ? `${baseUrl}/api/events?token=${encodeURIComponent(token)}` : `${baseUrl}/api/events`;
+        const sseUrl = token
+          ? `${baseUrl}/api/events?token=${encodeURIComponent(token)}`
+          : `${baseUrl}/api/events`;
         es = new EventSource(sseUrl);
 
         es.onopen = () => {
@@ -312,9 +259,7 @@ export const App: React.FC = () => {
             if (parsed.type === "snapshot" && parsed.payload) {
               setRawStatus(parsed.payload);
             } else if (parsed.type === "mt5_sync" && parsed.payload) {
-              setRawStatus((prev) =>
-                prev ? { ...prev, mt5: parsed.payload } : prev
-              );
+              setRawStatus((prev) => (prev ? { ...prev, mt5: parsed.payload } : prev));
             } else if (parsed.type === "engine_state" && parsed.payload) {
               setRawStatus((prev) =>
                 prev ? { ...prev, engine: { ...prev.engine, ...parsed.payload } } : prev
@@ -347,35 +292,23 @@ export const App: React.FC = () => {
       clearInterval(interval);
       if (es) es.close();
     };
-  }, [
-    refreshStatus,
-    refreshBtcStatus,
-    reloadTrades,
-    reloadDecisions,
-    reloadErrors,
-    reloadLogs,
-    reloadAudits,
-    reloadConfigInstruments,
-  ]);
+  }, [refreshStatus, reloadTrades, reloadLogs, reloadAudits]);
 
   const normalized = useMemo(
-    () => buildNormalizedDashboardData(rawStatus, trades, decisions, errors),
-    [rawStatus, trades, decisions, errors]
+    () => buildNormalizedDashboardData(rawStatus, trades),
+    [rawStatus, trades]
   );
 
   const effectiveStatus = normalized.status;
-  const activeErrorCount = effectiveStatus.health.active_error_count;
   const openPosCount = effectiveStatus.mt5.positions.length;
 
-  // All 16 screens grouped under Monitor / Control / Diagnose using centralized UI_COPY short forms
+  // 9 kept screens grouped cleanly under MONITOR / CONTROL / DIAGNOSE
   const navGroups: NavGroupSpec[] = useMemo(
     () => [
       {
         group: "Monitor",
         items: [
           { id: "dashboard", ...UI_COPY.nav.screens.dashboard, icon: LayoutDashboard, badge: "LIVE" },
-          { id: "market", ...UI_COPY.nav.screens.market, icon: TrendingUp, badge: 3 },
-          { id: "signals", ...UI_COPY.nav.screens.signals, icon: Zap },
           { id: "positions", ...UI_COPY.nav.screens.positions, icon: Layers, badge: openPosCount },
           { id: "history", ...UI_COPY.nav.screens.history, icon: History, badge: normalized.recentTrades.length },
           { id: "analytics", ...UI_COPY.nav.screens.analytics, icon: BarChart3 },
@@ -384,10 +317,6 @@ export const App: React.FC = () => {
       {
         group: "Control",
         items: [
-          { id: "engine", ...UI_COPY.nav.screens.engine, icon: Cpu },
-          { id: "risk", ...UI_COPY.nav.screens.risk, icon: Shield },
-          { id: "instruments", ...UI_COPY.nav.screens.instruments, icon: Activity },
-          { id: "configuration", ...UI_COPY.nav.screens.configuration, icon: FolderCog },
           { id: "mt5", ...UI_COPY.nav.screens.mt5, icon: Link2 },
           { id: "operations", ...UI_COPY.nav.screens.operations, icon: Terminal },
         ],
@@ -395,38 +324,26 @@ export const App: React.FC = () => {
       {
         group: "Diagnose",
         items: [
-          {
-            id: "errors",
-            ...UI_COPY.nav.screens.errors,
-            icon: AlertOctagon,
-            badge: activeErrorCount > 0 ? activeErrorCount : undefined,
-          },
           { id: "logs", ...UI_COPY.nav.screens.logs, icon: FileText },
           { id: "health", ...UI_COPY.nav.screens.health, icon: Database },
           { id: "settings", ...UI_COPY.nav.screens.settings, icon: SettingsIcon },
         ],
       },
     ],
-    [openPosCount, normalized.recentTrades.length, activeErrorCount]
+    [openPosCount, normalized.recentTrades.length]
   );
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden iea-bg-atmosphere text-[#F4F7FF] antialiased font-sans select-none">
-      {/* Ambient Blurred Light Orbs (Reference Deep Navy-to-Royal-Blue + Lime Sheen) */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
-      >
+      {/* Ambient Blurred Light Orbs (Deep Navy-to-Royal-Blue + Lime Sheen) */}
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
         <div className="absolute -left-24 top-1/4 w-[420px] h-[420px] rounded-full bg-[#7196CB]/20 blur-[120px]" />
         <div className="absolute right-12 -top-20 w-[380px] h-[380px] rounded-full bg-[#B0F648]/10 blur-[130px]" />
         <div className="absolute left-1/3 -bottom-28 w-[520px] h-[420px] rounded-full bg-[#2F497C]/30 blur-[130px]" />
       </div>
 
       {/* =====================================================================
-          PHASE 3: SUPABASE-STYLE HOVER-EXPAND OVERLAY SIDEBAR
-          - Collapsed default rail: 60px wide
-          - Expands on cursor hover or keyboard focus-within to 256px wide
-          - Fixed overlay positioning so main content never jumps or reflows
+          SUPABASE-STYLE HOVER-EXPAND OVERLAY SIDEBAR (9 SCREENS, 3 GROUPS)
       ====================================================================== */}
       <aside
         ref={sidebarRef}
@@ -444,16 +361,14 @@ export const App: React.FC = () => {
         }}
         className="fixed top-0 bottom-0 left-0 z-40 iea-sidebar-rail flex flex-col justify-between overflow-hidden"
       >
-        {/* Top Brand Block */}
-        <div>
-          <div className="h-14 px-3 border-b border-[rgba(186,214,255,0.12)] flex items-center justify-between">
+        {/* Top Brand Block + Navigation */}
+        <div className="flex flex-col min-h-0 flex-1">
+          <div className="h-14 px-3 border-b border-[rgba(186,214,255,0.12)] flex items-center justify-between shrink-0">
             <div className="flex items-center space-x-3 min-w-0">
-              {/* Compact Brand Mark with Neon Lime Accent */}
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#B0F648]/25 via-[#2F497C]/50 to-[#112B42]/80 border border-[#B0F648]/45 shadow-[0_0_16px_rgba(176,246,72,0.22)] flex items-center justify-center shrink-0">
                 <Activity className="w-4 h-4 text-[#B0F648]" />
               </div>
 
-              {/* Expanded Brand Lockup */}
               <div
                 className={`min-w-0 whitespace-nowrap transition-all duration-200 ease-out ${
                   isSidebarExpanded
@@ -462,15 +377,14 @@ export const App: React.FC = () => {
                 }`}
               >
                 <div className="text-xs font-bold tracking-tight text-[#F4F7FF] leading-none">
-                  INSTITUTIONAL EA
+                  {UI_COPY.brand.title}
                 </div>
                 <div className="text-[10px] font-mono text-[#B0F648] mt-1">
-                  TERMINAL v1.2 · DEMO
+                  {UI_COPY.brand.subtitle}
                 </div>
               </div>
             </div>
 
-            {/* Touch / Manual Pin Toggle Button (Visible when expanded or on touch devices) */}
             {isSidebarExpanded && (
               <button
                 type="button"
@@ -495,15 +409,14 @@ export const App: React.FC = () => {
           {/* Grouped Navigation Items (MONITOR / CONTROL / DIAGNOSE) */}
           <nav
             aria-label="Screen Groups"
-            className="px-2 py-2.5 space-y-3 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-134px)]"
+            className="flex-1 px-2 py-4 space-y-5 overflow-y-auto overflow-x-hidden"
           >
             {navGroups.map((grp) => (
-              <div key={grp.group} className="space-y-1">
-                {/* Section Heading (Revealed smoothly when expanded, subtle divider dot when collapsed) */}
-                <div className="h-5 px-2 flex items-center">
+              <div key={grp.group} className="space-y-1.5">
+                <div className="h-5 px-2.5 flex items-center">
                   {isSidebarExpanded ? (
                     <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8496B8] whitespace-nowrap transition-opacity duration-200">
-                      {grp.group}
+                      {UI_COPY.nav.groups[grp.group]}
                     </span>
                   ) : (
                     <span className="w-4 h-[1px] mx-auto bg-[rgba(186,214,255,0.18)] rounded-full" />
@@ -527,19 +440,18 @@ export const App: React.FC = () => {
                       aria-current={active ? "page" : undefined}
                       aria-label={item.label}
                       title={`${item.label} — ${item.tooltip}`}
-                      className={`group relative w-full h-9 flex items-center rounded-xl text-xs transition-all duration-150 ${
-                        isSidebarExpanded ? "px-2.5 justify-between" : "px-0 justify-center"
+                      className={`group relative w-full h-10 flex items-center rounded-xl text-xs transition-all duration-200 ${
+                        isSidebarExpanded ? "px-3 justify-between" : "px-0 justify-center"
                       } ${
                         active
                           ? "bg-gradient-to-r from-[#B0F648]/20 to-[#2F497C]/30 text-[#F4F7FF] font-semibold border border-[#B0F648]/40 shadow-[0_4px_16px_rgba(176,246,72,0.12)]"
                           : "text-[#B6C5E0] hover:text-[#F4F7FF] hover:bg-[rgba(47,73,124,0.32)] border border-transparent"
                       }`}
                     >
-                      {/* Active Neon-Lime Indicator Bar */}
                       {active && (
                         <span
                           aria-hidden="true"
-                          className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-[#B0F648] shadow-[0_0_10px_#B0F648]"
+                          className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-[#B0F648] shadow-[0_0_10px_#B0F648]"
                         />
                       )}
 
@@ -566,13 +478,10 @@ export const App: React.FC = () => {
                         </span>
                       </div>
 
-                      {/* Badge Counter */}
                       {isSidebarExpanded && item.badge !== undefined && (
                         <span
                           className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold whitespace-nowrap transition-opacity duration-150 ${
-                            item.id === "errors" && Number(item.badge) > 0
-                              ? "bg-[#FF5A6E]/25 text-[#FF5A6E] border border-[#FF5A6E]/40"
-                              : active
+                            active
                               ? "bg-[#B0F648] text-[#081321]"
                               : "bg-[#192E58]/80 text-[#B6C5E0] border border-[rgba(186,214,255,0.14)]"
                           }`}
@@ -581,15 +490,10 @@ export const App: React.FC = () => {
                         </span>
                       )}
 
-                      {/* Tiny badge dot when collapsed */}
                       {!isSidebarExpanded && item.badge !== undefined && (
                         <span
                           aria-hidden="true"
-                          className={`absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full ${
-                            item.id === "errors" && Number(item.badge) > 0
-                              ? "bg-[#FF5A6E]"
-                              : "bg-[#B0F648]"
-                          }`}
+                          className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-[#B0F648]"
                         />
                       )}
                     </button>
@@ -601,11 +505,14 @@ export const App: React.FC = () => {
         </div>
 
         {/* Sidebar Footer: Hard DEMO Safety Lock Indicator */}
-        <div className="p-2.5 border-t border-[rgba(186,214,255,0.12)] bg-[#071020]/70">
+        <div className="p-3 border-t border-[rgba(186,214,255,0.12)] bg-[#071020]/70 shrink-0">
           {isSidebarExpanded ? (
             <div className="space-y-1.5 whitespace-nowrap">
               <div className="flex items-center justify-between text-[10px] font-mono">
-                <span className="inline-flex items-center space-x-1 text-[#B0F648] font-bold" title={UI_COPY.brand.demoLockTooltip}>
+                <span
+                  className="inline-flex items-center space-x-1 text-[#B0F648] font-bold"
+                  title={UI_COPY.brand.demoLockTooltip}
+                >
                   <Lock className="w-3 h-3" />
                   <span>{UI_COPY.brand.demoLockShort}</span>
                 </span>
@@ -649,14 +556,12 @@ export const App: React.FC = () => {
 
       {/* =====================================================================
           MAIN CONTENT AREA
-          Fixed left offset equal to the collapsed sidebar width (60px) so
-          hover-expanding the sidebar OVERLAYS content without any jump/reflow.
       ====================================================================== */}
       <div
         style={{ paddingLeft: `${DESIGN_TOKENS.sidebar.collapsedWidthPx}px` }}
         className="relative z-10 flex-1 min-w-0 flex flex-col h-screen overflow-hidden"
       >
-        {/* Top Reference-Style Glass Navigation Header Bar (when viewing one of the other 15 screens) */}
+        {/* Consistent Glass Navigation Header Bar (when viewing any sub-screen) */}
         {activeScreen !== "dashboard" && (
           <header className="h-14 px-5 bg-[#0A152B]/75 backdrop-blur-xl border-b border-[rgba(186,214,255,0.14)] flex items-center justify-between shrink-0">
             <div className="flex items-center space-x-3.5">
@@ -675,7 +580,7 @@ export const App: React.FC = () => {
 
             <div className="flex items-center space-x-2.5 text-xs font-mono">
               <span className="px-3 py-1 rounded-full bg-[#B0F648]/15 border border-[#B0F648]/40 text-[#B0F648] font-bold">
-                DEMO · LIVE_TRADING_ENABLED=false
+                {UI_COPY.brand.demoLockChip}
               </span>
               <span className="iea-pill-control px-3 py-1 text-[#B6C5E0]">
                 MT5 {normalized.maskedAccount}
@@ -720,124 +625,70 @@ export const App: React.FC = () => {
 
         {/* Scrollable Screen Viewport */}
         <main className="flex-1 min-h-0 overflow-y-auto p-3.5 md:p-4">
-          {activeScreen === "dashboard" && (
-            <DashboardScreen
-              status={effectiveStatus}
-              onRefresh={refreshStatus}
-              onNavigate={setActiveScreen}
-              onActionMessage={handleActionMessage}
-              btcStatus={btcStatus}
-              onRefreshBtc={refreshBtcStatus}
-              trades={normalized.recentTrades}
-              decisions={decisions}
-              errors={errors}
-              feedStatus={feedStatus}
-              telegramEnabled={telegram.enabled}
-            />
-          )}
+          <div className="max-w-[1920px] mx-auto">
+            {activeScreen === "dashboard" && (
+              <DashboardScreen
+                status={effectiveStatus}
+                onRefresh={refreshStatus}
+                onNavigate={setActiveScreen}
+                onActionMessage={handleActionMessage}
+                trades={normalized.recentTrades}
+                feedStatus={feedStatus}
+              />
+            )}
 
-          {activeScreen === "engine" && (
-            <EngineScreen
-              status={effectiveStatus}
-              onRefresh={refreshStatus}
-              onActionMessage={handleActionMessage}
-            />
-          )}
+            {activeScreen === "positions" && (
+              <PositionsScreen
+                status={effectiveStatus}
+                onRefresh={refreshStatus}
+                onActionMessage={handleActionMessage}
+              />
+            )}
 
-          {activeScreen === "market" && (
-            <MarketWatchScreen
-              status={effectiveStatus}
-              onRefresh={refreshStatus}
-              onActionMessage={handleActionMessage}
-            />
-          )}
+            {activeScreen === "history" && (
+              <TradeHistoryScreen trades={normalized.recentTrades} onReload={reloadTrades} />
+            )}
 
-          {activeScreen === "signals" && (
-            <SignalsScreen decisions={decisions} onReload={reloadDecisions} />
-          )}
+            {activeScreen === "analytics" && (
+              <AnalyticsScreen trades={normalized.recentTrades} />
+            )}
 
-          {activeScreen === "positions" && (
-            <PositionsScreen
-              status={effectiveStatus}
-              onRefresh={refreshStatus}
-              onActionMessage={handleActionMessage}
-            />
-          )}
+            {activeScreen === "mt5" && (
+              <MT5ConnectionScreen
+                status={effectiveStatus}
+                onRefresh={refreshStatus}
+                onActionMessage={handleActionMessage}
+              />
+            )}
 
-          {activeScreen === "history" && (
-            <TradeHistoryScreen trades={normalized.recentTrades} onReload={reloadTrades} />
-          )}
+            {activeScreen === "operations" && (
+              <OperationsCentreScreen onActionMessage={handleActionMessage} />
+            )}
 
-          {activeScreen === "risk" && (
-            <RiskManagerScreen
-              riskState={riskState}
-              decisions={decisions}
-              portfolioCapacity={effectiveStatus.engine.portfolio_capacity}
-              onReload={reloadDecisions}
-            />
-          )}
+            {activeScreen === "logs" && (
+              <LogsScreen
+                logs={normalizeLogEntries(controlLogs)}
+                onReload={reloadLogs}
+                onActionMessage={handleActionMessage}
+              />
+            )}
 
-          {activeScreen === "instruments" && (
-            <InstrumentsScreen
-              instrumentsConfig={instrumentsConfig}
-              status={effectiveStatus}
-            />
-          )}
+            {activeScreen === "health" && (
+              <SystemHealthScreen
+                status={effectiveStatus}
+                audits={audits}
+                onReload={reloadAudits}
+              />
+            )}
 
-          {activeScreen === "configuration" && (
-            <ConfigurationScreen onActionMessage={handleActionMessage} />
-          )}
-
-          {activeScreen === "mt5" && (
-            <MT5ConnectionScreen
-              status={effectiveStatus}
-              onRefresh={refreshStatus}
-              onActionMessage={handleActionMessage}
-            />
-          )}
-
-          {activeScreen === "operations" && (
-            <OperationsCentreScreen onActionMessage={handleActionMessage} />
-          )}
-
-          {activeScreen === "errors" && (
-            <ErrorCentreScreen
-              errors={errors}
-              onReload={reloadErrors}
-              onActionMessage={handleActionMessage}
-            />
-          )}
-
-          {activeScreen === "logs" && (
-            <LogsScreen
-              logs={normalizeLogEntries(controlLogs)}
-              onReload={reloadLogs}
-              onActionMessage={handleActionMessage}
-            />
-          )}
-
-          {activeScreen === "analytics" && (
-            <AnalyticsScreen trades={normalized.recentTrades} />
-          )}
-
-          {activeScreen === "health" && (
-            <SystemHealthScreen
-              status={effectiveStatus}
-              audits={audits}
-              onReload={reloadAudits}
-            />
-          )}
-
-          {activeScreen === "settings" && (
-            <SettingsScreen
-              status={effectiveStatus}
-              onRefresh={refreshStatus}
-              onActionMessage={handleActionMessage}
-              onOpenDiagnostics={() => setIsDiagnosticsOpen(true)}
-              onOpenInstitutionalEa={() => setIsPairingOpen(true)}
-              onOpenTelegram={() => setIsTelegramOpen(true)}
-            />
-          )}
+            {activeScreen === "settings" && (
+              <SettingsScreen
+                onOpenDiagnostics={() => setIsDiagnosticsOpen(true)}
+                onOpenInstitutionalEa={() => setIsPairingOpen(true)}
+                onOpenTelegram={() => setIsTelegramOpen(true)}
+              />
+            )}
+          </div>
         </main>
       </div>
 
@@ -853,8 +704,7 @@ export const App: React.FC = () => {
         isOpen={isTelegramOpen}
         onClose={() => setIsTelegramOpen(false)}
         onStatusUpdated={async () => {
-          const t = await IPC.getTelegramStatus();
-          setTelegram(t);
+          await IPC.getTelegramStatus().catch(() => {});
         }}
       />
 

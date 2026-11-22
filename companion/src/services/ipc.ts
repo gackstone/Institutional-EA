@@ -11,15 +11,11 @@ import {
   DiagnosticResult,
   CompanionConfig,
   ControlStatusPayload,
-  ControlErrorEvent,
   AllowlistedOpInfo,
   OperationAuditRecord,
-  ConfigVersionRecord,
   ControlLogEntry,
   TradeHistoryRecord,
-  RiskDecisionRecord,
-  AuditLogRecord,
-  BTCUSDSampleStatus
+  AuditLogRecord
 } from "../types";
 
 declare global {
@@ -504,23 +500,6 @@ async function callControl<T = any>(method: "GET" | "POST", apiPath: string, bod
     // Browser / offline DEMO simulation fallback when local Control Service daemon is not running
     // // TODO(real-data): Requires running companion Control Service on 127.0.0.1:8765 for live execution.
     if (method === "POST") {
-      if (apiPath === "/api/config/apply" || apiPath === "/api/config/rollback") {
-        return {
-          version: 4,
-          changed_keys: Object.keys(body?.patch || {}),
-          requires_restart: false,
-          config: body?.patch || {},
-        } as unknown as T;
-      }
-      if (apiPath === "/api/config/preview") {
-        return {
-          valid: true,
-          errors: [],
-          changed_keys: Object.keys(body?.patch || {}),
-          requires_restart: false,
-          proposed: body?.patch || {},
-        } as unknown as T;
-      }
       return {
         success: true,
         message: `Executed ${apiPath} (DEMO Simulation Fallback)`,
@@ -534,27 +513,16 @@ async function callControl<T = any>(method: "GET" | "POST", apiPath: string, bod
 
 export const controlClient = {
   getStatus: () => callControl<ControlStatusPayload>("GET", "/api/status"),
-  getEngineStatus: () => callControl<ControlStatusPayload["engine"]>("GET", "/api/engine/status"),
-  getHealth: () => callControl<ControlStatusPayload["health"]>("GET", "/api/health"),
 
-  // Engine Lifecycle
-  startEngine: (dryRun?: boolean) => callControl<{ success: boolean; message: string; state: string }>("POST", "/api/engine/start", dryRun !== undefined ? { dry_run: dryRun } : {}),
+  // Top-bar Safety Controls
   stopEngine: () => callControl<{ success: boolean; message: string; state: string }>("POST", "/api/engine/stop", {}),
-  restartEngine: () => callControl<{ success: boolean; message: string; state: string }>("POST", "/api/engine/restart", {}),
   pauseEntries: () => callControl<{ success: boolean; message: string; state: string }>("POST", "/api/engine/pause", {}),
   resumeEntries: () => callControl<{ success: boolean; message: string; state: string }>("POST", "/api/engine/resume", {}),
-  emergencyStop: (closeBotPositions = false, confirmed = false) =>
-    callControl<{ success: boolean; message: string; state: string; closed_count: number }>("POST", "/api/engine/emergency-stop", {
-      close_bot_positions: closeBotPositions,
-      confirmed,
-    }),
   clearEmergencyStop: (confirmed = false) =>
     callControl<{ success: boolean; message: string; state?: string }>("POST", "/api/engine/clear-emergency-stop", { confirmed }),
 
-  // MT5 Connection & Sync
-  detectMT5: () => callControl<{ installed_paths: string[]; running: boolean }>("GET", "/api/mt5/detect"),
+  // MT5 Connection
   connectMT5: () => callControl<{ success: boolean; snapshot: ControlStatusPayload["mt5"] }>("POST", "/api/mt5/connect", {}),
-  syncMT5: (symbols?: string[]) => callControl<{ success: boolean; snapshot: ControlStatusPayload["mt5"] }>("POST", "/api/mt5/sync", { symbols }),
 
   // Trade & Order Controls
   modifyPosition: (ticket: number, sl: number, tp: number) =>
@@ -566,25 +534,11 @@ export const controlClient = {
   cancelPendingOrder: (ticket: number, confirmed: boolean) =>
     callControl<{ success: boolean; message: string }>("POST", "/api/orders/cancel", { ticket, confirmed }),
 
-  // Configuration & Versioning
-  getConfig: () => callControl<{ operating_mode: string; settings: Record<string, any>; risk: Record<string, any>; strategy: Record<string, any>; instruments: Record<string, any>; live_trading_locked: boolean }>("GET", "/api/config"),
-  getConfigHistory: () => callControl<{ versions: ConfigVersionRecord[] }>("GET", "/api/config/history"),
-  previewConfig: (patch: Record<string, any>) => callControl<{ valid: boolean; errors: string[]; changed_keys: string[]; requires_restart: boolean; proposed: Record<string, any> }>("POST", "/api/config/preview", { patch }),
-  applyConfig: (patch: Record<string, any>, changeSummary = "Updated via Companion Control Centre") =>
-    callControl<{ version: number; changed_keys: string[]; requires_restart: boolean; config: Record<string, any> }>("POST", "/api/config/apply", { patch, change_summary: changeSummary }),
-  rollbackConfig: (version: number) =>
-    callControl<{ version: number; changed_keys: string[]; requires_restart: boolean; config: Record<string, any> }>("POST", "/api/config/rollback", { version }),
-
   // Operations Centre (Allowlisted PowerShell & Scripts)
   getOperations: () => callControl<{ operations: AllowlistedOpInfo[]; audits: OperationAuditRecord[] }>("GET", "/api/operations"),
   runOperation: (opId: string) => callControl<OperationAuditRecord>("POST", "/api/operations/run", { op_id: opId }),
-  cancelOperation: (auditId: string) => callControl<{ success: boolean }>("POST", "/api/operations/cancel", { audit_id: auditId }),
 
-  // Error Centre
-  getErrors: (status?: "ACTIVE" | "RESOLVED") => callControl<{ errors: ControlErrorEvent[] }>("GET", status ? `/api/errors?status=${status}` : "/api/errors"),
-  resolveError: (errorId: number, note: string) => callControl<{ success: boolean }>("POST", "/api/errors/resolve", { error_id: errorId, note }),
-
-  // Logs, History, Risk & Audit
+  // Logs, History & Audit
   getLogs: (params?: { limit?: number; severity?: string; component?: string; instrument?: string }) => {
     const qs = new URLSearchParams();
     if (params?.limit) qs.set("limit", String(params.limit));
@@ -596,19 +550,9 @@ export const controlClient = {
   },
   clearLogs: () => callControl<{ success: boolean }>("POST", "/api/logs/clear", {}),
   getTradeHistory: () => callControl<{ trades: TradeHistoryRecord[] }>("GET", "/api/trades/history"),
-  getRiskDecisions: () => callControl<{ decisions: RiskDecisionRecord[]; risk_state: Record<string, any> }>("GET", "/api/risk/decisions"),
   getAudit: () => callControl<{ audits: AuditLogRecord[]; connections: Array<Record<string, any>> }>("GET", "/api/audit"),
 
-  // BTCUSD DEMO Sample Trading & Telegram
-  getBtcSampleStatus: () => callControl<BTCUSDSampleStatus>("GET", "/api/btcusd/status"),
-  enableBtcSample: () => callControl<{ success: boolean; message: string; status: BTCUSDSampleStatus }>("POST", "/api/btcusd/enable", {}),
-  disableBtcSample: () => callControl<{ success: boolean; message: string; status: BTCUSDSampleStatus }>("POST", "/api/btcusd/disable", {}),
-  startBtcSample: () => callControl<{ success: boolean; message: string; status: BTCUSDSampleStatus }>("POST", "/api/btcusd/start", {}),
-  stopBtcSample: () => callControl<{ success: boolean; message: string; status: BTCUSDSampleStatus }>("POST", "/api/btcusd/stop", {}),
-  pauseBtcSample: () => callControl<{ success: boolean; message: string; status: BTCUSDSampleStatus }>("POST", "/api/btcusd/pause", {}),
-  resumeBtcSample: () => callControl<{ success: boolean; message: string; status: BTCUSDSampleStatus }>("POST", "/api/btcusd/resume", {}),
-  placeBtcManualTestOrder: (direction: "BUY" | "SELL") =>
-    callControl<{ success: boolean; message: string; trade?: Record<string, any> }>("POST", "/api/btcusd/manual-test-order", { direction }),
+  // Telegram Quick Connectivity Test
   testTelegram: (sendMessage = true) =>
     callControl<{ success: boolean; message: string }>("POST", "/api/telegram/test", { send_message: sendMessage }),
 };

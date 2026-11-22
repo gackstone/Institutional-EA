@@ -1,13 +1,13 @@
-import { OperatingMode, ScreenId } from "../types";
+import { ScreenId } from "../types";
 
 export interface GlossaryItem {
   short: string;
   full: string;
-  category: "Account & Risk" | "Execution & Orders" | "Chart & SMC" | "System & Modes";
+  category: "Account & Risk" | "Execution & Orders" | "Chart & SMC" | "System";
 }
 
 /**
- * Centralized UI Copy, Short Forms, Tooltips, and Glossary (PART A).
+ * Centralized UI Copy, Short Forms, Tooltips, and Glossary.
  * Single Source of Truth for all user-facing strings in the Companion app.
  */
 export const UI_COPY = {
@@ -26,62 +26,22 @@ export const UI_COPY = {
     },
     screens: {
       dashboard: { label: "Dashboard", tooltip: "Main trading terminal & live chart" },
-      market: { label: "Quotes", tooltip: "Live broker quotes & contract specs" },
-      signals: { label: "Signals", tooltip: "Strategy signals & risk gate decisions" },
-      positions: { label: "Pos & Ord", tooltip: "Open positions & pending orders" },
-      history: { label: "History", tooltip: "Closed trade history" },
-      analytics: { label: "Perf", tooltip: "Performance analytics & profit factor" },
-      engine: { label: "Engine", tooltip: "Engine & bridge process lifecycle" },
-      risk: { label: "Risk", tooltip: "PortfolioRiskEngine limits & utilization" },
-      instruments: { label: "Instr", tooltip: "Approved instrument profiles" },
-      configuration: { label: "Config", tooltip: "Authoritative JSON config & versions" },
-      mt5: { label: "MT5", tooltip: "MetaTrader 5 terminal scan & EA deploy" },
-      operations: { label: "Ops", tooltip: "Allowlisted operations runner" },
-      errors: { label: "Errors", tooltip: "Active & resolved system errors" },
-      logs: { label: "Logs", tooltip: "Structured runtime event logs" },
-      health: { label: "Health", tooltip: "SQLite, drift & audit trail health" },
-      settings: { label: "Settings", tooltip: "Operating modes, pairing & short-form glossary" },
+      positions: { label: "Positions & Orders", tooltip: "Open positions & pending orders" },
+      history: { label: "Trade History", tooltip: "Closed trade history" },
+      analytics: { label: "Analytics", tooltip: "Performance analytics & profit factor" },
+      mt5: { label: "MT5 Terminal", tooltip: "MetaTrader 5 terminal scan & EA deploy" },
+      operations: { label: "Operations", tooltip: "Allowlisted operations runner" },
+      logs: { label: "Event Logs", tooltip: "Structured runtime event logs" },
+      health: { label: "System Health", tooltip: "SQLite, MT5 & audit trail health" },
+      settings: { label: "Settings", tooltip: "Diagnostics, pairing & short-form glossary" },
     } satisfies Record<ScreenId, { label: string; tooltip: string }>,
   },
-  modes: [
-    {
-      mode: "OBSERVE" as OperatingMode,
-      code: "OBS",
-      label: "Observe Only",
-      tooltip: "OBS (Observe Only): Stream MT5 quotes & signals without placing orders",
-    },
-    {
-      mode: "DRY_RUN" as OperatingMode,
-      code: "DRY",
-      label: "Dry Run",
-      tooltip: "DRY (Dry Run): Evaluate strategy & risk gate without broker submission",
-    },
-    {
-      mode: "DEMO_SCALPING" as OperatingMode,
-      code: "SCALP",
-      label: "Demo Scalping",
-      tooltip: "SCALP (Demo Scalping): Balanced Gold, USDJPY & BTC DEMO execution",
-    },
-    {
-      mode: "DEMO_FAST" as OperatingMode,
-      code: "FAST",
-      label: "Demo Fast",
-      tooltip: "FAST (Demo Fast): Low-latency M1/M5 DEMO execution profile",
-    },
-    {
-      mode: "DEMO_MANUAL_ASSIST" as OperatingMode,
-      code: "ASSIST",
-      label: "Manual Assist",
-      tooltip: "ASSIST (Demo Manual Assist): Adopt manual trades & enforce tighten-only SL",
-    },
-  ],
   kpis: {
     balEq: { label: "Bal / Eq", tooltip: "Account Balance & Live Equity" },
     todayPnl: { label: "Today P&L", tooltip: "Today realized + floating P&L in USD and R-multiples" },
     dailyLoss: { label: "Daily Loss", tooltip: "Daily realized loss used vs hard daily loss limit" },
     ddCap: { label: "DD vs Cap", tooltip: "Total account drawdown vs maximum drawdown cap" },
-    openExp: { label: "Open Exp", tooltip: "Active exposure: Bot positions, Manual positions & Pending orders" },
-    nextSess: { label: "Next Sess", tooltip: "Time remaining until next weekday/weekend schedule switch" },
+    openExp: { label: "Open Exp", tooltip: "Active exposure: open positions & pending orders" },
   },
   chart: {
     layers: {
@@ -127,13 +87,7 @@ export const SHORT_FORM_GLOSSARY: GlossaryItem[] = [
   { short: "MSS", full: "Market Structure Shift with displacement impulse", category: "Chart & SMC" },
   { short: "Sess", full: "Trading Session Killzone (Asian, London, LDN/NY Overlap, NY)", category: "Chart & SMC" },
 
-  // System & Modes
-  { short: "OBS", full: "Observe Mode (telemetry & signals only; no orders)", category: "System & Modes" },
-  { short: "DRY", full: "Dry-Run Mode (full risk gate evaluation without broker orders)", category: "System & Modes" },
-  { short: "SCALP", full: "Demo Scalping Mode (balanced Gold/USDJPY/BTC DEMO trading)", category: "System & Modes" },
-  { short: "FAST", full: "Demo Fast Mode (low-latency M1/M5 execution profile)", category: "System & Modes" },
-  { short: "ASSIST", full: "Demo Manual Assist (adopts & protects manual MT5 trades)", category: "System & Modes" },
-  { short: "Sig / Hist / Perf", full: "Signals Pipeline / Trade History / Performance Analytics", category: "System & Modes" },
-  { short: "Instr / Cfg / Ops", full: "Instruments / Configuration Editor / Operations Runner", category: "System & Modes" },
-  { short: "CUSUM / PSI / TCA", full: "Cumulative Sum decay / Population Stability drift / Transaction Cost Analysis", category: "System & Modes" },
+  // System
+  { short: "ZMQ", full: "ZeroMQ/TCP Bridge Sockets (5555 EA / 5556 IPC)", category: "System" },
+  { short: "TG", full: "Telegram Notification & Alert Dispatcher", category: "System" },
 ];

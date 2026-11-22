@@ -19,7 +19,7 @@
     "test": "node --experimental-strip-types --test src/utils/__tests__/tradeChartMath.test.ts",
     "preview": "vite preview",
     "electron": "electron electron/main.cjs",
-    "electron:dev": "concurrently \"vite\" \"wait-on tcp:5173 && electron electron/main.cjs\"",
+    "electron:dev": "concurrently \"vite\" \"wait-on tcp:5173 && electron electron/main.cjs --dev\"",
     "sidecars": "python packaging/build_sidecars.py",
     "dist:win": "npm run build && electron-builder --win nsis:x64 && node -e \"const fs=require('fs'),p=require('./package.json');fs.copyFileSync('release/Institutional-EA-Setup-'+p.version+'.exe','release/setup.exe')\"",
     "package:win": "python packaging/build_sidecars.py && npm run dist:win",

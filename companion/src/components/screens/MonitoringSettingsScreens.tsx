@@ -5,7 +5,6 @@ import {
   AuditLogRecord,
   ControlLogEntry,
   ControlStatusPayload,
-  OperatingMode,
   TradeHistoryRecord,
 } from "../../types";
 import { SHORT_FORM_GLOSSARY, UI_COPY } from "../../constants/uiCopy";
@@ -207,36 +206,17 @@ export const SystemHealthScreen: React.FC<{
 };
 
 export const SettingsScreen: React.FC<{
-  status: ControlStatusPayload | null;
-  onRefresh: () => Promise<void>;
-  onActionMessage: (msg: string, isError?: boolean) => void;
   onOpenDiagnostics: () => void;
   onOpenInstitutionalEa: () => void;
   onOpenTelegram: () => void;
-}> = ({ status, onRefresh, onActionMessage, onOpenDiagnostics, onOpenInstitutionalEa, onOpenTelegram }) => {
-  const [busy, setBusy] = useState(false);
-  const currentMode = status?.engine.operating_mode || "DEMO_SCALPING";
-
-  const switchMode = async (mode: OperatingMode) => {
-    setBusy(true);
-    try {
-      await controlClient.applyConfig({ operating_mode: mode }, `Mode -> ${mode}`);
-      onActionMessage(`Mode -> ${mode}`);
-      await onRefresh();
-    } catch (e: any) {
-      onActionMessage(`Mode error: ${e.message}`, true);
-    } finally {
-      setBusy(false);
-    }
-  };
-
+}> = ({ onOpenDiagnostics, onOpenInstitutionalEa, onOpenTelegram }) => {
   return (
     <div className="space-y-4">
       <div className="iea-glass-card p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-light text-[#F4F7FF] flex items-center space-x-2">
             <SettingsIcon className="w-5 h-5 text-[#B0F648]" />
-            <span>Modes &amp; Connections</span>
+            <span>Connections &amp; Diagnostics</span>
           </h2>
           <span
             title={UI_COPY.brand.demoLockTooltip}
@@ -247,49 +227,20 @@ export const SettingsScreen: React.FC<{
           </span>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
-          {UI_COPY.modes.map((m) => {
-            const active = currentMode === m.mode;
-            return (
-              <button
-                key={m.mode}
-                disabled={busy}
-                onClick={() => switchMode(m.mode)}
-                title={m.tooltip}
-                className={`text-left p-3 rounded-2xl border transition-all duration-150 ${
-                  active
-                    ? "bg-gradient-to-br from-[#B0F648]/20 to-[#2F497C]/45 border-[#B0F648]/60 text-[#F4F7FF] shadow-[0_0_20px_rgba(176,246,72,0.14)]"
-                    : "iea-glass-tile text-[#B6C5E0] hover:border-[rgba(186,214,255,0.28)] hover:text-[#F4F7FF]"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-sm text-[#F4F7FF]">{m.code}</span>
-                  {active && (
-                    <span className="px-2 py-0.2 rounded-full bg-[#B0F648] text-[#081321] text-[9px] font-mono font-extrabold">
-                      ON
-                    </span>
-                  )}
-                </div>
-                <div className="text-[11px] text-[#8496B8] mt-1">{m.label}</div>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex flex-wrap gap-2.5 pt-2">
-          <button onClick={onOpenDiagnostics} className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF] font-semibold">
+        <div className="flex flex-wrap gap-2.5">
+          <button onClick={onOpenDiagnostics} className="iea-pill-control px-4 py-2 text-xs text-[#F4F7FF] font-semibold">
             Diagnostics
           </button>
-          <button onClick={onOpenInstitutionalEa} className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF] font-semibold">
+          <button onClick={onOpenInstitutionalEa} className="iea-pill-control px-4 py-2 text-xs text-[#F4F7FF] font-semibold">
             Cloud Pairing
           </button>
-          <button onClick={onOpenTelegram} className="iea-pill-control px-4 py-1.5 text-xs text-[#F4F7FF] font-semibold">
+          <button onClick={onOpenTelegram} className="iea-pill-control px-4 py-2 text-xs text-[#F4F7FF] font-semibold">
             Telegram Setup
           </button>
         </div>
       </div>
 
-      {/* Short-Form Glossary Section (Part A.2: Settings > Glossary) */}
+      {/* Short-Form Glossary Section */}
       <div className="iea-glass-card p-5 space-y-3" data-testid="short-form-glossary">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-[#F4F7FF] flex items-center space-x-2">

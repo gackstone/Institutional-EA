@@ -159,19 +159,12 @@ export interface CompanionConfig {
 
 export type ScreenId =
   | "dashboard"
-  | "engine"
-  | "market"
-  | "signals"
   | "positions"
   | "history"
-  | "risk"
-  | "instruments"
-  | "configuration"
+  | "analytics"
   | "mt5"
   | "operations"
-  | "errors"
   | "logs"
-  | "analytics"
   | "health"
   | "settings";
 
@@ -182,35 +175,6 @@ export type OperatingMode =
   | "DEMO_FAST"
   | "DEMO_MANUAL_ASSIST"
   | "BTCUSD_DEMO_SAMPLE_MODE";
-
-export interface BTCUSDSampleStatus {
-  enabled: boolean;
-  active: boolean;
-  paused: boolean;
-  state: string;
-  operating_mode: string;
-  broker_symbol: string;
-  bid: number;
-  ask: number;
-  spread_points: number;
-  mt5_connection: string;
-  demo_verified: boolean;
-  open_positions: ControlPosition[];
-  floating_pnl: number;
-  daily_pnl: number;
-  last_signal: Record<string, any> | null;
-  last_executed_trade: Record<string, any> | null;
-  last_execution_result: string | null;
-  last_check_note: string;
-  telegram: {
-    enabled: boolean;
-    has_token: boolean;
-    has_chat_id: boolean;
-    delivery_count: number;
-    failed_count: number;
-    last_notification: { timestamp: string; preview: string; status: string; error?: string } | null;
-  };
-}
 
 export interface ControlSymbolSpec {
   symbol: string;
@@ -304,22 +268,6 @@ export interface ControlStatusPayload {
   };
 }
 
-export interface ControlErrorEvent {
-  id: number;
-  category: string;
-  severity: string;
-  component: string;
-  message: string;
-  trading_affected: number;
-  entries_blocked: number;
-  recommended_recovery: string;
-  user_action_required: number;
-  status: "ACTIVE" | "RESOLVED";
-  resolution_note: string | null;
-  created_at: string;
-  resolved_at: string | null;
-}
-
 export interface AllowlistedOpInfo {
   op_id: string;
   name: string;
@@ -338,15 +286,6 @@ export interface OperationAuditRecord {
   duration_ms: number | null;
   started_at: string;
   finished_at: string | null;
-}
-
-export interface ConfigVersionRecord {
-  id: number;
-  version: number;
-  change_summary: string;
-  author: string;
-  requires_restart: number;
-  created_at: string;
 }
 
 export interface ControlLogEntry {
@@ -376,17 +315,6 @@ export interface TradeHistoryRecord {
   status: string;
   opened_at: string;
   closed_at: string | null;
-}
-
-export interface RiskDecisionRecord {
-  id: number;
-  symbol: string;
-  direction: string;
-  approved: number;
-  reason: string;
-  lot_size: number;
-  risk_pct: number;
-  created_at: string;
 }
 
 export interface AuditLogRecord {
