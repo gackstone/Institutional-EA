@@ -1,91 +1,125 @@
-# Institutional EA — Chart Drawings Architecture & Data Contract (`PART D`)
+# Chart Drawings Data Pipeline & Schema
 
-> **Branch:** `chore/audit-chart-copy`  
-> **Chart Library:** TradingView Lightweight Charts (`lightweight-charts` `^5.3.0`, `createChart` + `CandlestickSeries` + synchronized SVG/HTML overlay layer)  
-> **Primary Files:** `companion/src/components/LiveTradingChart.tsx`, `companion/src/services/dashboardDataAdapter.ts`, `companion/src/utils/tradeChartMath.ts`
+> Documents the single typed drawings pipeline from the Institutional EA engine through the Control Service to the Companion chart renderer.
 
 ---
 
-## 1. End-to-End Drawing Pipeline (Bot -> Control Service -> Companion Chart)
+## 1. End-to-End Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│ 1. Strategy & SMC Detection Layer (Python src/smc/ + MQL5 EA)           │
-│    - src/smc/liquidity.py: LiquidityZone (PDH, PDL, PWH, PWL, EQH, EQL) │
-│    - src/smc/fvg_ob.py: FairValueGap (FVG, IFVG), OrderBlock (OB)       │
-│    - src/smc/market_structure.py: MarketStructureEvent (BOS, CHoCH, MSS)│
-│    - src/core/schedule_mode.py: Sessions (Asia, London, NY, Overlap)    │
-│    - src/execution/order_manager.py: Trade Lifecycle & Tighten-Only SL  │
-│    - mql5/Experts/PythonBridgeEA.mq5: AFX_BOS_, AFX_FVG_, AFX_OB_, etc. │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│ 2. Control Service & SSE Transport (127.0.0.1:8765)                     │
-│    - GET /api/status & GET /api/events (SSE stream)                     │
-│    - Emits: mt5.symbols (bid/ask/digits/point), mt5.positions,          │
-│      engine.last_signal, engine.last_trade, plus optional               │
-│      mt5.drawings / smc_overlays payload                                │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│ 3. Companion Adapter & Multi-Timeframe Drawing Fixture                  │
-│    (companion/src/services/dashboardDataAdapter.ts)                     │
-│    - Normalizes broker symbol suffixes (XAUUSD.m / XAUUSDc -> XAUUSD)   │
-│    - Snaps every drawing timestamp to exact candle bucket:              │
-│      snappedTime = Math.floor(utcSec / tfSec) * tfSec                   │
-│    - Computes causal SMC drawings directly from the active OHLC series  │
-│      + live trade overlays when backend omits raw SMC arrays            │
-│    - Caps active drawings per layer & prunes expired/mitigated items    │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│ 4. Synchronized Z-Ordered Renderer (LiveTradingChart.tsx)               │
-│    - z-0: Lightweight Charts Candlestick Canvas                         │
-│    - z-5: Shaded Zones (Sessions, FVG/IFVG, OB, Risk/Reward boxes)      │
-│           with low-opacity translucent fills so candles stay crisp      │
-│    - z-10: Horizontal Level Lines (Entry, SL, Ghost SL, TP1, TP2,       │
-│            PDH/PDL/PWH/PWL/EQH/EQL) + Structure Break rays (BOS/CHoCH)  │
-│    - z-20: Priority-Sorted Collision-Free Axis Labels, Signal Pins,     │
-│            Interactive Hover Tooltips & Compact Layer Legend            │
-└─────────────────────────────────────────────────────────────────────────┘
+Trading Engine Analyzers (read-only)          MT5SyncService & CompanionRepository
+  - WeeklyDailyEngine (PDH/PDL/PWH/PWL)         - Open positions (ticket, entry, SL, initial_sl, TP, open_time)
+  - SessionLiquidityEngine (Asia H/L, sweep)    - Pending signals (signal_records)
+  - LiquidityEngine (EQH/EQL/BSL/SSL, sweep)    - Closed trade history (trade_records)
+  - FvgObEngine (FVG/IFVG, OB/Breaker)
+  - MarketStructureEngine (BOS/MSS/CHoCH)
+  - config/sessions.json (Asia/LDN/NY/Overlap)
+                 │                                              │
+                 └──────────────────────┬───────────────────────┘
+                                        ▼
+            companion/service/market/drawings_engine.py (Read-Only Observer)
+                                        │
+                      GET /api/chart/drawings?symbol=XAUUSD&tf=M5
+                                        │
+                                        ▼
+              companion/src/utils/chartDrawingsSchema.ts (Validator)
+                                        │
+                                        ▼
+            companion/src/components/LiveTradingChart.tsx (Canvas Renderer)
+```
+
+- **Zero strategy mutation**: `drawings_engine.py` imports and calls the exact engine classes with the exact parameters from `config/strategy_config.json` and `config/sessions.json`. No file under `src/` is modified.
+
+---
+
+## 2. Typed Drawing Schema (`schema_version = "1.0"`)
+
+```ts
+interface EngineDrawingsFeed {
+  schema_version: "1.0";
+  symbol: string;               // Canonical symbol (e.g. "XAUUSD")
+  broker_symbol?: string;       // Broker symbol (e.g. "XAUUSD.m")
+  timeframe: string;            // Chart timeframe ("M1" | "M5" | "M15" | "H1" | "H4")
+  generated_at: string;         // ISO-8601 UTC timestamp
+  broker_utc_offset_hours?: number;
+  dropped_count?: number;
+  counts: {
+    liquidity: number;
+    fvgOb: number;
+    structure: number;
+    sessions: number;
+    trades: number;
+  };
+  drawings: EngineDrawingItem[];
+}
+
+interface EngineDrawingItem {
+  id: string;                   // Deterministic stable ID (prevents duplicates on live refresh)
+  type: "LIQ" | "SESS" | "FVG" | "OB" | "STRUCT" | "TRADE";
+  subtype: string;              // e.g. "PDH", "EQH", "ASIA", "FVG", "OB", "BOS", "OPEN", "PENDING", "CLOSED"
+  symbol: string;               // Canonical symbol
+  broker_symbol?: string;
+  timeframe: string;            // Engine timeframe the item was computed on
+  start_time: number;           // Unix epoch seconds
+  end_time: number | null;      // Unix epoch seconds, or null if open/active to right edge
+  price_levels: {
+    price?: number;             // LIQ, STRUCT
+    sweep_time?: number | null; // LIQ (swept)
+    sweep_price?: number | null;
+    top?: number;               // FVG, OB
+    bottom?: number;            // FVG, OB
+    midpoint?: number;
+    high?: number | null;       // SESS
+    low?: number | null;        // SESS
+    entry?: number;             // TRADE
+    sl?: number;                // TRADE (current stop loss)
+    initial_sl?: number;        // TRADE (original SL before BE/trailing)
+    tp?: number;                // TRADE
+    tp1?: number;               // TRADE (1.0R partial target)
+    exit?: number;              // TRADE (closed)
+    current?: number;           // TRADE (open)
+    pnl?: number;               // TRADE
+    rr?: number;                // TRADE
+    volume?: number;            // TRADE
+    ticket?: number;            // TRADE
+    ownership?: string;         // TRADE ("BOT" | "MANUAL" | "OTHER_EA")
+  };
+  direction: "BULLISH" | "BEARISH" | "NEUTRAL";
+  status: "ACTIVE" | "MITIGATED" | "SWEPT" | "INVALIDATED" | "EXPIRED" | "OPEN" | "PENDING" | "CLOSED";
+  source: string;               // Engine class or service name
+  meta?: Record<string, any>;
+}
 ```
 
 ---
 
-## 2. Complete Inventory of Bot Drawing Types & Coverage Matrix
+## 3. Validation Layer Rules
 
-| Drawing Category | Specific Sub-Types Produced by Bot | Bot Source (`src/` / `mql5/`) | Prior UI Support | Now Supported in `LiveTradingChart.tsx` |
-| :--- | :--- | :--- | :--- | :--- |
-| **1. Liquidity Levels** | `PDH`, `PDL`, `PWH`, `PWL`, `EQH` (Equal Highs), `EQL` (Equal Lows), `BSL`/`SSL` sweeps | `src/smc/liquidity.py` (`LiquidityZone`), `PythonBridgeEA.mq5` (`AFX_LIQ_`) | Only `PWH`, `PDH`, `PDL`, `PWL` (missing `EQH` / `EQL` & mitigation end-time) | **Full (`PDH`, `PDL`, `PWH`, `PWL`, `EQH`, `EQL`)** — anchored to formation candle, extending to right edge (or stopping/fading at sweep candle). |
-| **2. Imbalances (FVG / IFVG)** | Bullish `FVG`, Bearish `FVG`, Inverse `IFVG` (mitigated vs active) | `src/smc/fvg_ob.py` (`FairValueGap`), `PythonBridgeEA.mq5` (`AFX_FVG_`) | Only 1 static unmitigated FVG box | **Full (`Bull FVG`, `Bear FVG`, `IFVG`)** — detected from 3-candle gaps on active timeframe, spanning from formation candle to mitigation candle (faded) or current bar. |
-| **3. Order Blocks (OB)** | Bullish Demand `OB`, Bearish Supply `OB` (active vs mitigated) | `src/smc/fvg_ob.py` (`OrderBlock`), `PythonBridgeEA.mq5` (`AFX_OB_`) | Only 1 static OB box | **Full (`Bull OB`, `Bear OB`)** — anchored to last opposite candle before displacement impulse, with mitigation tracking and low-opacity fill. |
-| **4. Market Structure** | `BOS` (Break of Structure), `CHoCH` (Change of Character), `MSS` (Market Structure Shift) | `src/smc/market_structure.py` (`MarketStructureEvent`), `PythonBridgeEA.mq5` (`AFX_BOS_`) | Only `MSS` and `CHoCH` text pins (no `BOS` horizontal break ray) | **Full (`BOS`, `CHoCH`, `MSS`)** — draws horizontal swing-pivot break ray from swing origin to break candle + compact pill tag. |
-| **5. Sessions & Killzones** | `ASIAN`, `LONDON`, `LDN/NY OVERLAP`, `NEW YORK` session boxes | `src/core/schedule_mode.py`, `config/sessions.json` | Only London & Overlap bands | **Full (`ASIA`, `LDN`, `LDN/NY`, `NY`)** — snapped to UTC session hours on intraday timeframes (`M1`–`H1`) with high/low boundary frame. |
-| **6. Trade Levels & Zones** | `Entry`, `Active SL`, `Ghost Initial SL`, `Trailing/Tightened SL`, `TP1`, `TP2`, `Risk Zone`, `Reward Zone` | `src/execution/order_manager.py`, `src/manual_mgmt/assessor.py` | Supported, but zones sat in front of canvas (`z-10`) | **Full** — shaded Risk/Reward zones use subtle translucent tint (`opacity <= 0.12`) with crisp borders, ghosted initial SL, and trailing SL step markers. |
-| **7. Trade Lifecycle & Signals** | `BUY`/`SELL` Signal arrows, `Entry` tag (lot, score, ticket), `BE+` lock, `50% Partial`, `Trail SL`, `Closed` | `src/core/orchestrator.py`, `engine.last_signal` | Missing standalone `Signal` markers | **Full** — includes risk-approved/blocked `Signal` markers + trade lifecycle pins with hover tooltips. |
+Both backend (`validate_drawing_item`) and frontend (`validateEngineDrawingsFeed`) enforce:
+1. Envelope must contain a `drawings` array; otherwise marked `malformedFeed: true` and surfaced as a compact warning badge (chart candles stay intact).
+2. Every item must have non-empty `id` and `source`, valid `type`, finite `start_time > 2000-01-01`, and canonical `symbol` matching the active chart symbol (suffixes like `.m` normalized).
+3. Price invariants:
+   - `LIQ` / `STRUCT`: finite positive `price`.
+   - `FVG` / `OB`: finite positive `top` and `bottom` with `top > bottom`.
+   - `TRADE`: finite positive `entry`.
+4. Deduplication by `id` prevents duplicate overlays during live ticks/polling.
+5. Per-layer caps (`LIQ: 24, SESS: 32, FVG: 16, OB: 14, STRUCT: 24, TRADE: 30`) keep rendering locked at 60fps.
 
 ---
 
-## 3. Rendering Correctness & Coordinate Rules
+## 4. Timeframe Hierarchy Rules
 
-1. **Symbol Suffix Normalization (`normalizeCanonicalSymbol`)**:
-   - Strips broker suffixes (`XAUUSD.m`, `XAUUSD.pro`, `XAUUSDc`, `BTCUSD.m`, `USDJPY.m`) so any position, signal, or drawing for `XAUUSD*` maps deterministically to the `XAUUSD` chart view.
-2. **Timeframe Snapping & UTC Alignment (`snapTimestampToTimeframe`)**:
-   - Every drawing timestamp (`startTime`, `endTime`, `entryTime`, `breakTime`) is snapped to the active timeframe bar boundary:
-     `snappedSec = Math.floor(utcSeconds / tfSeconds) * tfSeconds`
-   - When a timestamp falls outside the visible bar range or across a weekend gap, the projector clamps `X` to the nearest loaded bar coordinate rather than dropping or misplacing the drawing.
-3. **Priority-Aware Collision Avoidance (`resolveLabelCollisions`)**:
-   - Every right-axis label carries an explicit priority weight:
-     - Priority `100`: `LIVE` price + floating R
-     - Priority `95`: `ENTRY` (`BUY`/`SELL` lot, score, ticket)
-     - Priority `90`: `SL` (Active Stop Loss)
-     - Priority `85`: `TP1` / `TP2`
-     - Priority `75`: `INIT SL` (Ghosted initial stop)
-     - Priority `60`: `PDH` / `PDL` / `PWH` / `PWL` / `EQH` / `EQL`
-   - When more than 10 labels compete in a tight vertical price range, lower-priority labels are pruned or offset with leader lines while keeping all labels strictly inside `[minY, maxY]`.
-4. **Layer Persistence & Caps**:
-   - Layer toggle state (`Liq`, `FVG/OB`, `Struct`, `Sess`, `Trades`) persists in `localStorage` (`iea_chart_overlay_toggles_v1`).
-   - Caps rendered items per layer (max `6` liquidity levels, `4` FVG/OB zones, `4` structure breaks, `3` session boxes, `4` trades) so 60fps pan/zoom performance never degrades.
+Timeframe rank: `M1 (1) < M5 (2) < M15 (3) < M30 (4) < H1 (5) < H4 (6) < D1 (7) < W1 (8)`.
+- **Higher-timeframe drawings on lower timeframes**: Shown when `rank(drawing.timeframe) >= rank(chart_tf)` (e.g., `D1` PDH/PDL, `W1` PWH/PWL, `M15` Asia Range, `H1` structure/FVG/OB appear on `M5` and `M1`).
+- **Lower-timeframe drawings on higher timeframes**: Filtered out (`rank(drawing.timeframe) < rank(chart_tf)` — e.g., an `M5` FVG never clutters `H1` or `H4`).
+- **Sessions (`SESS`)**: Shown on all intraday timeframes (`M1` through `H4`), respecting `config/sessions.json` UTC windows and `broker_utc_offset_hours`.
+- **Trades (`TRADE`)**: Open positions, pending signals, and closed trade history are shown on all timeframes for the matching canonical symbol only.
+
+---
+
+## 5. Text & Interaction Rules
+
+- **Strict Text Rule**: No permanent text on the plot except:
+  1. `"LONG POSITION"` / `"SHORT POSITION"` on trade position templates.
+  2. `"FVG"` / `"OB"` (or `"IFVG"`) centered inside FVG/OB rectangles.
+- All other details (level names like `PDH`/`EQH`, sweep time, `BOS`/`CHoCH`, session UTC windows, trade Entry/SL/TP/R:R/P&L) appear on **hover tooltips** and **click-to-pin detail cards**, and OHLC + change appears in the **toolbar strip above the plot**.

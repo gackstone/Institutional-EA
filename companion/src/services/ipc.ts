@@ -613,6 +613,13 @@ export const controlClient = {
       fetched_at: string;
     }>("GET", `/api/market/candles?${qs.toString()}`);
   },
+  getChartDrawings: (symbol: string, tf: string, count = 160) => {
+    const qs = new URLSearchParams({ symbol, tf, count: String(count) });
+    return callControl<import("../utils/chartDrawingsSchema").EngineDrawingsFeed>(
+      "GET",
+      `/api/chart/drawings?${qs.toString()}`
+    );
+  },
 
   // Trade & Order Controls
   modifyPosition: (ticket: number, sl: number, tp: number) =>

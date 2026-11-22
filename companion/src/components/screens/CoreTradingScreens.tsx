@@ -49,6 +49,7 @@ import {
 import { getSymbolChipSpec } from "../../styles/designTokens";
 import { UI_COPY } from "../../constants/uiCopy";
 import { LiveTradingChart } from "../LiveTradingChart";
+import type { EngineDrawingsFeed } from "../../utils/chartDrawingsSchema";
 
 // One-time confirmation flag per app session for demo order-placing Start
 let sessionStartDemoConfirmed = false;
@@ -86,6 +87,8 @@ export const DashboardScreen: React.FC<
   const [realCandles, setRealCandles] = useState<CandleBar[]>([]);
   const [liveQuote, setLiveQuote] = useState<ControlSymbolSpec | null>(null);
   const [candleWaitingReason, setCandleWaitingReason] = useState<string | undefined>(undefined);
+  const [drawingsFeed, setDrawingsFeed] = useState<EngineDrawingsFeed | null>(null);
+  const [drawingsError, setDrawingsError] = useState<string | null>(null);
   const [utcClockText, setUtcClockText] = useState<string>(() =>
     `${new Date().toISOString().slice(11, 19)} UTC`
   );
@@ -157,6 +160,30 @@ export const DashboardScreen: React.FC<
       clearInterval(timer);
     };
   }, [selectedSymbol, selectedTimeframe, serviceStatus?.status]);
+
+  // Fetch engine drawings feed (/api/chart/drawings) on load and live refresh
+  useEffect(() => {
+    let cancelled = false;
+    const loadDrawings = async () => {
+      try {
+        const feed = await controlClient.getChartDrawings(selectedSymbol, selectedTimeframe, 160);
+        if (!cancelled) {
+          setDrawingsFeed(feed);
+          setDrawingsError(null);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setDrawingsError(sanitizeControlError(err, "Unable to fetch engine drawings"));
+        }
+      }
+    };
+    loadDrawings();
+    const timer = setInterval(loadDrawings, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [selectedSymbol, selectedTimeframe, serviceStatus?.status, status?.mt5?.last_sync_at]);
 
   // Build normalized dashboard state strictly from real MT5/bot data
   const dash = useMemo(
@@ -1088,6 +1115,8 @@ export const DashboardScreen: React.FC<
             selectedTimeframe={selectedTimeframe}
             feedStatus={feedStatus}
             waitingReason={candleWaitingReason}
+            drawingsFeed={drawingsFeed}
+            drawingsError={drawingsError}
             onSelectSymbol={setSelectedSymbol}
             onSelectTimeframe={setSelectedTimeframe}
             onCaptureScreenshot={handleSaveScreenshot}
