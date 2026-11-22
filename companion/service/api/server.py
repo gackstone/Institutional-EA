@@ -4,9 +4,12 @@ Binds exclusively to 127.0.0.1 and validates Bearer/X-Companion-Token on every r
 """
 
 from __future__ import annotations
+import base64
 import json
 import queue
+import re
 import threading
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -162,6 +165,87 @@ def create_request_handler(ctx: ControlServiceContext):
                 })
             elif path == "/api/trades/history":
                 self._send_json(200, {"trades": ctx.repo.get_trade_records(limit=250)})
+            elif path == "/api/market/candles":
+                sym = query.get("symbol", ["XAUUSD"])[0]
+                tf = query.get("tf", ["M5"])[0]
+                count = int(query.get("count", ["120"])[0])
+                from_iso = query.get("from", [None])[0]
+                to_iso = query.get("to", [None])[0]
+                self._send_json(200, ctx.mt5_sync.get_candles(sym, tf, count, from_iso, to_iso))
+            elif path == "/api/analytics/equity":
+                self._send_json(200, {
+                    "snapshots": ctx.repo.get_balance_snapshots(limit=500),
+                    "trades": ctx.repo.get_trade_records(limit=500),
+                    "source": "BOT+MT5",
+                    "fetched_at": datetime.now(timezone.utc).isoformat(),
+                })
+            elif path == "/api/signals":
+                self._send_json(200, {
+                    "signals": ctx.repo.get_signals(limit=150),
+                    "decisions": ctx.repo.get_risk_decisions(limit=150),
+                    "source": "BOT",
+                    "fetched_at": datetime.now(timezone.utc).isoformat(),
+                })
+            elif path == "/api/trades/replay":
+                ticket = int(query.get("ticket", ["0"])[0])
+                tf = query.get("tf", ["M5"])[0]
+                all_trades = ctx.repo.get_trade_records(limit=500)
+                trade = next((t for t in all_trades if int(t.get("ticket", 0)) == ticket), None)
+                if not trade:
+                    self._send_json(404, {"error": f"Trade #{ticket} not found in real trade history"})
+                else:
+                    events = ctx.repo.get_execution_events_for_ticket(ticket)
+                    shots = ctx.repo.get_trade_screenshots(ticket=ticket)
+                    opened_iso = trade.get("opened_at")
+                    closed_iso = trade.get("closed_at") or datetime.now(timezone.utc).isoformat()
+                    try:
+                        s_dt = datetime.fromisoformat(str(opened_iso).replace("Z", "+00:00")) - timedelta(minutes=90)
+                        e_dt = datetime.fromisoformat(str(closed_iso).replace("Z", "+00:00")) + timedelta(minutes=60)
+                        candles_res = ctx.mt5_sync.get_candles(
+                            str(trade.get("symbol", "XAUUSD")),
+                            tf,
+                            count=200,
+                            start_iso=s_dt.isoformat(),
+                            end_iso=e_dt.isoformat(),
+                        )
+                    except Exception:
+                        candles_res = {"candles": [], "source": "MT5"}
+                    self._send_json(200, {
+                        "trade": trade,
+                        "events": events,
+                        "screenshots": shots,
+                        "candles": candles_res.get("candles", []),
+                        "source": "MT5+BOT",
+                    })
+            elif path == "/api/trades/screenshots":
+                ticket_q = query.get("ticket", [None])[0]
+                t_int = int(ticket_q) if ticket_q is not None else None
+                self._send_json(200, {"screenshots": ctx.repo.get_trade_screenshots(ticket=t_int)})
+            elif path == "/api/trades/screenshots/file":
+                name = str(query.get("name", [""])[0])
+                if not re.fullmatch(r"[A-Za-z0-9._-]+\.png", name):
+                    self._send_json(400, {"error": "Invalid screenshot filename"})
+                else:
+                    fpath = (ctx.project_root / "data" / "screenshots" / name).resolve()
+                    shots_root = (ctx.project_root / "data" / "screenshots").resolve()
+                    if not str(fpath).startswith(str(shots_root)) or not fpath.exists():
+                        self._send_json(404, {"error": "Screenshot not found"})
+                    else:
+                        raw_png = fpath.read_bytes()
+                        self.send_response(200)
+                        self.send_header("Content-Type", "image/png")
+                        self.send_header("Content-Length", str(len(raw_png)))
+                        self.send_header("Cache-Control", "no-store")
+                        self.end_headers()
+                        self.wfile.write(raw_png)
+            elif path == "/api/alerts":
+                self._send_json(200, {
+                    "alerts": ctx.repo.get_alerts(limit=150),
+                    "settings": ctx.repo.get_alert_settings(),
+                    "source": "BOT",
+                })
+            elif path == "/api/alerts/settings":
+                self._send_json(200, ctx.repo.get_alert_settings())
             elif path == "/api/risk/decisions":
                 self._send_json(200, {
                     "decisions": ctx.repo.get_risk_decisions(limit=150),
@@ -303,6 +387,47 @@ def create_request_handler(ctx: ControlServiceContext):
                             "🧪 <b>Institutional EA TELEGRAM TEST</b>\n\nConnection verified from Companion Control Centre (DEMO mode)."
                         )
                     self._send_json(200, {"success": ok, "message": msg})
+            elif path == "/api/trades/screenshots":
+                ticket = int(body.get("ticket", 0))
+                symbol = re.sub(r"[^A-Za-z0-9._-]", "", str(body.get("symbol", "UNK")))
+                stage = re.sub(r"[^A-Za-z0-9_-]", "", str(body.get("stage", "CAPTURE"))).upper()
+                data_url = str(body.get("data_url", ""))
+                if not data_url.startswith("data:image/png;base64,") or ticket <= 0:
+                    self._send_json(400, {"success": False, "error": "Invalid ticket or PNG data_url"})
+                else:
+                    try:
+                        b64_part = data_url.split(",", 1)[1]
+                        png_bytes = base64.b64decode(b64_part)
+                        shots_dir = ctx.project_root / "data" / "screenshots"
+                        shots_dir.mkdir(parents=True, exist_ok=True)
+                        ts_tag = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                        fname = f"trade_{ticket}_{symbol}_{stage}_{ts_tag}.png"
+                        (shots_dir / fname).write_bytes(png_bytes)
+                        ctx.repo.record_trade_screenshot(ticket, symbol, stage, fname)
+                        self._send_json(200, {"success": True, "filename": fname})
+                    except Exception as exc:
+                        self._send_json(400, {"success": False, "error": str(exc)})
+            elif path == "/api/alerts/settings":
+                saved = ctx.repo.save_alert_settings(body)
+                self._send_json(200, {"success": True, "settings": saved})
+            elif path == "/api/alerts/test":
+                msg_text = "Alert Centre test notification (DEMO mode, real event pipeline active)."
+                tg_status = "SKIPPED"
+                if ctx.telegram_notifier:
+                    ok, _ = ctx.telegram_notifier.verify_connection()
+                    if ok:
+                        ctx.telegram_notifier.send_raw_html(f"🔔 <b>Institutional EA Alert Test</b>\n{msg_text}")
+                        tg_status = "DELIVERED"
+                    else:
+                        tg_status = "FAILED"
+                alert_id = ctx.repo.record_alert(
+                    alert_type="signal",
+                    severity="INFO",
+                    message=msg_text,
+                    symbol="SYSTEM",
+                    telegram_status=tg_status,
+                )
+                self._send_json(200, {"success": True, "alert_id": alert_id, "telegram_status": tg_status})
             elif path == "/api/ati/sync":
                 res = ctx.ati.sync_broker_history() if ctx.ati else {"status": "UNAVAILABLE"}
                 self._send_json(200, res)

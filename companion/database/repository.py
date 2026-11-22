@@ -407,3 +407,222 @@ class CompanionRepository:
                 return [dict(r) for r in rows]
             finally:
                 conn.close()
+
+    # ------------------------------------------------------------------
+    # Real Balance Snapshots, Screenshots, Signals & Alerts (Migration 002)
+    # ------------------------------------------------------------------
+    def record_balance_snapshot(self, balance: float, equity: float, floating_pnl: float = 0.0, source: str = "MT5") -> None:
+        with self._lock:
+            conn = self._conn()
+            try:
+                last = conn.execute(
+                    "SELECT balance, equity, created_at FROM balance_snapshots ORDER BY id DESC LIMIT 1"
+                ).fetchone()
+                if last and abs(float(last["balance"]) - balance) < 1e-4 and abs(float(last["equity"]) - equity) < 1e-4:
+                    return
+                with conn:
+                    conn.execute(
+                        "INSERT INTO balance_snapshots (balance, equity, floating_pnl, source, created_at) VALUES (?, ?, ?, ?, ?)",
+                        (round(float(balance), 2), round(float(equity), 2), round(float(floating_pnl), 2), source, _utc_now()),
+                    )
+            finally:
+                conn.close()
+
+    def get_balance_snapshots(self, limit: int = 500) -> List[Dict[str, Any]]:
+        with self._lock:
+            conn = self._conn()
+            try:
+                rows = conn.execute(
+                    "SELECT * FROM balance_snapshots ORDER BY id ASC LIMIT ?", (limit,)
+                ).fetchall()
+                return [dict(r) for r in rows]
+            finally:
+                conn.close()
+
+    def record_trade_screenshot(self, ticket: int, symbol: str, stage: str, filename: str) -> int:
+        with self._lock:
+            conn = self._conn()
+            try:
+                with conn:
+                    cur = conn.execute(
+                        """
+                        INSERT OR REPLACE INTO trade_screenshots (ticket, symbol, stage, filename, created_at)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (int(ticket), str(symbol), str(stage).upper(), str(filename), _utc_now()),
+                    )
+                    return int(cur.lastrowid)
+            finally:
+                conn.close()
+
+    def get_trade_screenshots(self, ticket: Optional[int] = None, limit: int = 100) -> List[Dict[str, Any]]:
+        with self._lock:
+            conn = self._conn()
+            try:
+                if ticket is not None:
+                    rows = conn.execute(
+                        "SELECT * FROM trade_screenshots WHERE ticket = ? ORDER BY id ASC LIMIT ?",
+                        (int(ticket), limit),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        "SELECT * FROM trade_screenshots ORDER BY id DESC LIMIT ?", (limit,)
+                    ).fetchall()
+                return [dict(r) for r in rows]
+            finally:
+                conn.close()
+
+    def get_execution_events_for_ticket(self, ticket: int) -> List[Dict[str, Any]]:
+        with self._lock:
+            conn = self._conn()
+            try:
+                rows = conn.execute(
+                    "SELECT * FROM execution_events WHERE ticket = ? ORDER BY id ASC",
+                    (int(ticket),),
+                ).fetchall()
+                return [dict(r) for r in rows]
+            finally:
+                conn.close()
+
+    def record_signal(self, sig: Dict[str, Any]) -> int:
+        with self._lock:
+            conn = self._conn()
+            try:
+                with conn:
+                    cur = conn.execute(
+                        """
+                        INSERT INTO signal_records (
+                            signal_id, symbol, direction, score, entry_price, stop_loss,
+                            take_profit, rr, status, rejection_reason, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            str(sig.get("signal_id", "")),
+                            str(sig.get("symbol", "")),
+                            str(sig.get("direction", "")),
+                            float(sig.get("score", 0.0)),
+                            float(sig.get("entry_price", 0.0)),
+                            float(sig.get("stop_loss", 0.0)),
+                            float(sig.get("take_profit", 0.0)),
+                            float(sig.get("rr", 0.0)),
+                            str(sig.get("status", "WATCHING")).upper(),
+                            str(sig.get("rejection_reason", "")),
+                            str(sig.get("created_at") or _utc_now()),
+                        ),
+                    )
+                    return int(cur.lastrowid)
+            finally:
+                conn.close()
+
+    def get_signals(self, limit: int = 150) -> List[Dict[str, Any]]:
+        with self._lock:
+            conn = self._conn()
+            try:
+                rows = conn.execute(
+                    "SELECT * FROM signal_records ORDER BY id DESC LIMIT ?", (limit,)
+                ).fetchall()
+                return [dict(r) for r in rows]
+            finally:
+                conn.close()
+
+    def record_alert(
+        self,
+        alert_type: str,
+        severity: str,
+        message: str,
+        symbol: str = "",
+        telegram_status: str = "SKIPPED",
+        dedup_key: str = "",
+    ) -> int:
+        with self._lock:
+            conn = self._conn()
+            try:
+                with conn:
+                    cur = conn.execute(
+                        """
+                        INSERT INTO alert_events (
+                            alert_type, severity, symbol, message, telegram_status, dedup_key, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            str(alert_type).lower(),
+                            str(severity).upper(),
+                            str(symbol),
+                            str(message),
+                            str(telegram_status).upper(),
+                            str(dedup_key),
+                            _utc_now(),
+                        ),
+                    )
+                    return int(cur.lastrowid)
+            finally:
+                conn.close()
+
+    def get_alerts(self, limit: int = 150) -> List[Dict[str, Any]]:
+        with self._lock:
+            conn = self._conn()
+            try:
+                rows = conn.execute(
+                    "SELECT * FROM alert_events ORDER BY id DESC LIMIT ?", (limit,)
+                ).fetchall()
+                return [dict(r) for r in rows]
+            finally:
+                conn.close()
+
+    def get_alert_settings(self) -> Dict[str, Any]:
+        defaults: Dict[str, Any] = {
+            "enabled_types": {
+                "signal": True,
+                "trade_open": True,
+                "trade_close": True,
+                "be_moved": True,
+                "sl_tp_hit": True,
+                "daily_loss_warn": True,
+                "bridge_down": True,
+                "heartbeat_lost": True,
+                "stale_data": True,
+            },
+            "telegram_enabled": True,
+            "quiet_hours_enabled": False,
+            "quiet_start_utc": "22:00",
+            "quiet_end_utc": "06:00",
+            "rate_limit_per_min": 6,
+            "dedup_window_sec": 120,
+        }
+        with self._lock:
+            conn = self._conn()
+            try:
+                row = conn.execute(
+                    "SELECT value_json FROM alert_settings WHERE key = 'alert_prefs'"
+                ).fetchone()
+                if row:
+                    saved = json.loads(row["value_json"])
+                    if isinstance(saved, dict):
+                        merged = {**defaults, **saved}
+                        if isinstance(saved.get("enabled_types"), dict):
+                            merged["enabled_types"] = {**defaults["enabled_types"], **saved["enabled_types"]}
+                        return merged
+                return defaults
+            finally:
+                conn.close()
+
+    def save_alert_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+        current = self.get_alert_settings()
+        updated = {**current, **settings}
+        if isinstance(settings.get("enabled_types"), dict):
+            updated["enabled_types"] = {**current["enabled_types"], **settings["enabled_types"]}
+        with self._lock:
+            conn = self._conn()
+            try:
+                with conn:
+                    conn.execute(
+                        """
+                        INSERT INTO alert_settings (key, value_json, updated_at)
+                        VALUES ('alert_prefs', ?, ?)
+                        ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at
+                        """,
+                        (json.dumps(updated), _utc_now()),
+                    )
+                return updated
+            finally:
+                conn.close()

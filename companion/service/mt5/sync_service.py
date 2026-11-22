@@ -19,6 +19,14 @@ from typing import Any, Dict, List, Optional, Tuple
 from companion.database.repository import CompanionRepository
 from companion.service.events.event_bus import EventBus
 from src.core.contracts import AccountInfo, Position, SymbolInfo
+from src.data.market_feed import (
+    detect_broker_utc_offset_sec,
+    fetch_live_quote,
+    fetch_ohlc_candles,
+    load_broker_symbol_map,
+    load_freshness_limits,
+    resolve_broker_symbol,
+)
 from src.execution.bridge_client import BridgeClient
 
 
@@ -271,6 +279,16 @@ class MT5SyncService:
                     "demo_verified": demo_verified,
                     "netting_observe_only": netting_obs,
                 }
+                if acc_bal > 0 or acc_eq > 0:
+                    try:
+                        self.repo.record_balance_snapshot(
+                            balance=acc_bal,
+                            equity=acc_eq,
+                            floating_pnl=round(acc_eq - acc_bal, 2),
+                            source="MT5",
+                        )
+                    except Exception:
+                        pass
                 if not demo_verified:
                     self.repo.record_error(
                         category="RISK",
@@ -283,9 +301,9 @@ class MT5SyncService:
                         user_action_required=True,
                     )
 
-            # Symbol discovery & live quotes
+            # Symbol discovery & live quotes (all 3 mapped broker .m symbols with freshness guards)
             if mt5 is not None:
-                self._discover_symbols(mt5, target_symbols or ["XAUUSD", "BTCUSD"])
+                self._discover_symbols(mt5, target_symbols or ["XAUUSD", "USDJPY", "BTCUSD"])
 
             # Reconcile positions and classify ownership
             self._reconcile_positions(raw_positions)
@@ -297,32 +315,135 @@ class MT5SyncService:
 
     def _discover_symbols(self, mt5: Any, target_roots: List[str]) -> None:
         try:
-            all_syms = mt5.symbols_get() or []
-            for sym_obj in all_syms:
-                name = str(getattr(sym_obj, "name", ""))
-                upper = name.upper()
-                if any(upper.startswith(r.upper().split(".")[0]) for r in target_roots):
-                    tick = mt5.symbol_info_tick(name)
-                    bid = float(getattr(tick, "bid", 0.0)) if tick else 0.0
-                    ask = float(getattr(tick, "ask", 0.0)) if tick else 0.0
-                    self.symbols[name] = {
-                        "symbol": name,
-                        "digits": int(getattr(sym_obj, "digits", 2)),
-                        "point": float(getattr(sym_obj, "point", 0.01)),
-                        "tick_size": float(getattr(sym_obj, "trade_tick_size", 0.01)),
-                        "tick_value": float(getattr(sym_obj, "trade_tick_value", 1.0)),
-                        "contract_size": float(getattr(sym_obj, "trade_contract_size", 1.0)),
-                        "min_lot": float(getattr(sym_obj, "volume_min", 0.01)),
-                        "max_lot": float(getattr(sym_obj, "volume_max", 50.0)),
-                        "lot_step": float(getattr(sym_obj, "volume_step", 0.01)),
-                        "stops_level": int(getattr(sym_obj, "trade_stops_level", 0)),
-                        "spread": int(getattr(sym_obj, "spread", 0)),
-                        "bid": bid,
-                        "ask": ask,
-                        "trade_mode": int(getattr(sym_obj, "trade_mode", 0)),
-                    }
+            symbol_map = load_broker_symbol_map()
+            limits = load_freshness_limits()
+            max_age = limits["max_tick_age_seconds"]
+            now_utc = datetime.now(timezone.utc)
+            broker_offset = detect_broker_utc_offset_sec(mt5, now_utc=now_utc)
+
+            for canonical, broker_sym in symbol_map.items():
+                if target_roots and canonical not in [r.upper().split(".")[0] for r in target_roots]:
+                    continue
+                select_fn = getattr(mt5, "symbol_select", None)
+                if callable(select_fn):
+                    try:
+                        select_fn(broker_sym, True)
+                    except Exception:
+                        pass
+                quote = fetch_live_quote(
+                    mt5=mt5,
+                    broker_symbol=broker_sym,
+                    canonical_symbol=canonical,
+                    max_age_sec=max_age,
+                    broker_utc_offset_sec=broker_offset,
+                    now_utc=now_utc,
+                )
+                if quote is not None:
+                    self.symbols[broker_sym] = quote
+                    continue
+
+                # Fallback for test fixtures that only implement symbols_get()
+                all_syms = mt5.symbols_get() or []
+                for sym_obj in all_syms:
+                    name = str(getattr(sym_obj, "name", ""))
+                    if name.upper() == broker_sym.upper() or name.upper().startswith(canonical):
+                        tick = mt5.symbol_info_tick(name)
+                        bid = float(getattr(tick, "bid", 0.0)) if tick else 0.0
+                        ask = float(getattr(tick, "ask", 0.0)) if tick else 0.0
+                        pt = float(getattr(sym_obj, "point", 0.01))
+                        spr = int(round((ask - bid) / pt)) if pt > 0 and ask >= bid and bid > 0 else int(getattr(sym_obj, "spread", 0))
+                        self.symbols[name] = {
+                            "canonical": canonical,
+                            "symbol": name,
+                            "digits": int(getattr(sym_obj, "digits", 2)),
+                            "point": pt,
+                            "tick_size": float(getattr(sym_obj, "trade_tick_size", pt)),
+                            "tick_value": float(getattr(sym_obj, "trade_tick_value", 1.0)),
+                            "contract_size": float(getattr(sym_obj, "trade_contract_size", 1.0)),
+                            "volume_min": float(getattr(sym_obj, "volume_min", 0.01)),
+                            "volume_max": float(getattr(sym_obj, "volume_max", 50.0)),
+                            "volume_step": float(getattr(sym_obj, "volume_step", 0.01)),
+                            "stops_level": int(getattr(sym_obj, "trade_stops_level", 0)),
+                            "spread_points": spr,
+                            "bid": bid,
+                            "ask": ask,
+                            "trade_mode": int(getattr(sym_obj, "trade_mode", 0)),
+                            "stale": False,
+                            "market_closed": False,
+                            "source": "MT5",
+                        }
         except Exception:
             pass
+
+    def get_candles(
+        self,
+        symbol: str,
+        timeframe: str = "M5",
+        count: int = 120,
+        start_iso: Optional[str] = None,
+        end_iso: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Fetches real OHLCV candles directly from MT5 for the mapped broker symbol."""
+        symbol_map = load_broker_symbol_map()
+        try:
+            broker_sym = resolve_broker_symbol(symbol, symbol_map)
+        except Exception:
+            broker_sym = symbol
+        canonical = symbol.upper().split(".")[0]
+
+        mt5 = self._get_mt5()
+        if mt5 is None:
+            return {
+                "symbol": canonical,
+                "broker_symbol": broker_sym,
+                "timeframe": timeframe.upper(),
+                "candles": [],
+                "quote": self.symbols.get(broker_sym),
+                "source": "MT5",
+                "connected": False,
+                "fetched_at": datetime.now(timezone.utc).isoformat(),
+            }
+
+        try:
+            mt5.initialize()
+        except Exception:
+            pass
+
+        now_utc = datetime.now(timezone.utc)
+        broker_offset = detect_broker_utc_offset_sec(mt5, now_utc=now_utc)
+        start_dt = datetime.fromisoformat(start_iso.replace("Z", "+00:00")) if start_iso else None
+        end_dt = datetime.fromisoformat(end_iso.replace("Z", "+00:00")) if end_iso else None
+
+        candles = fetch_ohlc_candles(
+            mt5=mt5,
+            broker_symbol=broker_sym,
+            timeframe=timeframe,
+            count=count,
+            start_utc=start_dt,
+            end_utc=end_dt,
+            broker_utc_offset_sec=broker_offset,
+        )
+        quote = fetch_live_quote(
+            mt5=mt5,
+            broker_symbol=broker_sym,
+            canonical_symbol=canonical,
+            max_age_sec=load_freshness_limits()["max_tick_age_seconds"],
+            broker_utc_offset_sec=broker_offset,
+            now_utc=now_utc,
+        )
+        if quote:
+            self.symbols[broker_sym] = quote
+
+        return {
+            "symbol": canonical,
+            "broker_symbol": broker_sym,
+            "timeframe": timeframe.upper(),
+            "candles": candles,
+            "quote": quote or self.symbols.get(broker_sym),
+            "source": "MT5",
+            "connected": self.connection_status == "CONNECTED" or len(candles) > 0,
+            "fetched_at": now_utc.isoformat(),
+        }
 
     def _reconcile_positions(self, raw_positions: List[Position]) -> None:
         reconciled: List[Dict[str, Any]] = []

@@ -155,8 +155,65 @@ def _migration_001_initial(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_002_real_data_features(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS balance_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            balance REAL NOT NULL,
+            equity REAL NOT NULL,
+            floating_pnl REAL NOT NULL DEFAULT 0.0,
+            source TEXT NOT NULL DEFAULT 'MT5',
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS trade_screenshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket INTEGER NOT NULL,
+            symbol TEXT NOT NULL,
+            stage TEXT NOT NULL,
+            filename TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS signal_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            signal_id TEXT NOT NULL,
+            symbol TEXT NOT NULL,
+            direction TEXT NOT NULL,
+            score REAL DEFAULT 0.0,
+            entry_price REAL DEFAULT 0.0,
+            stop_loss REAL DEFAULT 0.0,
+            take_profit REAL DEFAULT 0.0,
+            rr REAL DEFAULT 0.0,
+            status TEXT NOT NULL DEFAULT 'WATCHING',
+            rejection_reason TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS alert_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            alert_type TEXT NOT NULL,
+            severity TEXT NOT NULL DEFAULT 'INFO',
+            symbol TEXT DEFAULT '',
+            message TEXT NOT NULL,
+            telegram_status TEXT NOT NULL DEFAULT 'SKIPPED',
+            dedup_key TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS alert_settings (
+            key TEXT PRIMARY KEY,
+            value_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """
+    )
+
+
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "001_initial_companion_schema", _migration_001_initial),
+    (2, "002_real_data_features", _migration_002_real_data_features),
 ]
 
 
