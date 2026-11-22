@@ -610,9 +610,9 @@ export const DashboardScreen: React.FC<
           </div>
         </div>
 
-        {/* 5. Open Exp (Simplified — no manual adoption counters) */}
+        {/* 5. Open Exp (Simplified — spans 2 cols at sm so there is never an empty hole) */}
         <div
-          className="iea-glass-card p-4 flex flex-col justify-between min-h-[112px]"
+          className="iea-glass-card p-4 flex flex-col justify-between min-h-[112px] sm:col-span-2 lg:col-span-1"
           title={UI_COPY.kpis.openExp.tooltip}
         >
           <div className="flex items-center justify-between text-xs text-[#B6C5E0]">
