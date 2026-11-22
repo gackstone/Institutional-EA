@@ -1944,7 +1944,7 @@ function createWindow() {
     minHeight: 720,
     frame: false,
     backgroundColor: "#0b0e14",
-    title: "Institutional EA Companion",
+    title: "Institutional EA",
     icon: path.join(__dirname, "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),

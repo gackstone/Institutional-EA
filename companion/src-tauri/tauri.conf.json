@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
   "productName": "Institutional EA Companion",
-  "version": "1.0.0",
-  "identifier": "com.institutionalea.app",
+  "version": "1.3.0",
+  "identifier": "com.institutionalea.companion",
   "build": {
     "beforeDevCommand": "npm run build",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Institutional EA Companion",
+        "title": "Institutional EA",
         "width": 1280,
         "height": 860,
         "minWidth": 1024,

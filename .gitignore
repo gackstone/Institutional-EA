@@ -70,6 +70,5 @@ companion/packaging/*.spec
 companion/resources/bin/
 companion/src-tauri/target/
 companion/src-tauri/binaries/
-
-
+*.exe
 release/Institutional-EA-Companion-Setup.exe
