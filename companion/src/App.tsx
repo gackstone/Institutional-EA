@@ -676,8 +676,8 @@ export const App: React.FC = () => {
         {/* Top Brand Block + Navigation */}
         <div className="flex flex-col min-h-0 flex-1">
           {/* Brand Logo Tile (White Rounded-Square Mark per IMAGE 2) */}
-          <div className="h-[72px] px-4 flex items-center justify-between shrink-0">
-            <div className="flex items-center space-x-3 min-w-0">
+          <div className="h-[72px] px-4 flex items-center justify-between gap-2 shrink-0">
+            <div className="flex items-center space-x-3 min-w-0 flex-1">
               <div
                 className="w-11 h-11 rounded-[13px] bg-[#F8F8FA] shadow-xs flex items-center justify-center shrink-0"
                 aria-hidden="true"
@@ -689,16 +689,16 @@ export const App: React.FC = () => {
               </div>
 
               <div
-                className={`min-w-0 whitespace-nowrap transition-all duration-200 ease-out ${
+                className={`min-w-0 flex-1 whitespace-nowrap transition-all duration-200 ease-out ${
                   isSidebarExpanded
                     ? "opacity-100 translate-x-0"
                     : "opacity-0 -translate-x-2 pointer-events-none w-0 overflow-hidden"
                 }`}
               >
-                <div className="text-[13px] font-semibold tracking-tight text-white leading-tight">
+                <div className="text-[12px] font-semibold tracking-tight text-white leading-tight truncate">
                   {UI_COPY.brand.title}
                 </div>
-                <div className="text-[11px] font-mono text-[#9CA1A6] mt-0.5">
+                <div className="text-[10px] font-mono text-[#9CA1A6] mt-0.5 truncate">
                   {UI_COPY.brand.subtitle}
                 </div>
               </div>
@@ -852,11 +852,11 @@ export const App: React.FC = () => {
                   {/* Smooth Collapsible Tree Children */}
                   <div
                     className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
-                      isOpen ? "grid-rows-[1fr] opacity-100 mt-1" : "grid-rows-[0fr] opacity-0"
+                      isOpen ? "grid-rows-[1fr] opacity-100 mt-1" : "grid-rows-[0fr] opacity-0 pointer-events-none"
                     }`}
                   >
-                    <div className="overflow-hidden">
-                      <div className="iea-tree-children space-y-0.5 py-0.5">
+                    <div className="overflow-hidden min-h-0">
+                      <div className={`iea-tree-children space-y-0.5 ${isOpen ? "py-0.5" : "py-0"}`}>
                         {grp.items.map((item) => {
                           const active = activeScreen === item.id;
                           return (
