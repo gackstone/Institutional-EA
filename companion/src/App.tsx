@@ -47,12 +47,9 @@ import {
   SettingsScreen,
   SystemHealthScreen,
 } from "./components/screens/MonitoringSettingsScreens";
-import { MT5SetupWizard } from "./components/MT5SetupWizard";
 import { PairingModal } from "./components/PairingModal";
 import { TelegramPairingModal } from "./components/TelegramPairingModal";
-import { OnboardingWizard } from "./components/OnboardingWizard";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
-import { SettingsModal } from "./components/SettingsModal";
 
 import {
   AuditLogRecord,
@@ -170,12 +167,9 @@ export const App: React.FC = () => {
     enabled: true,
   });
 
-  const [isMT5WizardOpen, setIsMT5WizardOpen] = useState<boolean>(false);
   const [isPairingOpen, setIsPairingOpen] = useState<boolean>(false);
   const [isTelegramOpen, setIsTelegramOpen] = useState<boolean>(false);
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState<boolean>(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   const handleActionMessage = useCallback((message: string, isError = false) => {
     setActionToast({ message, isError, ts: Date.now() });
@@ -836,16 +830,6 @@ export const App: React.FC = () => {
       </div>
 
       {/* Existing Modal Dialogs */}
-      <OnboardingWizard
-        isOpen={isOnboardingOpen}
-        onFinish={() => setIsOnboardingOpen(false)}
-      />
-
-      <MT5SetupWizard
-        isOpen={isMT5WizardOpen}
-        onClose={() => setIsMT5WizardOpen(false)}
-      />
-
       <PairingModal
         isOpen={isPairingOpen}
         onClose={() => setIsPairingOpen(false)}
@@ -865,11 +849,6 @@ export const App: React.FC = () => {
       <DiagnosticsModal
         isOpen={isDiagnosticsOpen}
         onClose={() => setIsDiagnosticsOpen(false)}
-      />
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
       />
     </div>
   );
