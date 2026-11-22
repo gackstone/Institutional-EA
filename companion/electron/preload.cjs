@@ -89,6 +89,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("pairing-status-changed", handler);
   },
 
+  // Startup Watchdog & Crash Recovery
+  notifyAppReady: () => ipcRenderer.invoke("notify-app-ready"),
+  reportRendererError: (payload) => ipcRenderer.invoke("report-renderer-error", payload),
+  fallbackReload: () => ipcRenderer.invoke("fallback-reload"),
+  fallbackResetSettings: () => ipcRenderer.invoke("fallback-reset-settings"),
+  fallbackOpenLogs: () => ipcRenderer.invoke("fallback-open-logs"),
+
   // Window control
   minimizeWindow: () => ipcRenderer.invoke("minimize-window"),
   maximizeWindow: () => ipcRenderer.invoke("maximize-window"),

@@ -102,6 +102,74 @@ const ENGINE_PID_META_FILE = path.join(APP_STATE_DIR, "mt5_trading_engine.pid.js
 const ENGINE_HEARTBEAT_FILE = path.join(APP_STATE_DIR, "engine_heartbeat.json");
 const ENGINE_STOP_FLAG_FILE = path.join(APP_STATE_DIR, "engine_stop.flag");
 const LIFECYCLE_LOG_FILE = path.join(APP_LOGS_DIR, "engine_lifecycle.log");
+const STARTUP_DIAG_LOG_FILE = path.join(APP_LOGS_DIR, "startup_diagnostics.log");
+let appShellReady = false;
+let startupWatchdogTimer = null;
+let reloadTimestamps = [];
+const STARTUP_WATCHDOG_MS = 8000;
+const RELOAD_LOOP_WINDOW_MS = 30000;
+const RELOAD_LOOP_MAX = 3;
+
+function redactDiagText(raw) {
+  return String(raw || "").replace(/[A-Za-z0-9_\-]{28,}/g, "[REDACTED]");
+}
+
+function logStartupEvent(event, details = "") {
+  const payload = typeof details === "string" ? redactDiagText(details) : redactDiagText(JSON.stringify(details));
+  const line = `${new Date().toISOString()} [${event}] ${payload}\n`;
+  try {
+    fs.appendFileSync(STARTUP_DIAG_LOG_FILE, line, "utf8");
+  } catch (e) {}
+  if (process.env.ELECTRON_ENABLE_LOGGING === "1") {
+    try { process.stderr.write(`[STARTUP] ${line}`); } catch (e) {}
+  }
+}
+
+function showFallbackScreen(reason) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const fallbackPath = path.join(__dirname, "fallback.html");
+  logStartupEvent("show-fallback-screen", { reason });
+  if (startupWatchdogTimer) {
+    clearTimeout(startupWatchdogTimer);
+    startupWatchdogTimer = null;
+  }
+  if (fs.existsSync(fallbackPath)) {
+    mainWindow.loadFile(fallbackPath, { query: { reason: String(reason || "Startup error") } }).catch(() => {});
+  }
+}
+
+function recordLoadAttemptAndCheckLoop(trigger) {
+  const now = Date.now();
+  reloadTimestamps = reloadTimestamps.filter((t) => now - t <= RELOAD_LOOP_WINDOW_MS);
+  reloadTimestamps.push(now);
+  if (reloadTimestamps.length > RELOAD_LOOP_MAX) {
+    logStartupEvent("reload-loop-guard-triggered", { trigger, count: reloadTimestamps.length });
+    showFallbackScreen(`Reload loop stopped (${reloadTimestamps.length} loads in 30s)`);
+    return true;
+  }
+  return false;
+}
+
+function armStartupWatchdog() {
+  appShellReady = false;
+  if (startupWatchdogTimer) clearTimeout(startupWatchdogTimer);
+  startupWatchdogTimer = setTimeout(() => {
+    if (!appShellReady && mainWindow && !mainWindow.isDestroyed()) {
+      const url = mainWindow.webContents.getURL() || "";
+      if (!url.includes("fallback.html")) {
+        logStartupEvent("startup-watchdog-timeout", { timeoutMs: STARTUP_WATCHDOG_MS, url });
+        showFallbackScreen("Interface did not finish loading within 8 seconds.");
+      }
+    }
+  }, STARTUP_WATCHDOG_MS);
+}
+
+process.on("uncaughtException", (err) => {
+  logStartupEvent("main-uncaught-exception", { message: err?.message, stack: err?.stack });
+});
+process.on("unhandledRejection", (reason) => {
+  logStartupEvent("main-unhandled-rejection", { reason: reason instanceof Error ? reason.message : String(reason) });
+});
 
 // Logs Buffer
 const MAX_LOGS = 1000;
@@ -2010,6 +2078,89 @@ function createWindow() {
     }
   });
 
+  // Structured startup & lifecycle diagnostics on BrowserWindow webContents
+  const wc = mainWindow.webContents;
+  logStartupEvent("window-created", { isPackaged, argv: process.argv.slice(1) });
+  wc.on("did-start-navigation", (_e, url, isInPlace, isMainFrame) => {
+    logStartupEvent("did-start-navigation", { url, isInPlace, isMainFrame });
+    if (isMainFrame && !isInPlace && !String(url || "").includes("fallback.html")) {
+      if (recordLoadAttemptAndCheckLoop("did-start-navigation")) {
+        return;
+      }
+      armStartupWatchdog();
+    }
+  });
+  wc.on("did-navigate", (_e, url, httpResponseCode) => {
+    logStartupEvent("did-navigate", { url, httpResponseCode });
+  });
+  wc.on("did-navigate-in-page", (_e, url, isMainFrame) => {
+    logStartupEvent("did-navigate-in-page", { url, isMainFrame });
+  });
+  wc.on("dom-ready", () => {
+    logStartupEvent("dom-ready", { url: wc.getURL() });
+  });
+  wc.on("did-finish-load", () => {
+    logStartupEvent("did-finish-load", { url: wc.getURL() });
+    if (process.env.IEA_DIAG_DUMP === "1") {
+      setTimeout(async () => {
+        try {
+          const info = await wc.executeJavaScript(`(() => {
+            const root = document.getElementById('root');
+            return {
+              title: document.title,
+              url: location.href,
+              rootLen: root ? root.innerHTML.length : -1,
+              rootText: root ? (root.innerText || '').slice(0, 400) : '',
+              rootSnippet: root ? root.innerHTML.slice(0, 400) : '',
+              winW: window.innerWidth,
+              winH: window.innerHeight,
+              hasElectronAPI: Boolean(window.electronAPI)
+            };
+          })()`);
+          logStartupEvent("diag-dom-snapshot", info);
+          const img = await wc.capturePage();
+          const outPng = path.join(APP_LOGS_DIR, "diag_capture.png");
+          fs.writeFileSync(outPng, img.toPNG());
+          logStartupEvent("diag-screenshot", { path: outPng, size: img.getSize() });
+        } catch (err) {
+          logStartupEvent("diag-dump-error", { message: err?.message });
+        }
+      }, 4000);
+    }
+  });
+  wc.on("did-fail-load", (_e, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    logStartupEvent("did-fail-load", { errorCode, errorDescription, validatedURL, isMainFrame });
+    if (isMainFrame && errorCode !== -3 && !String(validatedURL || "").includes("fallback.html")) {
+      showFallbackScreen(`Failed to load UI (${errorDescription || errorCode})`);
+    }
+  });
+  wc.on("did-fail-provisional-load", (_e, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    logStartupEvent("did-fail-provisional-load", { errorCode, errorDescription, validatedURL, isMainFrame });
+  });
+  wc.on("preload-error", (_e, preloadPath, error) => {
+    logStartupEvent("preload-error", { preloadPath, message: error?.message, stack: error?.stack });
+  });
+  wc.on("render-process-gone", (_e, details) => {
+    logStartupEvent("render-process-gone", details);
+    showFallbackScreen(`Renderer process exited (${details?.reason || "crashed"})`);
+  });
+  wc.on("unresponsive", () => {
+    logStartupEvent("unresponsive", { url: wc.getURL() });
+    showFallbackScreen("Interface became unresponsive.");
+  });
+  wc.on("console-message", (_e, level, message, line, sourceId) => {
+    const lvl = ["VERBOSE", "INFO", "WARNING", "ERROR"][level] || String(level);
+    logStartupEvent(`console-${lvl}`, { message, line, sourceId });
+  });
+  wc.on("before-input-event", (_e, input) => {
+    if ((input.control || input.meta) && input.shift && input.key.toLowerCase() === "i") {
+      wc.toggleDevTools();
+    }
+  });
+  if (process.env.IEA_DEVTOOLS === "1") {
+    wc.openDevTools({ mode: "detach" });
+  }
+
   // Prevent arbitrary external navigation inside the desktop shell
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   mainWindow.webContents.on("will-navigate", (event, navUrl) => {
@@ -2951,6 +3102,78 @@ ipcMain.handle("reconnect-control-service", async () => {
   controlRestartAttempts = 0;
   stopControlService(false);
   return startControlService();
+});
+
+// Startup Watchdog & Crash Recovery IPC Handlers
+ipcMain.handle("notify-app-ready", () => {
+  appShellReady = true;
+  if (startupWatchdogTimer) {
+    clearTimeout(startupWatchdogTimer);
+    startupWatchdogTimer = null;
+  }
+  logStartupEvent("app-shell-ready", { url: mainWindow?.webContents?.getURL?.() || "" });
+  return { ok: true };
+});
+
+ipcMain.handle("report-renderer-error", (_e, payload) => {
+  logStartupEvent("renderer-error", payload || {});
+  return { ok: true };
+});
+
+ipcMain.handle("fallback-reload", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { ok: false };
+  reloadTimestamps = [];
+  const devUrl = "http://localhost:5173";
+  const prodIndex = path.join(__dirname, "../dist/index.html");
+  armStartupWatchdog();
+  if (process.env.VITE_DEV_SERVER_URL || process.argv.includes("--dev")) {
+    mainWindow.loadURL(devUrl);
+  } else if (fs.existsSync(prodIndex)) {
+    mainWindow.loadFile(prodIndex);
+  } else {
+    mainWindow.loadURL(devUrl);
+  }
+  return { ok: true };
+});
+
+ipcMain.handle("fallback-reset-settings", async () => {
+  try {
+    // Safety Rule 6: Always copy stored data to a timestamped backup folder before resetting
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const backupDir = path.join(APP_BACKUPS_DIR, `ui_reset_${stamp}`);
+    fs.mkdirSync(backupDir, { recursive: true });
+    if (fs.existsSync(APP_CONFIG_DIR)) {
+      fs.cpSync(APP_CONFIG_DIR, path.join(backupDir, "config"), { recursive: true });
+    }
+    const userDataDir = app.getPath("userData");
+    const lsDir = path.join(userDataDir, "Local Storage");
+    if (fs.existsSync(lsDir)) {
+      fs.cpSync(lsDir, path.join(backupDir, "Local Storage"), { recursive: true });
+    }
+    logStartupEvent("settings-backup-created", { backupDir });
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      await mainWindow.webContents.session.clearStorageData({ storages: ["localstorage", "indexdb"] });
+      reloadTimestamps = [];
+      const prodIndex = path.join(__dirname, "../dist/index.html");
+      armStartupWatchdog();
+      if (fs.existsSync(prodIndex)) {
+        mainWindow.loadFile(prodIndex);
+      }
+    }
+    return { ok: true, backupDir };
+  } catch (err) {
+    logStartupEvent("settings-reset-error", { message: err?.message });
+    return { ok: false, error: err?.message };
+  }
+});
+
+ipcMain.handle("fallback-open-logs", () => {
+  try {
+    shell.openPath(APP_LOGS_DIR);
+    return { ok: true, path: APP_LOGS_DIR };
+  } catch (err) {
+    return { ok: false, error: err?.message };
+  }
 });
 
 // Window controls

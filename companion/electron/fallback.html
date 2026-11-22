@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Institutional EA — Recovery</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body {
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle at 20% 20%, #13284f 0%, #091426 60%, #071020 100%);
+        color: #F4F7FF;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+      }
+      .drag-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 36px;
+        -webkit-app-region: drag;
+        background: rgba(10, 21, 43, 0.92);
+        border-bottom: 1px solid rgba(186, 214, 255, 0.14);
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+      .card {
+        width: 100%;
+        max-width: 460px;
+        background: linear-gradient(165deg, rgba(32, 54, 101, 0.52), rgba(11, 22, 44, 0.9));
+        border: 1px solid rgba(255, 90, 110, 0.45);
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 24px 54px rgba(0, 0, 0, 0.6);
+      }
+      h1 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+      .sub { font-size: 12px; color: #B6C5E0; margin-bottom: 14px; line-height: 1.5; }
+      .reason {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 11px;
+        color: #FFD9DF;
+        background: rgba(7, 16, 32, 0.85);
+        border: 1px solid rgba(255, 90, 110, 0.3);
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-bottom: 18px;
+        word-break: break-word;
+      }
+      .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+      button {
+        border-radius: 9999px;
+        padding: 8px 16px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: opacity 0.15s ease;
+      }
+      button:hover { opacity: 0.9; }
+      .btn-primary { background: #B0F648; color: #081321; }
+      .btn-secondary { background: rgba(25, 46, 88, 0.85); color: #F4F7FF; border-color: rgba(186, 214, 255, 0.22); }
+      .btn-ghost { background: transparent; color: #B6C5E0; border-color: rgba(186, 214, 255, 0.2); }
+    </style>
+  </head>
+  <body>
+    <div class="drag-bar">INSTITUTIONAL EA · RECOVERY</div>
+    <main class="card" role="alert" data-testid="watchdog-fallback-screen">
+      <h1>Institutional EA did not finish loading</h1>
+      <p class="sub">
+        The interface was safely intercepted before showing a blank window. Your MT5 terminal and DEMO lock remain unaffected.
+      </p>
+      <div class="reason" id="reason-box">Startup watchdog triggered.</div>
+      <div class="actions">
+        <button id="btn-reload" class="btn-primary" type="button">Reload</button>
+        <button id="btn-reset" class="btn-secondary" type="button">Reset settings</button>
+        <button id="btn-logs" class="btn-ghost" type="button">Open logs</button>
+      </div>
+    </main>
+    <script>
+      (function () {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var r = params.get("reason");
+          if (r) document.getElementById("reason-box").textContent = r;
+        } catch (e) {}
+
+        document.getElementById("btn-reload").addEventListener("click", function () {
+          if (window.electronAPI && window.electronAPI.fallbackReload) {
+            window.electronAPI.fallbackReload();
+          } else {
+            window.location.reload();
+          }
+        });
+        document.getElementById("btn-reset").addEventListener("click", function () {
+          if (window.electronAPI && window.electronAPI.fallbackResetSettings) {
+            window.electronAPI.fallbackResetSettings();
+          }
+        });
+        document.getElementById("btn-logs").addEventListener("click", function () {
+          if (window.electronAPI && window.electronAPI.fallbackOpenLogs) {
+            window.electronAPI.fallbackOpenLogs();
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
