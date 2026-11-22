@@ -1,5 +1,5 @@
 """
-Combined Engine Confirmation Pipeline (AlgoVistra & Art of Trading Master Specification).
+Combined Engine Confirmation Pipeline (Institutional EA & Art of Trading Master Specification).
 Implements the full 28-video confirmation pipeline (P2-4):
 H0  HTF POOL MAP        liquidity_pools_bsl_ssl (PDH/PDL/PWH/PWL, EQH/EQL)   (ART-04, ART-10)
 G1  TREND/STRUCTURE     swing_hierarchy -> trend_by_structure + protected_swing_marker (ART-02, V3, V4)
@@ -56,7 +56,7 @@ from src.engine.skills import (
     candle_anatomy,
 )
 
-logger = logging.getLogger("AlgoVistraPipeline")
+logger = logging.getLogger("InstitutionalEaPipeline")
 
 
 class SetupLifecycleState(str, Enum):
@@ -111,7 +111,7 @@ class PipelineEvaluationResult:
         return json.dumps(d)
 
 
-class AlgoVistraEnginePipeline:
+class InstitutionalEaEnginePipeline:
     """
     Combined Confirmation Pipeline enforcing strict H0 -> G7 evaluation on closed candles.
     """

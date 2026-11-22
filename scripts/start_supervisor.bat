@@ -1,10 +1,10 @@
 @echo off
 setlocal
-title Arcade Fx - MT5 Bot & Bridge Supervisor
+title Institutional EA - MT5 Bot & Bridge Supervisor
 cd /d "%~dp0\.."
 
 echo =========================================================================
-echo   ARCADE FX — AUTONOMOUS MT5 BOT & BRIDGE SUPERVISOR
+echo   INSTITUTIONAL EA — AUTONOMOUS MT5 BOT & BRIDGE SUPERVISOR
 echo =========================================================================
 echo.
 
@@ -25,7 +25,7 @@ if "%1"=="--debug" (
     goto :end
 )
 
-echo Starting Arcade Fx Supervisor in background mode (zero console popups)...
+echo Starting Institutional EA Supervisor in background mode (zero console popups)...
 echo Streaming logs to logs\supervisor.log, logs\bridge.log, logs\bot.log.
 echo To run in interactive debug mode with visible console: scripts\start_supervisor.bat --visible
 echo.

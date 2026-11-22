@@ -1,4 +1,4 @@
-# MT5-001 Adaptive Trading Intelligence (ATI) — Windows PowerShell Deployment & Run Guide
+# Institutional EA Adaptive Trading Intelligence (ATI) — Windows PowerShell Deployment & Run Guide
 
 ## 1. Prerequisites & Environment Check
 

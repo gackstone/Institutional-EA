@@ -1,7 +1,7 @@
 """
-AlgoVistra & Art of Trading Skills Package.
+Institutional EA & Art of Trading Skills Package.
 Exposes the 25 verified skills from the 28-video curriculum:
-Part 1 (AlgoVistra 15 videos):
+Part 1 (Institutional EA 15 videos):
   1. inducement_ob_entry (Video 1)
   2. premium_discount_filter (Video 2, ART-07)
   3. protected_swing_marker (Video 3)

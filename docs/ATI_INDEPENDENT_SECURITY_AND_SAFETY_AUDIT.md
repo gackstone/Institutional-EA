@@ -1,4 +1,4 @@
-# MT5-001 Adaptive Trading Intelligence (ATI) — Independent Security & Safety Audit
+# Institutional EA Adaptive Trading Intelligence (ATI) — Independent Security & Safety Audit
 
 ## 1. Scope & Verification Authority
 - **Repository Root**: `c:\Users\Gackstone_Baraka\Downloads\MT5 001`

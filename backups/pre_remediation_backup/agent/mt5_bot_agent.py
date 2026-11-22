@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ArcadeFx — MT5 Bot Agent
+Institutional EA — MT5 Bot Agent
 Outbound-only secure orchestration agent running next to MetaTrader 5 on Windows.
 
 Hard Rules Enforced:
@@ -67,7 +67,7 @@ except ImportError:
     ORCHESTRATOR_AVAILABLE = False
 
 # Configuration Defaults
-DEFAULT_API_URL = os.environ.get("ARCADEFX_API_URL", "https://www.arcadefx.live/api/v1")
+DEFAULT_API_URL = os.environ.get("INSTITUTIONAL_EA_API_URL", "https://www.arcadefx.live/api/v1")
 AGENT_VERSION = "1.2.0"
 
 # Centralized safe Windows writable directories
@@ -88,8 +88,8 @@ LOCAL_LIMITS_FILE = str(get_base_app_data_dir() / "local_limits.json")
 QUEUE_DB_FILE = str(get_state_dir() / "offline_queue.sqlite")
 AGENT_STATE_FILE = get_state_dir() / "agent_state.json"
 
-# Safe rotating logger setup writing to %LOCALAPPDATA%\ArcadeFX\MT5-OO1 Companion\logs
-logger = setup_service_logger("ArcadeFxAgent", "arcadefx_agent.log")
+# Safe rotating logger setup writing to %LOCALAPPDATA%\InstitutionalEA\Institutional EA Companion\logs
+logger = setup_service_logger("InstitutionalEaAgent", "institutional_ea_agent.log")
 
 
 class LocalCredentialStore:
@@ -126,7 +126,7 @@ class LocalCredentialStore:
 
         # Mirror to legacy path for backward compatibility with older tools
         try:
-            legacy_dir = Path.home() / ".arcadefx_agent"
+            legacy_dir = Path.home() / ".institutional_ea_agent"
             legacy_dir.mkdir(parents=True, exist_ok=True)
             with open(legacy_dir / "credentials.enc.json", "w", encoding="utf-8") as f:
                 json.dump(normalized, f, indent=2)
@@ -172,7 +172,7 @@ class LocalCredentialStore:
 
                 # 2. XOR Obfuscation fallback
                 try:
-                    seed = f"{socket.gethostname()}-{os.getenv('USERNAME', 'default')}-arcadefx-agent-v1"
+                    seed = f"{socket.gethostname()}-{os.getenv('USERNAME', 'default')}-institutional-ea-agent-v1"
                     key = hashlib.sha256(seed.encode("utf-8")).digest()
                     recovered = bytes([b ^ key[i % len(key)] for i, b in enumerate(raw_bytes)])
                     data = json.loads(recovered.decode("utf-8"))
@@ -278,7 +278,7 @@ class OfflineEventQueue:
 
 
 class MT5BotAgent:
-    """ArcadeFx MT5 Bot Agent orchestrator."""
+    """Institutional EA MT5 Bot Agent orchestrator."""
 
     def __init__(self, api_url: str = DEFAULT_API_URL):
         self.api_url = api_url.rstrip("/")
@@ -345,11 +345,11 @@ class MT5BotAgent:
         """Makes an outbound HTTPS/HTTP request with redirect following and no inbound server listening."""
         url = path if path.startswith("http") else f"{self.api_url}{path}"
         # Ensure canonical domain to avoid HTTP 308 apex redirect
-        if url.startswith("https://arcadefx.live"):
-            url = "https://www.arcadefx.live" + url[len("https://arcadefx.live"):]
+        if url.startswith("https://Institutional EA Cloud"):
+            url = "https://www.Institutional EA Cloud" + url[len("https://Institutional EA Cloud"):]
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": f"ArcadeFx-MT5BotAgent/{AGENT_VERSION}"
+            "User-Agent": f"InstitutionalEA-MT5BotAgent/{AGENT_VERSION}"
         }
         if use_auth and self.device_token:
             headers["x-bot-token"] = self.device_token
@@ -377,7 +377,7 @@ class MT5BotAgent:
             except json.JSONDecodeError:
                 raise RuntimeError(f"HTTP {e.code}: {e.reason}")
         except error.URLError as e:
-            raise RuntimeError(f"NETWORK ERROR: Unable to reach ArcadeFX.live. {e.reason}")
+            raise RuntimeError(f"NETWORK ERROR: Unable to reach Institutional EA Cloud. {e.reason}")
         except Exception as e:
             raise RuntimeError(f"Network error contacting {url}: {e}")
 
@@ -393,7 +393,7 @@ class MT5BotAgent:
 
     def pair_with_code(self, pairing_code: str, instance_name: Optional[str] = None) -> Tuple[bool, str]:
         """
-        Submits pairing code to ArcadeFX.live backend (/bot/pairing/claim).
+        Submits pairing code to Institutional EA Cloud backend (/bot/pairing/claim).
         Returns (success: bool, message: str).
         """
         valid, normalized_or_err = self.validate_pairing_code_format(pairing_code)
@@ -422,9 +422,9 @@ class MT5BotAgent:
                 if "already" in err_lower or "claimed" in err_lower or "used" in err_lower:
                     return False, "ALREADY USED: This pairing code has already been used. Generate another code."
                 elif "expired" in err_lower:
-                    return False, "EXPIRED CODE: This pairing code has expired. Generate a new code from ArcadeFX.live."
+                    return False, "EXPIRED CODE: This pairing code has expired. Generate a new code from Institutional EA Cloud."
                 elif "invalid" in err_lower or "not found" in err_lower:
-                    return False, "INVALID CODE: The pairing code is invalid. Check ArcadeFX.live and try again."
+                    return False, "INVALID CODE: The pairing code is invalid. Check Institutional EA Cloud and try again."
                 else:
                     return False, f"PAIRING FAILED: {err_raw}"
 
@@ -448,16 +448,16 @@ class MT5BotAgent:
             if "already" in err_lower or "claimed" in err_lower or "used" in err_lower:
                 return False, "ALREADY USED: This pairing code has already been used. Generate another code."
             elif "expired" in err_lower:
-                return False, "EXPIRED CODE: This pairing code has expired. Generate a new code from ArcadeFX.live."
+                return False, "EXPIRED CODE: This pairing code has expired. Generate a new code from Institutional EA Cloud."
             elif "not found" in err_lower or "invalid" in err_lower:
-                return False, "INVALID CODE: The pairing code is invalid. Check ArcadeFX.live and try again."
+                return False, "INVALID CODE: The pairing code is invalid. Check Institutional EA Cloud and try again."
             elif "network error" in err_lower or "connection refused" in err_lower or "timed out" in err_lower:
-                return False, "NETWORK ERROR: Unable to reach ArcadeFX.live. Check your internet connection."
+                return False, "NETWORK ERROR: Unable to reach Institutional EA Cloud. Check your internet connection."
             elif "http 5" in err_lower:
-                return False, "SERVER ERROR: ArcadeFX.live is temporarily unavailable. Retrying connection..."
+                return False, "SERVER ERROR: Institutional EA Cloud is temporarily unavailable. Retrying connection..."
             return False, f"ERROR: {err_msg}"
         except Exception as e:
-            return False, f"NETWORK ERROR: Unable to reach ArcadeFX.live ({e})"
+            return False, f"NETWORK ERROR: Unable to reach Institutional EA Cloud ({e})"
 
     def check_local_connectivity(self) -> Dict[str, str]:
         """Verifies local MT5 terminal, PythonBridgeEA socket, and trading engine readiness."""
@@ -602,7 +602,7 @@ class MT5BotAgent:
             self.bot_state = "RUNNING"
             if self.orchestrator and hasattr(self.orchestrator, "alerts") and self.orchestrator.alerts:
                 try:
-                    self.orchestrator.alerts.alert_bot_status("Trading Bot STARTED via ArcadeFX Cloud.")
+                    self.orchestrator.alerts.alert_bot_status("Trading Bot STARTED via Institutional EA Cloud.")
                 except Exception:
                     pass
             return {"status": "RUNNING", "message": "Bot engine started successfully."}
@@ -611,7 +611,7 @@ class MT5BotAgent:
             self.bot_state = "PAUSED"
             if self.orchestrator and hasattr(self.orchestrator, "alerts") and self.orchestrator.alerts:
                 try:
-                    self.orchestrator.alerts.alert_bot_status("Trading Bot PAUSED via ArcadeFX Cloud. Existing positions monitored.")
+                    self.orchestrator.alerts.alert_bot_status("Trading Bot PAUSED via Institutional EA Cloud. Existing positions monitored.")
                 except Exception:
                     pass
             return {"status": "PAUSED", "message": "Bot trading paused. Existing positions monitored."}
@@ -620,7 +620,7 @@ class MT5BotAgent:
             self.bot_state = "RUNNING"
             if self.orchestrator and hasattr(self.orchestrator, "alerts") and self.orchestrator.alerts:
                 try:
-                    self.orchestrator.alerts.alert_bot_status("Trading Bot RESUMED via ArcadeFX Cloud.")
+                    self.orchestrator.alerts.alert_bot_status("Trading Bot RESUMED via Institutional EA Cloud.")
                 except Exception:
                     pass
             return {"status": "RUNNING", "message": "Bot trading resumed."}
@@ -629,7 +629,7 @@ class MT5BotAgent:
             self.bot_state = "STOPPED"
             if self.orchestrator and hasattr(self.orchestrator, "alerts") and self.orchestrator.alerts:
                 try:
-                    self.orchestrator.alerts.alert_bot_status("Trading Bot STOPPED via ArcadeFX Cloud.")
+                    self.orchestrator.alerts.alert_bot_status("Trading Bot STOPPED via Institutional EA Cloud.")
                 except Exception:
                     pass
             return {"status": "STOPPED", "message": "Bot engine stopped."}
@@ -672,7 +672,7 @@ class MT5BotAgent:
                                 "price": price,
                                 "deviation": 20,
                                 "magic": p.magic,
-                                "comment": "ArcadeFx Cloud Close All",
+                                "comment": "Institutional EA Cloud Close All",
                                 "type_time": mt5.ORDER_TIME_GTC,
                                 "type_filling": mt5.ORDER_FILLING_IOC,
                             }
@@ -711,7 +711,7 @@ class MT5BotAgent:
             raise ValueError(f"Unsupported command type: {cmd_type}")
 
     def poll_and_execute_commands(self) -> None:
-        """Polls ArcadeFX cloud for pending signed commands and acknowledges execution results."""
+        """Polls Institutional EA cloud for pending signed commands and acknowledges execution results."""
         if not self.device_token:
             return
         try:
@@ -926,10 +926,10 @@ class MT5BotAgent:
         self.signing_secret = None
         LocalCredentialStore.clear()
         self.offline_queue.clear()
-        self.update_agent_state("AUTHENTICATION_FAILED", error="Invalid or revoked bot agent token. Please generate a new pairing code from ArcadeFX.live dashboard.")
+        self.update_agent_state("AUTHENTICATION_FAILED", error="Invalid or revoked bot agent token. Please generate a new pairing code from Institutional EA Cloud dashboard.")
 
     def send_heartbeat(self) -> None:
-        """Sends comprehensive 20s telemetry heartbeat to ArcadeFX.live."""
+        """Sends comprehensive 20s telemetry heartbeat to Institutional EA Cloud."""
         if not self.device_token:
             return
         telemetry = self.collect_real_telemetry()
@@ -954,7 +954,7 @@ class MT5BotAgent:
             )
 
     def drain_offline_queue(self) -> None:
-        """Drains local SQLite offline events queue to ArcadeFX cloud."""
+        """Drains local SQLite offline events queue to Institutional EA cloud."""
         pending = self.offline_queue.get_pending(limit=25)
         if not pending:
             return
@@ -1031,7 +1031,7 @@ class MT5BotAgent:
     def wait_for_pairing_loop(self, instance_name: Optional[str] = None):
         """Persistent non-blocking daemon loop waiting for pairing code via credentials file or trigger."""
         self.update_agent_state("WAITING_FOR_PAIRING")
-        logger.info("ArcadeFX Cloud Agent waiting for device pairing... (State: WAITING_FOR_PAIRING)")
+        logger.info("Institutional EA Cloud Agent waiting for device pairing... (State: WAITING_FOR_PAIRING)")
 
         trigger_file = get_state_dir() / "pairing_request.json"
         result_file = get_state_dir() / "pairing_result.json"
@@ -1139,7 +1139,7 @@ class MT5BotAgent:
 
     def shutdown(self):
         """Gracefully shuts down agent and trading engine."""
-        logger.info("Gracefully stopping ArcadeFX MT5 Bot Agent...")
+        logger.info("Gracefully stopping Institutional EA MT5 Bot Agent...")
         self.is_running = False
         self._stop_event.set()
         self.update_agent_state("STOPPED")
@@ -1148,20 +1148,20 @@ class MT5BotAgent:
                 self.bridge.disconnect()
             except Exception:
                 pass
-        logger.info("ArcadeFX MT5 Bot Agent stopped cleanly.")
+        logger.info("Institutional EA MT5 Bot Agent stopped cleanly.")
 
 
 def display_pairing_prompt():
     """Renders the required professional terminal onboarding interface."""
     print("====================================================")
-    print("ARCADEFx MT5 BOT AGENT")
+    print("INSTITUTIONAL EA MT5 BOT AGENT")
     print("CLOUD PAIRING\n")
-    print("Welcome to ArcadeFX MT5 Bot Agent.\n")
+    print("Welcome to Institutional EA MT5 Bot Agent.\n")
     print("Connect your local MT5 trading machine to your")
-    print("ArcadeFX.live cloud dashboard.\n")
+    print("Institutional EA Cloud dashboard.\n")
     print("CONNECTION STATUS: NOT PAIRED\n")
     print("STEP 1:")
-    print("Open https://arcadefx.live\n")
+    print("Open https://Institutional EA Cloud\n")
     print("STEP 2:")
     print("Navigate to MT5 Bot > Pair MT5 Machine.\n")
     print("STEP 3:")
@@ -1174,9 +1174,9 @@ def display_pairing_prompt():
 def display_pairing_success(instance_id: str, local_checks: Dict[str, str]):
     """Renders the required connection success confirmation box."""
     print("\n====================================================")
-    print("ARCADEFx MT5 BOT AGENT\n")
+    print("INSTITUTIONAL EA MT5 BOT AGENT\n")
     print("[ SUCCESS ] MACHINE PAIRED SUCCESSFULLY\n")
-    print("Cloud Platform: ArcadeFX.live")
+    print("Cloud Platform: Institutional EA Cloud")
     print("Machine Status: CONNECTED")
     print("Authentication: VERIFIED")
     print(f"MT5 Terminal: {local_checks.get('mt5', 'CHECKING')}")
@@ -1184,7 +1184,7 @@ def display_pairing_success(instance_id: str, local_checks: Dict[str, str]):
     print(f"Execution Bridge: {local_checks.get('bridge', 'CHECKING')}\n")
     print(f"Machine ID: {instance_id}\n")
     print("Your MT5 trading machine is now connected")
-    print("to ArcadeFX.live.\n")
+    print("to Institutional EA Cloud.\n")
     print("The agent is initializing the existing trading")
     print("infrastructure...\n")
     print("====================================================\n")
@@ -1196,7 +1196,7 @@ def interactive_pairing_flow(agent: MT5BotAgent, instance_name: Optional[str] = 
 
     while True:
         try:
-            user_input = input("\nENTER ARCADEFx PAIRING CODE: ")
+            user_input = input("\nENTER INSTITUTIONAL_EA PAIRING CODE: ")
         except (KeyboardInterrupt, EOFError):
             print("\n[CANCELLED] Pairing aborted by user.")
             return False
@@ -1210,13 +1210,13 @@ def interactive_pairing_flow(agent: MT5BotAgent, instance_name: Optional[str] = 
         if not valid:
             print(f"\n[ERROR] {result}")
             print("Enter the 6-character pairing code displayed on")
-            print("your ArcadeFX.live dashboard (or 'q' to exit).")
+            print("your Institutional EA Cloud dashboard (or 'q' to exit).")
             continue
 
         clean_code = result
         print(f"\nEnter the 6-character pairing code displayed on")
-        print(f"your ArcadeFX.live dashboard.")
-        print(f"\n[CONNECT] Authenticating with ArcadeFX.live...")
+        print(f"your Institutional EA Cloud dashboard.")
+        print(f"\n[CONNECT] Authenticating with Institutional EA Cloud...")
 
         success, msg = agent.pair_with_code(clean_code, instance_name)
         if success:
@@ -1225,14 +1225,14 @@ def interactive_pairing_flow(agent: MT5BotAgent, instance_name: Optional[str] = 
             return True
         else:
             print(f"\n[FAILED] {msg}")
-            print("Please generate a fresh code on https://arcadefx.live and try again.")
+            print("Please generate a fresh code on https://Institutional EA Cloud and try again.")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="ArcadeFx MT5 Bot Agent")
-    parser.add_argument("--pair", type=str, help="One-time pairing code from ArcadeFX dashboard")
+    parser = argparse.ArgumentParser(description="Institutional EA MT5 Bot Agent")
+    parser.add_argument("--pair", type=str, help="One-time pairing code from Institutional EA dashboard")
     parser.add_argument("--name", type=str, help="Instance name")
-    parser.add_argument("--api-url", type=str, default=DEFAULT_API_URL, help="ArcadeFx API URL")
+    parser.add_argument("--api-url", type=str, default=DEFAULT_API_URL, help="Institutional EA API URL")
     parser.add_argument("--status", action="store_true", help="Print local agent status and limits")
     parser.add_argument("--clear-auth", action="store_true", help="Clear saved credentials")
     parser.add_argument("--daemon", action="store_true", help="Run in non-blocking daemon / background mode")
@@ -1271,7 +1271,7 @@ def main():
             print(f"[ERROR] {clean_code_or_err}")
             sys.exit(1)
 
-        print("[CONNECT] Authenticating with ArcadeFX.live...")
+        print("[CONNECT] Authenticating with Institutional EA Cloud...")
         success, msg = agent.pair_with_code(clean_code_or_err, args.name)
         if success:
             local_checks = agent.check_local_connectivity()
@@ -1287,9 +1287,9 @@ def main():
         if agent.device_token and agent.instance_id:
             local_checks = agent.check_local_connectivity()
             print("====================================================")
-            print("ARCADEFx MT5 BOT AGENT")
+            print("INSTITUTIONAL EA MT5 BOT AGENT")
             print("\n[ RESUMING ] CONNECTING PAIRED MACHINE\n")
-            print(f"Cloud Platform: ArcadeFX.live")
+            print(f"Cloud Platform: Institutional EA Cloud")
             print(f"Machine Status: CONNECTED")
             print(f"Authentication: VERIFIED")
             print(f"MT5 Terminal: {local_checks.get('mt5', 'CHECKING')}")
@@ -1303,7 +1303,7 @@ def main():
 
         # Non-blocking daemon flow for background/companion supervision
         if args.daemon or not sys.stdin.isatty():
-            logger.info("ArcadeFX Cloud Agent running in non-blocking daemon mode. Waiting for pairing code...")
+            logger.info("Institutional EA Cloud Agent running in non-blocking daemon mode. Waiting for pairing code...")
             agent.wait_for_pairing_loop(args.name)
             return
 

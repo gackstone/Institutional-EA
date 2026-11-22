@@ -1,5 +1,5 @@
 """
-AlgoVistra Quantitative Engine Types and Pure Function Contracts.
+Institutional EA Quantitative Engine Types and Pure Function Contracts.
 Defines SkillResult, Context, and unified DataFrame/Candle adapters.
 Every rule and output is tagged [VIDEO n], [DERIVED], or [ASSUMPTION].
 """
@@ -22,7 +22,7 @@ from src.core.contracts import Candle, OrderType, Timeframe
 @dataclass
 class SkillResult:
     """
-    Standard return contract for all AlgoVistra skills:
+    Standard return contract for all Institutional EA skills:
     evaluate(df: DataFrame, ctx: Context) -> SkillResult(status, level_prices, reasons, confidence)
     """
     status: str  # "PASS", "FAIL", "TRIGGERED", "HOLD", "PENDING", "TRAP", "DECAYING", "NO_TRADE"

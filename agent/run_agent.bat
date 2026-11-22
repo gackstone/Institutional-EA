@@ -1,10 +1,10 @@
 @echo off
 setlocal
-title ArcadeFx - MT5 Bot Agent Runner
+title Institutional EA - MT5 Bot Agent Runner
 cd /d "%~dp0\.."
 
 echo ========================================================
-echo   ARCADEFx MT5 BOT AGENT (OUTBOUND-ONLY ENGINE)
+echo   INSTITUTIONAL EA MT5 BOT AGENT (OUTBOUND-ONLY ENGINE)
 echo ========================================================
 echo   Zero-password architecture. Runs next to local MT5.
 echo   Cloud commands are strictly bounded by local_limits.json.

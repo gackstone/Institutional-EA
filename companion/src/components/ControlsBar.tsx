@@ -142,10 +142,10 @@ export const ControlsBar: React.FC<ControlsBarProps> = ({
   const isActive = isRunning || isPaused;
 
   return (
-    <div className="yardly-glass border-b border-arcade-border px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2.5 select-none transition-colors duration-150 z-20">
+    <div className="institutional-ea-glass border-b border-institutional-ea-border px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2.5 select-none transition-colors duration-150 z-20">
       {/* Group A: Trading Controls */}
       <div className="flex items-center gap-2">
-        <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider text-arcade-textMuted mr-1">
+        <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider text-institutional-ea-textMuted mr-1">
           Trading:
         </span>
 
@@ -166,7 +166,7 @@ export const ControlsBar: React.FC<ControlsBarProps> = ({
             type="button"
             onClick={handleStopBot}
             disabled={loadingAction !== null}
-            className="h-8 px-3.5 rounded-lg bg-arcade-primary hover:bg-arcade-primaryHover active:scale-[0.98] text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+            className="h-8 px-3.5 rounded-lg bg-institutional-ea-primary hover:bg-institutional-ea-primaryHover active:scale-[0.98] text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
             title="Safely stop the automated trading engine"
           >
             <Square className="w-3.5 h-3.5 fill-white" />
@@ -210,19 +210,19 @@ export const ControlsBar: React.FC<ControlsBarProps> = ({
           type="button"
           onClick={handleRestart}
           disabled={loadingAction !== null}
-          className="h-8 px-3 rounded-lg bg-arcade-card hover:bg-arcade-secondary text-arcade-text text-xs font-semibold border border-arcade-border transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+          className="h-8 px-3 rounded-lg bg-institutional-ea-card hover:bg-institutional-ea-secondary text-institutional-ea-text text-xs font-semibold border border-institutional-ea-border transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
           title="Restart Python Trading Engine & Bridge Server backend processes"
         >
           <RefreshCw
-            className={`w-3.5 h-3.5 text-arcade-textSecondary ${
-              loadingAction === "restart" ? "animate-spin text-arcade-primary" : ""
+            className={`w-3.5 h-3.5 text-institutional-ea-textSecondary ${
+              loadingAction === "restart" ? "animate-spin text-institutional-ea-primary" : ""
             }`}
           />
           <span>Restart Services</span>
         </button>
       </div>
 
-      <div className="hidden md:block w-[1px] h-5 bg-arcade-border" />
+      <div className="hidden md:block w-[1px] h-5 bg-institutional-ea-border" />
 
       {/* Group B: Emergency Controls */}
       <div className="flex items-center gap-2">
@@ -258,52 +258,52 @@ export const ControlsBar: React.FC<ControlsBarProps> = ({
         </button>
       </div>
 
-      <div className="hidden md:block w-[1px] h-5 bg-arcade-border" />
+      <div className="hidden md:block w-[1px] h-5 bg-institutional-ea-border" />
 
       {/* Group C: Connections & Integrations */}
       <div className="flex items-center gap-2">
-        <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider text-arcade-textMuted mr-1">
+        <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider text-institutional-ea-textMuted mr-1">
           Integrations:
         </span>
 
         <button
           type="button"
           onClick={onOpenMT5Wizard}
-          className="h-8 px-3 rounded-lg bg-arcade-card hover:bg-arcade-secondary text-arcade-text text-xs font-semibold border border-arcade-border transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+          className="h-8 px-3 rounded-lg bg-institutional-ea-card hover:bg-institutional-ea-secondary text-institutional-ea-text text-xs font-semibold border border-institutional-ea-border transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
           title="Configure local MetaTrader 5 terminal connection and Expert Advisor"
         >
-          <ExternalLink className="w-3.5 h-3.5 text-arcade-primary" />
+          <ExternalLink className="w-3.5 h-3.5 text-institutional-ea-primary" />
           <span>Connect MT5</span>
         </button>
 
         <button
           type="button"
           onClick={onOpenPairing}
-          className="h-8 px-3 rounded-lg bg-arcade-card hover:bg-arcade-secondary text-arcade-text text-xs font-semibold border border-arcade-border transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-          title="Pair Companion desktop with ArcadeFX.live cloud dashboard"
+          className="h-8 px-3 rounded-lg bg-institutional-ea-card hover:bg-institutional-ea-secondary text-institutional-ea-text text-xs font-semibold border border-institutional-ea-border transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+          title="Pair Companion desktop with Institutional EA Cloud dashboard"
         >
-          <Link className="w-3.5 h-3.5 text-arcade-primary" />
-          <span>Pair ArcadeFX</span>
+          <Link className="w-3.5 h-3.5 text-institutional-ea-primary" />
+          <span>Pair Institutional EA</span>
         </button>
 
         <button
           type="button"
           onClick={onOpenTelegram}
-          className="h-8 px-3 rounded-lg bg-arcade-card hover:bg-arcade-secondary text-arcade-text text-xs font-semibold border border-arcade-border transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+          className="h-8 px-3 rounded-lg bg-institutional-ea-card hover:bg-institutional-ea-secondary text-institutional-ea-text text-xs font-semibold border border-institutional-ea-border transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
           title="Configure Telegram bot notifications and remote commands"
         >
-          <Send className="w-3.5 h-3.5 text-arcade-primary" />
+          <Send className="w-3.5 h-3.5 text-institutional-ea-primary" />
           <span>Telegram Control</span>
         </button>
       </div>
 
       {/* Feedback Toast Notification */}
       {feedback && (
-        <div className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border bg-arcade-surface text-arcade-text border-arcade-border animate-yardly-slide">
+        <div className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border bg-institutional-ea-surface text-institutional-ea-text border-institutional-ea-border animate-institutional-ea-slide">
           {feedback.type === "success" ? (
-            <CheckCircle className="w-4 h-4 text-arcade-profit shrink-0" />
+            <CheckCircle className="w-4 h-4 text-institutional-ea-profit shrink-0" />
           ) : (
-            <AlertCircle className="w-4 h-4 text-arcade-loss shrink-0" />
+            <AlertCircle className="w-4 h-4 text-institutional-ea-loss shrink-0" />
           )}
           <span>{feedback.text}</span>
         </div>
@@ -311,18 +311,18 @@ export const ControlsBar: React.FC<ControlsBarProps> = ({
 
       {/* Close All Confirmation Dialog */}
       {showCloseAllConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-yardly-fade">
-          <div className="bg-arcade-card border border-rose-500/40 rounded-2xl shadow-2xl p-6 max-w-md w-full text-arcade-text space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-institutional-ea-fade">
+          <div className="bg-institutional-ea-card border border-rose-500/40 rounded-2xl shadow-2xl p-6 max-w-md w-full text-institutional-ea-text space-y-4">
             <div className="flex items-center gap-3 text-rose-500">
               <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-5 h-5 text-rose-500" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-arcade-text">Confirm Close All Positions</h3>
-                <p className="text-xs text-arcade-textMuted">Liquidate all open market orders</p>
+                <h3 className="text-base font-bold text-institutional-ea-text">Confirm Close All Positions</h3>
+                <p className="text-xs text-institutional-ea-textMuted">Liquidate all open market orders</p>
               </div>
             </div>
-            <p className="text-xs text-arcade-textSecondary leading-relaxed">
+            <p className="text-xs text-institutional-ea-textSecondary leading-relaxed">
               Are you sure you want to immediately liquidate all open market positions at current broker prices?
               This action is executed directly across all active tickets and cannot be undone.
             </p>
@@ -330,7 +330,7 @@ export const ControlsBar: React.FC<ControlsBarProps> = ({
               <button
                 type="button"
                 onClick={() => setShowCloseAllConfirm(false)}
-                className="px-4 py-2 rounded-xl bg-arcade-surface hover:bg-arcade-secondary text-xs font-semibold text-arcade-text border border-arcade-border transition cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-institutional-ea-surface hover:bg-institutional-ea-secondary text-xs font-semibold text-institutional-ea-text border border-institutional-ea-border transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -348,18 +348,18 @@ export const ControlsBar: React.FC<ControlsBarProps> = ({
 
       {/* Emergency Kill Switch Dialog */}
       {showKillSwitchConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-yardly-fade">
-          <div className="bg-arcade-card border border-rose-500/50 rounded-2xl shadow-2xl p-6 max-w-md w-full text-arcade-text space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-institutional-ea-fade">
+          <div className="bg-institutional-ea-card border border-rose-500/50 rounded-2xl shadow-2xl p-6 max-w-md w-full text-institutional-ea-text space-y-4">
             <div className="flex items-center gap-3 text-rose-500">
               <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
                 <AlertCircle className="w-5 h-5 text-rose-500 animate-pulse" />
               </div>
               <div>
-                <h3 className="text-base font-extrabold uppercase tracking-wide text-arcade-text">Emergency Kill Switch</h3>
+                <h3 className="text-base font-extrabold uppercase tracking-wide text-institutional-ea-text">Emergency Kill Switch</h3>
                 <p className="text-xs text-rose-400">Immediate automated trading halt</p>
               </div>
             </div>
-            <p className="text-xs text-arcade-textSecondary leading-relaxed">
+            <p className="text-xs text-institutional-ea-textSecondary leading-relaxed">
               This will immediately halt automated trade executions, pause signal processing, and freeze bot operations.
               Manual position control and existing risk management remain available.
             </p>
@@ -369,9 +369,9 @@ export const ControlsBar: React.FC<ControlsBarProps> = ({
                 id="killSwitchCloseAll"
                 checked={killSwitchCloseAll}
                 onChange={(e) => setKillSwitchCloseAll(e.target.checked)}
-                className="w-4 h-4 rounded text-rose-600 focus:ring-0 bg-arcade-surface border-arcade-border cursor-pointer"
+                className="w-4 h-4 rounded text-rose-600 focus:ring-0 bg-institutional-ea-surface border-institutional-ea-border cursor-pointer"
               />
-              <label htmlFor="killSwitchCloseAll" className="text-xs text-arcade-text font-semibold cursor-pointer select-none">
+              <label htmlFor="killSwitchCloseAll" className="text-xs text-institutional-ea-text font-semibold cursor-pointer select-none">
                 Also close all open market positions immediately
               </label>
             </div>
@@ -379,7 +379,7 @@ export const ControlsBar: React.FC<ControlsBarProps> = ({
               <button
                 type="button"
                 onClick={() => setShowKillSwitchConfirm(false)}
-                className="px-4 py-2 rounded-xl bg-arcade-surface hover:bg-arcade-secondary text-xs font-semibold text-arcade-text border border-arcade-border transition cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-institutional-ea-surface hover:bg-institutional-ea-secondary text-xs font-semibold text-institutional-ea-text border border-institutional-ea-border transition cursor-pointer"
               >
                 Cancel
               </button>

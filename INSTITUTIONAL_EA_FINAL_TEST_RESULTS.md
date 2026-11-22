@@ -1,4 +1,4 @@
-# MT5-001 — FINAL AUTOMATED TEST RESULTS REPORT
+# Institutional EA — FINAL AUTOMATED TEST RESULTS REPORT
 
 **Date:** 2026-11-16  
 **Environment:** Windows, Python 3.12.10 (`.venv\Scripts\python.exe`), `pytest 9.2.0`

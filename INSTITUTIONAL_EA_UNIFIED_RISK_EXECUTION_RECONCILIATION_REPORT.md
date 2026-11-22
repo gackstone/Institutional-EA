@@ -1,6 +1,6 @@
-# MT5-001 — Unified Risk Calculation, Removal of Micro-Lot Overrides and Cent/Micro Account Execution Reconciliation Report
+# Institutional EA — Unified Risk Calculation, Removal of Micro-Lot Overrides and Cent/Micro Account Execution Reconciliation Report
 
-**Document ID:** MT5-001-ENG-REPORT-2026-11-17-006  
+**Document ID:** INSTITUTIONAL-EA-ENG-REPORT-2026-11-17-006  
 **Engineering Directive:** Unified Risk Calculation, Micro-Lot Override Elimination, and Multi-Account Execution Reconciliation  
 **Branch:** `repair/universal-broker-adaptation`  
 **Git HEAD:** `8bf354d`  
@@ -11,7 +11,7 @@
 
 ## 1. Executive Summary
 
-This engineering report documents the comprehensive technical audit, source-level repair, and end-to-end verification of the MT5-001 trading engine and its companion application. 
+This engineering report documents the comprehensive technical audit, source-level repair, and end-to-end verification of the Institutional EA trading engine and its companion application. 
 
 The primary objectives of this mission were:
 1. **Preserve Standard USD accounts** as the institutional reference implementation with pristine 1.0 denomination factors and zero artificial balance blockers.
@@ -303,7 +303,7 @@ Both deployed binaries have identical byte counts and SHA-256 checksums matching
 ## 12. Rollback & Disaster Recovery Procedures
 
 1. **Pre-Reconciliation Backup:**  
-   `..\MT5_001_BACKUP_UNIFIED_RISK_20261117_193500`
+   `..\INSTITUTIONAL_EA_BACKUP_UNIFIED_RISK_20261117_193500`
 2. **Git Branch:**  
    Branch `repair/universal-broker-adaptation` can be reverted to commit `8bf354d` if required:
    ```bash

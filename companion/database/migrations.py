@@ -1,5 +1,5 @@
 """
-SQLite schema and forward-only migrations for the MT5-001 Companion Control Centre.
+SQLite schema and forward-only migrations for the Institutional EA Companion Control Centre.
 The broker (MetaTrader 5) remains authoritative for live account and execution truth;
 this database records configuration history, audit trails, errors, operations, and
 reconciled trade/risk records.

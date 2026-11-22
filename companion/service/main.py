@@ -1,5 +1,5 @@
 """
-Entry point for the MT5-001 Local Control Service.
+Entry point for the Institutional EA Local Control Service.
 Runs the authenticated localhost-only HTTP/SSE API and periodic MT5 synchronization loop.
 """
 
@@ -18,13 +18,13 @@ from companion.service.api.server import build_control_server
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="MT5-001 Local Control Service")
+    parser = argparse.ArgumentParser(description="Institutional EA Local Control Service")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
 
     server, ctx = build_control_server(PROJECT_ROOT, host=args.host, port=args.port, enable_telegram_polling=True)
-    ctx.events.log("CONTROL_SERVICE", "INFO", f"MT5-001 Control Service listening on http://{args.host}:{args.port}")
+    ctx.events.log("CONTROL_SERVICE", "INFO", f"Institutional EA Control Service listening on http://{args.host}:{args.port}")
 
     stop_event = threading.Event()
 

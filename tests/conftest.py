@@ -1,5 +1,5 @@
 """
-Pytest configuration and safety isolation fixtures for the modern MT5-001 architecture.
+Pytest configuration and safety isolation fixtures for the modern Institutional EA architecture.
 Ensures that an active operator STOP.flag or scripts/STOP.flag in the repository is NEVER
 deleted or modified by tests, while isolating unit-test risk/kill-switch checks to a
 temporary flag path unless a test explicitly configures a custom kill_switch_flag_path.

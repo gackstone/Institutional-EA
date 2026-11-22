@@ -54,7 +54,7 @@ def evaluate(data: Any, ctx: Context) -> SkillResult:
             )
             return SkillResult(status="MODIFY_SL", level_prices=level_prices, reasons=reasons, tag="[ASSUMPTION]")
 
-    # Check 2: Structure-Only trailing policy (Canonical AlgoVistra Video 12)
+    # Check 2: Structure-Only trailing policy (Canonical Institutional EA Video 12)
     # Trail SL ONLY when a new protected swing has formed after a confirmed BOS
     new_protected_low = ctx.protected_low
     new_protected_high = ctx.protected_high

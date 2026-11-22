@@ -25,9 +25,9 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
 }) => {
   const key = (status || "").toUpperCase();
 
-  // Unified ArcadeFX Yardly Automotive status semantics
-  let badgeClasses = "bg-arcade-secondary text-arcade-textMuted border-arcade-border";
-  let dotClass = "bg-arcade-textMuted";
+  // Unified Institutional EA status semantics
+  let badgeClasses = "bg-institutional-ea-secondary text-institutional-ea-textMuted border-institutional-ea-border";
+  let dotClass = "bg-institutional-ea-textMuted";
   let pulse = false;
 
   switch (key) {
@@ -39,8 +39,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
       break;
 
     case "RUNNING":
-      badgeClasses = "bg-arcade-primary/10 text-arcade-primary border-arcade-primary/30";
-      dotClass = "bg-arcade-primary";
+      badgeClasses = "bg-institutional-ea-primary/10 text-institutional-ea-primary border-institutional-ea-primary/30";
+      dotClass = "bg-institutional-ea-primary";
       pulse = true;
       break;
 
@@ -59,8 +59,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
 
     case "STOPPED":
     case "OFFLINE":
-      badgeClasses = "bg-arcade-secondary text-arcade-textSecondary border-arcade-border";
-      dotClass = "bg-arcade-textMuted";
+      badgeClasses = "bg-institutional-ea-secondary text-institutional-ea-textSecondary border-institutional-ea-border";
+      dotClass = "bg-institutional-ea-textMuted";
       break;
 
     case "DISCONNECTED":
@@ -71,8 +71,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
       break;
 
     default:
-      badgeClasses = "bg-arcade-secondary text-arcade-textSecondary border-arcade-border";
-      dotClass = "bg-arcade-textMuted";
+      badgeClasses = "bg-institutional-ea-secondary text-institutional-ea-textSecondary border-institutional-ea-border";
+      dotClass = "bg-institutional-ea-textMuted";
   }
 
   return (

@@ -1,8 +1,8 @@
-# MT5-001 — FULL CODEBASE AUDIT, IMPLEMENTATION VERIFICATION & ENGINEERING COMPLIANCE REPORT
+# Institutional EA — FULL CODEBASE AUDIT, IMPLEMENTATION VERIFICATION & ENGINEERING COMPLIANCE REPORT
 
 **Audit Date:** 2026-11-16  
 **Auditor Role:** Principal Software Auditor / Quantitative Trading Systems Architect / MT5 Integration Specialist  
-**Repository:** `https://github.com/gackstone/MT5-001-Bot.git`  
+**Repository:** `https://github.com/gackstone/Institutional-EA.git`  
 **Local Project Root:** `C:\Users\Gackstone_Baraka\Downloads\MT5 001`  
 **Audit Scope:** Full read-only source inspection, static repository-wide search, execution pipeline tracing, and mocked/unit runtime verification. No production source files were modified; no live/demo MT5 orders were placed.
 

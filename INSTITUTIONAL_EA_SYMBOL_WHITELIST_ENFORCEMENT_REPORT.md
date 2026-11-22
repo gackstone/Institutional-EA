@@ -1,4 +1,4 @@
-# MT5-001 — SYMBOL WHITELIST ENFORCEMENT REPORT
+# Institutional EA — SYMBOL WHITELIST ENFORCEMENT REPORT
 
 **Date:** 2026-11-16  
 **Authorized Canonical Universe:** `XAUUSD`, `BTCUSD`, `USDJPY`

@@ -1,5 +1,5 @@
 ﻿"""
-Comprehensive Unit & Integration Tests for the MT5-OO1 Complete Continuous Scalping Engine Upgrade.
+Comprehensive Unit & Integration Tests for the Institutional EA Complete Continuous Scalping Engine Upgrade.
 Covers all 20 required verification areas in Section 11:
 1. News-filter removal verification
 2. MT5 connection and reconnection handling

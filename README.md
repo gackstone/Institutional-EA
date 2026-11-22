@@ -192,8 +192,8 @@ python scripts/run_bridge_server.py
 python scripts/start_bot.py
 ```
 
-### Option C: Running the ArcadeFx Cloud Bot Agent (Interactive Pairing)
-Connect your MT5 machine to the [ArcadeFX.live](https://arcadefx.live) cloud dashboard:
+### Option C: Running the Institutional EA Cloud Bot Agent (Interactive Pairing)
+Connect your MT5 machine to the [Institutional EA Cloud](https://Institutional EA Cloud) cloud dashboard:
 ```bash
 # Interactive pairing prompt:
 python agent/mt5_bot_agent.py
@@ -204,13 +204,13 @@ start_mt5_agent.bat
 # Or with one-time pairing code directly:
 python agent/mt5_bot_agent.py --pair <6-CHAR-CODE>
 ```
-1. Open [https://arcadefx.live](https://arcadefx.live)
+1. Open [https://Institutional EA Cloud](https://Institutional EA Cloud)
 2. Navigate to **MT5 Bot** > **Pair MT5 Machine**
 3. Click **Generate 10-Minute Pairing Code**
 4. Enter the 6-character code into the agent terminal
 5. Upon successful verification, the agent connects to the local MT5 terminal, starts telemetry heartbeats, and begins listening for signed cloud control commands (Start, Pause, Resume, Stop, Emergency Actions).
 
-### Option D: MT5-001 Companion Control Centre (Windows Desktop App)
+### Option D: Institutional EA Companion Control Centre (Windows Desktop App)
 The Companion App (`companion/`) is the central orchestration and control centre for the trading engine, backed by an authenticated Python Local Control Service (`companion/service/`, bound strictly to `127.0.0.1:8765`) and embedded SQLite WAL persistence (`companion/database/`):
 ```bash
 # Run the Python Local Control Service directly:
@@ -344,7 +344,7 @@ The repository provides an autonomous, multi-process supervisor (`scripts/superv
 - **MT5 Process Gating:** Monitors `terminal64.exe` (or configured `MT5_TERMINAL_PATH`). Children run while MT5 is active and gracefully stop when MT5 exits, restarting automatically when MT5 reopens.
 - **Independent Crash Backoff:** Each process has independent exponential backoff (2s $\rightarrow$ 60s), auto-resetting to 2s after 60s of stable execution.
 - **Start Order & Port Readiness:** Waits for Bridge Socket ports (5555/5556) to be accepting connections before starting the bot engine.
-- **Single-Instance Locking:** Enforces named Windows Mutex (`Local\ArcadeFX_MT5_Supervisor_Mutex`) and PID lockfile with automatic stale-lock reclamation and orphan child termination.
+- **Single-Instance Locking:** Enforces named Windows Mutex (`Local\InstitutionalEA_MT5_Supervisor_Mutex`) and PID lockfile with automatic stale-lock reclamation and orphan child termination.
 - **Zero Console Popups:** Runs invisibly (`CREATE_NO_WINDOW`) with stdout/stderr piped to rotating 5 MB log files in `logs/` (`supervisor.log`, `bridge.log`, `bot.log`).
 
 ### Commands
@@ -383,7 +383,7 @@ powershell -ExecutionPolicy Bypass -File scripts\uninstall_autostart.ps1
 |---|---|---|
 | `SUPERVISOR_REQUIRE_MT5` | `true` | Gate bot/bridge execution to MT5 terminal process presence (`true`/`false`) |
 | `MT5_TERMINAL_PATH` | *(empty)* | Optional absolute path to specific MT5 `terminal64.exe` |
-| `SUPERVISOR_REQUIRE_EA_HEARTBEAT` | `false` | Optional gating to fresh EA heartbeat file (`MQL5/Files/arcadefx_ea_heartbeat.txt`) |
+| `SUPERVISOR_REQUIRE_EA_HEARTBEAT` | `false` | Optional gating to fresh EA heartbeat file (`MQL5/Files/institutional_ea_heartbeat.txt`) |
 | `EA_HEARTBEAT_PATH` | *(auto)* | Path to EA heartbeat file |
 | `SUPERVISOR_POLL_INTERVAL` | `3` | Polling and health check interval in seconds |
 | `SUPERVISOR_PYTHON_PATH` | *(auto)* | Optional path to custom Python interpreter |
@@ -429,7 +429,7 @@ The bot has been specialized exclusively for three institutional instruments:
 
 ```
                             ┌────────────────────────────────────────┐
-                            │    MT5-001 Specialized Universe        │
+                            │    Institutional EA Specialized Universe        │
                             │      [XAUUSD, BTCUSD, USDJPY]          │
                             └──────────────────┬─────────────────────┘
                                                │

@@ -1,4 +1,4 @@
-# MT5-001 — UNIVERSAL ACCOUNT & DEMO EXECUTION VERIFICATION AUDIT REPORT
+# Institutional EA — UNIVERSAL ACCOUNT & DEMO EXECUTION VERIFICATION AUDIT REPORT
 **Version**: 2.5.0-Universal-Verified  
 **Date**: November 17, 2026  
 **Auditor**: Principal Quantitative Trading Systems Architect & MQL5/Python Reliability Auditor  
@@ -9,7 +9,7 @@
 
 ## 1. EXECUTIVE SUMMARY & VERIFICATION OUTCOME
 
-This audit report documents the resolution, code remediation, and live broker execution verification for the **MT5-001 Universal Trading Engine**. 
+This audit report documents the resolution, code remediation, and live broker execution verification for the **Institutional EA Universal Trading Engine**. 
 
 All operational objectives set forth in the Master Engineering Directive have been achieved without introducing broker-specific hardcoding, synthetic fills, or risk-limit compromises:
 
@@ -211,4 +211,4 @@ All 18 tests passed cleanly, validating:
 
 ## 6. AUDIT CONCLUSION & SIGN-OFF
 
-The MT5-001 trading system is certified as fully operational across Standard USD, Micro USD, and Cent USC accounts. All artificial trade blockers, compiler syntax errors, and currency denomination discrepancies have been resolved. Real demo order execution and deal history reconciliation have been empirically proven on the connected MetaTrader 5 broker terminal.
+The Institutional EA trading system is certified as fully operational across Standard USD, Micro USD, and Cent USC accounts. All artificial trade blockers, compiler syntax errors, and currency denomination discrepancies have been resolved. Real demo order execution and deal history reconciliation have been empirically proven on the connected MetaTrader 5 broker terminal.

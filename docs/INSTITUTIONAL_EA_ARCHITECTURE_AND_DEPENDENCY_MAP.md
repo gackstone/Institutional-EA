@@ -9,7 +9,7 @@
 
 ## 1. Executive Architectural Overview
 
-The **MT5 001** automated trading system is a hybrid quantitative execution platform combining native MetaTrader 5 (MQL5) execution infrastructure with a modular Python 3.10+ algorithmic engine, an Electron-based desktop supervisor companion, and an outbound-only cloud telemetry/control agent (ArcadeFX Cloud).
+The **MT5 001** automated trading system is a hybrid quantitative execution platform combining native MetaTrader 5 (MQL5) execution infrastructure with a modular Python 3.10+ algorithmic engine, an Electron-based desktop supervisor companion, and an outbound-only cloud telemetry/control agent (Institutional EA Cloud).
 
 The system bifurcates high-level quantitative decision-making (market regime detection, multi-timeframe liquidity mapping, order block/FVG detection, statistical meta-labeling, fractional Kelly sizing, and CUSUM decay guarding) into Python, while delegating low-latency pre-execution safety gating, broker ticket management, trailing stop modifications, and emergency circuit breakers to a 4,773-line native Expert Advisor (`mql5/Experts/PythonBridgeEA.mq5`).
 
@@ -52,7 +52,7 @@ The system bifurcates high-level quantitative decision-making (market regime det
          │                                      │                                      │
          ▼                                      ▼                                      ▼
 ┌─────────────────────────┐        ┌─────────────────────────┐        ┌─────────────────────────┐
-│ Desktop Companion UI    │        │  ArcadeFX Cloud Agent   │        │ Telegram Notification   │
+│ Desktop Companion UI    │        │  Institutional EA Cloud Agent   │        │ Telegram Notification   │
 │ companion/electron/     │        │  agent/mt5_bot_agent.py │        │ src/notifications/      │
 │ main.cjs (Node/React)   │        │  Outbound HTTPS Only    │        │ Rate-limited alerts &   │
 │ - 6 supervised services │        │  - HMAC-SHA256 signed   │        │ 2-step command console  │
@@ -78,7 +78,7 @@ The system bifurcates high-level quantitative decision-making (market regime det
 | **Order Manager** | `src/execution/order_manager.py` | Pre-trade checklist verification, idempotent ticket tracking, broker response reconciliation, and order submission. | Approved candidate, sizing result, portfolio permission. | `TradeOrder` submission via Bridge client, execution logging. | TCP Client to Port 5555 / IPC Bridge. |
 | **Process Supervisor** | `scripts/supervisor.py` | 24/7 background OS supervisor with exponential backoff restart loops for Bridge Server and Trading Engine. | Windows process table (`terminal64.exe`), port health probes. | Child processes (`run_bridge_server.py`, `start_bot.py`), log rotation. | Windows OS Process API, Named Mutex, Socket Pings. |
 | **Desktop Companion** | `companion/electron/main.cjs` | Electron desktop supervisor, GUI dashboard, configuration editor, local credential store, and service watchdog. | IPC requests from React UI, child process stdout/stderr. | Supervised process state, real-time metrics, emergency controls. | Electron IPC, local config files, socket health pings. |
-| **ArcadeFX Cloud Agent** | `agent/mt5_bot_agent.py` | Outbound-only secure orchestration agent connecting local MT5 instance to ArcadeFX Cloud platform. | Local terminal data, signed cloud commands (HMAC-SHA256). | Outbound telemetry heartbeats, offline SQLite sync. | Outbound HTTPS (REST / WebSockets), zero listening ports. |
+| **Institutional EA Cloud Agent** | `agent/mt5_bot_agent.py` | Outbound-only secure orchestration agent connecting local MT5 instance to Institutional EA Cloud platform. | Local terminal data, signed cloud commands (HMAC-SHA256). | Outbound telemetry heartbeats, offline SQLite sync. | Outbound HTTPS (REST / WebSockets), zero listening ports. |
 | **Telegram Dispatcher** | `src/notifications/telegram_service.py` | Asynchronous notification pipeline and operator remote command switchboard with rate limiting and 2-step confirmation. | System events, execution outcomes, operator chat input. | Telegram HTML alerts, parsed administrative commands. | Outbound HTTPS to Telegram Bot API (proxy supported). |
 
 ---
@@ -87,7 +87,7 @@ The system bifurcates high-level quantitative decision-making (market regime det
 
 ### A. System Boot and Initialization Sequence
 1. **Supervisor / Electron Launch**:
-   - `scripts/supervisor.py` acquires the Named Windows Mutex (`Local\ArcadeFX_MT5_Supervisor_Mutex`) or Electron acquires single-instance lock.
+   - `scripts/supervisor.py` acquires the Named Windows Mutex (`Local\InstitutionalEA_MT5_Supervisor_Mutex`) or Electron acquires single-instance lock.
    - Verifies whether MT5 client terminal (`terminal64.exe`) is actively running. If absent, enters polling loop.
 2. **Bridge Server Start**:
    - Spawns `python scripts/run_bridge_server.py`.
@@ -200,7 +200,7 @@ For every monitored symbol in each scan loop iteration:
 │                   │  Agent)           │ spawn()       │ - SIGTERM / SIGKILL controls        │
 │                   │                   │               │ - Named Mutex / Lockfile management │
 ├───────────────────┼───────────────────┼───────────────┼─────────────────────────────────────┤
-│ mt5_bot_agent.py  │ ArcadeFX Cloud    │ Outbound      │ Telemetry & Signed Control:         │
+│ mt5_bot_agent.py  │ Institutional EA Cloud    │ Outbound      │ Telemetry & Signed Control:         │
 │ (Cloud Agent)     │ Backend           │ HTTPS / WSS   │ - Heartbeat telemetry (every 15s)   │
 │                   │                   │ (Port 443)    │ - Inbound commands (HMAC-SHA256)    │
 │                   │                   │               │ - Offline SQLite event queue        │
@@ -221,10 +221,10 @@ To prevent catastrophic dual-execution, split-brain routing, or overlapping posi
    - `bridge_server.py` configures `socket.SO_EXCLUSIVEADDRUSE` on Windows.
    - Prevents duplicate processes from hijacking Port 5555 or 5556 and intercepting execution traffic.
 2. **Single Instance Engine Lock**:
-   - `start_bot.py` instantiates `SingleInstanceLock("mt5_trading_engine")` backed by an OS-level file lock in `%LOCALAPPDATA%\ArcadeFX\MT5-OO1 Companion\state\mt5_trading_engine.lock`.
+   - `start_bot.py` instantiates `SingleInstanceLock("mt5_trading_engine")` backed by an OS-level file lock in `%LOCALAPPDATA%\InstitutionalEA\Institutional EA Companion\state\mt5_trading_engine.lock`.
    - If another instance is running, cleanly terminates immediately.
 3. **Supervisor Mutex**:
-   - `scripts/supervisor.py` creates a Win32 Named Mutex `Local\ArcadeFX_MT5_Supervisor_Mutex`.
+   - `scripts/supervisor.py` creates a Win32 Named Mutex `Local\InstitutionalEA_MT5_Supervisor_Mutex`.
    - Prevents multiple supervisors from competing to spawn duplicate bridge or engine instances.
 4. **MQL5 EA Chart-Level Guard**:
    - `PythonBridgeEA.mq5` verifies global terminal variables (`GlobalVariableCheck`) to prevent multiple EA instances from conflicting on the same magic number across multiple charts.

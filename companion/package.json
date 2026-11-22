@@ -1,7 +1,16 @@
 {
-  "name": "mt5-oo1-companion",
+  "name": "institutional-ea-companion",
   "version": "1.2.0",
-  "description": "MT5-OO1 Arcade FX Companion Desktop Application",
+  "description": "Institutional EA Companion Desktop Application",
+  "author": "Institutional EA",
+  "homepage": "https://github.com/gackstone/Institutional-EA",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gackstone/Institutional-EA.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gackstone/Institutional-EA/issues"
+  },
   "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
@@ -40,8 +49,8 @@
     "wait-on": "^8.0.2"
   },
   "build": {
-    "appId": "live.arcadefx.mt5oo1",
-    "productName": "MT5-OO1 Companion",
+    "appId": "com.institutionalea.app",
+    "productName": "Institutional EA Companion",
     "directories": {
       "output": "release",
       "buildResources": "resources"
@@ -90,8 +99,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "MT5-OO1 Companion",
-      "artifactName": "MT5-OO1-Companion-Setup.${ext}",
+      "shortcutName": "Institutional EA Companion",
+      "artifactName": "Institutional-EA-Companion-Setup.${ext}",
       "deleteAppDataOnUninstall": false
     }
   }

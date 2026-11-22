@@ -20,10 +20,10 @@ from typing import Optional, Dict, Any, Tuple
 def get_base_app_data_dir() -> Path:
     """
     Returns the root writable application data directory:
-    Windows: %LOCALAPPDATA%\\ArcadeFX\\MT5-OO1 Companion
-    macOS / Linux: ~/.arcadefx/mt5-oo1-companion
+    Windows: %LOCALAPPDATA%\\InstitutionalEA\\Institutional EA Companion
+    macOS / Linux: ~/.institutional-ea/institutional-ea-companion
     """
-    override = os.environ.get("ARCADEFX_APP_DATA_DIR") or os.environ.get("MT5_APP_DATA_DIR")
+    override = os.environ.get("INSTITUTIONAL_EA_APP_DATA_DIR") or os.environ.get("MT5_APP_DATA_DIR")
     if override:
         try:
             p = Path(override).resolve()
@@ -35,20 +35,20 @@ def get_base_app_data_dir() -> Path:
     if sys.platform == "win32":
         local_app_data = os.environ.get("LOCALAPPDATA")
         if local_app_data:
-            base = Path(local_app_data) / "ArcadeFX" / "MT5-OO1 Companion"
+            base = Path(local_app_data) / "Institutional EA" / "Institutional EA Companion"
         else:
-            base = Path.home() / "AppData" / "Local" / "ArcadeFX" / "MT5-OO1 Companion"
+            base = Path.home() / "AppData" / "Local" / "Institutional EA" / "Institutional EA Companion"
     elif sys.platform == "darwin":
-        base = Path.home() / "Library" / "Application Support" / "ArcadeFX" / "MT5-OO1 Companion"
+        base = Path.home() / "Library" / "Application Support" / "Institutional EA" / "Institutional EA Companion"
     else:
-        base = Path.home() / ".arcadefx" / "mt5-oo1-companion"
+        base = Path.home() / ".institutional_ea" / "institutional-ea-companion"
 
     try:
         base.mkdir(parents=True, exist_ok=True)
         return base
     except Exception as e:
         # Fallback to temp directory if user directory is inaccessible
-        fallback = Path(tempfile.gettempdir()) / "ArcadeFX_MT5Companion"
+        fallback = Path(tempfile.gettempdir()) / "InstitutionalEA_Companion"
         fallback.mkdir(parents=True, exist_ok=True)
         return fallback
 
@@ -113,8 +113,8 @@ def get_primary_credentials_file() -> Path:
 def get_legacy_credentials_files() -> list[Path]:
     """Returns possible legacy credentials paths for migration."""
     return [
-        Path.home() / ".arcadefx_agent" / "credentials.enc.json",
-        Path.home() / ".arcadefx_agent" / "credentials.json",
+        Path.home() / ".institutional_ea_agent" / "credentials.enc.json",
+        Path.home() / ".institutional_ea_agent" / "credentials.json",
         Path.home() / ".mt5_companion" / "credentials.json",
         BASE_DIR / "credentials.enc.json"
     ]

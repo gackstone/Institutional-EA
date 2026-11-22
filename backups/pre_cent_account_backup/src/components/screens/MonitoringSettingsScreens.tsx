@@ -206,9 +206,9 @@ export const SettingsScreen: React.FC<{
   onRefresh: () => Promise<void>;
   onActionMessage: (msg: string, isError?: boolean) => void;
   onOpenDiagnostics: () => void;
-  onOpenArcadeFX: () => void;
+  onOpenInstitutionalEa: () => void;
   onOpenTelegram: () => void;
-}> = ({ status, onRefresh, onActionMessage, onOpenDiagnostics, onOpenArcadeFX, onOpenTelegram }) => {
+}> = ({ status, onRefresh, onActionMessage, onOpenDiagnostics, onOpenInstitutionalEa, onOpenTelegram }) => {
   const [busy, setBusy] = useState(false);
   const currentMode = status?.engine.operating_mode || "DEMO_SCALPING";
 
@@ -262,8 +262,8 @@ export const SettingsScreen: React.FC<{
         <button onClick={onOpenDiagnostics} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs text-slate-100 rounded-lg">
           Run System Diagnostics
         </button>
-        <button onClick={onOpenArcadeFX} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs text-slate-100 rounded-lg">
-          ArcadeFX Cloud Pairing
+        <button onClick={onOpenInstitutionalEa} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs text-slate-100 rounded-lg">
+          Institutional EA Cloud Pairing
         </button>
         <button onClick={onOpenTelegram} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs text-slate-100 rounded-lg">
           Telegram Remote Control

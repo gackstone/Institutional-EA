@@ -1,7 +1,7 @@
-# MT5-OO1 Companion Desktop Application Guide
+# Institutional EA Companion Desktop Application Guide
 
-> **Application Name:** MT5-OO1 Companion — Arcade FX  
-> **Repository:** `https://github.com/gackstonew-lgtm/MT5-OO1.git`  
+> **Application Name:** Institutional EA Companion  
+> **Repository:** `https://github.com/gackstone/Institutional-EA.git`  
 > **Target Audience:** Traders, DevOps Engineers, and Quantitative Operators  
 > **Classification Tagging:** `[SAFETY]`, `[ARCHITECTURE]`, `[DERIVED]`
 
@@ -9,7 +9,7 @@
 
 ## 1. Overview & Vision
 
-The **MT5-OO1 Companion** transforms the institutional MT5 algorithmic day-trading and scalping engine into a fully packaged, self-contained desktop companion.
+The **Institutional EA Companion** transforms the institutional MT5 algorithmic day-trading and scalping engine into a fully packaged, self-contained desktop companion.
 
 Before this desktop companion, running the trading system required technical command-line interventions:
 - Opening a shell to execute `python scripts/run_bridge_server.py`.
@@ -18,9 +18,9 @@ Before this desktop companion, running the trading system required technical com
 - Manually locating MT5 data folders to install `PythonBridgeEA.mq5`.
 - Managing port readiness and background process supervision.
 
-The **MT5-OO1 Companion** completely automates this workflow:
+The **Institutional EA Companion** completely automates this workflow:
 ```
-  INSTALL → LAUNCH APP → PAIR ARCADEFX → CONNECT MT5 → START BOT
+  INSTALL → LAUNCH APP → PAIR INSTITUTIONAL_EA → CONNECT MT5 → START BOT
 ```
 No manual Python, pip, Node.js, Git, or terminal execution is required by the end-user.
 
@@ -32,7 +32,7 @@ The desktop application uses a modular, multi-tier architecture:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                   MT5-OO1 Desktop Companion UI                         │
+│                   Institutional EA Desktop Companion UI                         │
 │  - React 19 + TypeScript + Tailwind CSS                                │
 │  - Financial Status Dashboard (Balance, Equity, Daily PnL, Trades)     │
 │  - Service Health Monitoring Cards (Engine, Bridge, Cloud, Telegram)  │
@@ -55,7 +55,7 @@ The desktop application uses a modular, multi-tier architecture:
 ┌───────────────────────────────┐   ┌────────────────────────────────────┐
 │   Python Algorithmic Engine   │   │       MetaTrader 5 Terminal        │
 │   (scripts/start_bot.py)      │   │  - terminal64.exe                  │
-│  - AlgoVistra + Art of Trading│   │  - PythonBridgeEA.mq5 attached     │
+│  - Institutional EA + Art of Trading│   │  - PythonBridgeEA.mq5 attached     │
 │  - 25 Pure Strategy Skills    │   │  - Zero DLL requirement            │
 │  - R9 Risk Rulebook & Trailing│   │  - Live Account & Market Data Feed │
 │  - Manual Position Adoption   │   └────────────────────────────────────┘
@@ -72,7 +72,7 @@ The companion application supervises six independent background services:
 | :--- | :--- | :--- |
 | **Python Trading Engine** | `scripts/start_bot.py` | Runs multi-symbol M1/M5/M15 scalping loops, market structure analysis, and trade lifecycle management. Probed via process ID and IPC heartbeat. |
 | **MT5 Bridge Server** | `scripts/run_bridge_server.py` | Persistent TCP socket daemon on Port 5555 (EA) and Port 5556 (IPC). Probed via pre-flight socket connect. |
-| **ArcadeFX Cloud Sync** | `agent/mt5_bot_agent.py` | Outbound HTTPS telemetry, heartbeats, and signed cloud control. Probed via device token authentication. |
+| **Institutional EA Cloud Sync** | `agent/mt5_bot_agent.py` | Outbound HTTPS telemetry, heartbeats, and signed cloud control. Probed via device token authentication. |
 | **Telegram Dispatcher** | `src/notifications/telegram_service.py` | Structured HTML cards, pinned status messages, and operator commands (`/status`, `/positions`, `/pause`). |
 | **Health & Watchdog** | `src/execution/watchdog.py` | Anti-dormancy monitor, 60s hang detection, and CUSUM decay guard. |
 | **Log Manager** | `RotatingFileHandler` | Captures, deduplicates, and rotates log files into `logs/` (10 MB per file, 14 backups). |
@@ -103,7 +103,7 @@ The companion application supervises six independent background services:
   - Removes `state/PAUSE` and resumes normal automated market scanning.
 - **`CONNECT MT5`**:
   - Opens the MT5 Integration & EA Wizard to auto-deploy the EA and verify socket connection on port 5555.
-- **`PAIR ARCADEFX`**:
+- **`PAIR INSTITUTIONAL_EA`**:
   - Opens the Cloud Pairing dialog to submit a 6-character pairing code to `https://arcadefx.live/api/v1/bot/pairing/claim`.
 
 ---

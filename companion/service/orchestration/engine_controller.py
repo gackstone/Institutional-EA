@@ -1,5 +1,5 @@
 """
-Central Bot Engine Controller for the MT5-001 Companion Control Centre.
+Central Bot Engine Controller for the Institutional EA Companion Control Centre.
 Manages the lifecycle of the single authoritative Python trading engine (scripts/start_bot.py)
 and bridge server (scripts/run_bridge_server.py), respecting STOP.flag and state/PAUSE,
 preventing duplicate engines, and exposing controlled trade/risk operations.

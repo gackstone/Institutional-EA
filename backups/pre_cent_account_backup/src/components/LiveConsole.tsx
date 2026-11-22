@@ -106,7 +106,7 @@ export const LiveConsole: React.FC<LiveConsoleProps> = ({ logs, onClearLogs }) =
   return (
     <div
       id="live-console"
-      className={`p-3 sm:px-4 sm:py-3 bg-arcade-bg border-t border-arcade-border flex flex-col ${containerHeightClass} transition-all duration-200 ease-in-out`}
+      className={`p-3 sm:px-4 sm:py-3 bg-institutional-ea-bg border-t border-institutional-ea-border flex flex-col ${containerHeightClass} transition-all duration-200 ease-in-out`}
     >
       {/* Console Header & Control Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 select-none mb-2">
@@ -115,29 +115,29 @@ export const LiveConsole: React.FC<LiveConsoleProps> = ({ logs, onClearLogs }) =
           <button
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-arcade-text hover:text-arcade-primary transition cursor-pointer"
+            className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-institutional-ea-text hover:text-institutional-ea-primary transition cursor-pointer"
             title={isCollapsed ? "Expand Console" : "Collapse Console"}
           >
-            <div className="w-6 h-6 rounded-md bg-arcade-primary/10 border border-arcade-primary/20 flex items-center justify-center text-arcade-primary shrink-0">
+            <div className="w-6 h-6 rounded-md bg-institutional-ea-primary/10 border border-institutional-ea-primary/20 flex items-center justify-center text-institutional-ea-primary shrink-0">
               <Terminal className="w-3.5 h-3.5" />
             </div>
             <span className="font-sans font-bold">Live Activity Console</span>
           </button>
 
-          <span className="text-[10px] text-arcade-textMuted font-mono px-2 py-0.5 rounded-full bg-arcade-card border border-arcade-border shrink-0">
+          <span className="text-[10px] text-institutional-ea-textMuted font-mono px-2 py-0.5 rounded-full bg-institutional-ea-card border border-institutional-ea-border shrink-0">
             {filteredLogs.length} events
           </span>
 
           {/* Collapsed preview text */}
           {isCollapsed && latestLog && (
-            <div className="hidden md:flex items-center gap-2 text-xs font-mono text-arcade-textSecondary truncate max-w-xl pl-2">
-              <span className="text-arcade-textMuted text-[10px]">
+            <div className="hidden md:flex items-center gap-2 text-xs font-mono text-institutional-ea-textSecondary truncate max-w-xl pl-2">
+              <span className="text-institutional-ea-textMuted text-[10px]">
                 {latestLog.timestamp.slice(11, 19)}
               </span>
-              <span className="text-arcade-primary font-bold text-[11px]">
+              <span className="text-institutional-ea-primary font-bold text-[11px]">
                 [{latestLog.service}]
               </span>
-              <span className="truncate text-[11px] text-arcade-text">
+              <span className="truncate text-[11px] text-institutional-ea-text">
                 {latestLog.message}
               </span>
             </div>
@@ -150,13 +150,13 @@ export const LiveConsole: React.FC<LiveConsoleProps> = ({ logs, onClearLogs }) =
             <>
               {/* Search Filter */}
               <div className="relative">
-                <Search className="w-3.5 h-3.5 text-arcade-textMuted absolute left-2.5 top-2" />
+                <Search className="w-3.5 h-3.5 text-institutional-ea-textMuted absolute left-2.5 top-2" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Filter logs..."
-                  className="pl-7 pr-2.5 py-1 bg-arcade-card border border-arcade-border rounded-lg text-arcade-text text-xs w-32 focus:w-44 focus:border-arcade-primary transition-all outline-none font-sans"
+                  className="pl-7 pr-2.5 py-1 bg-institutional-ea-card border border-institutional-ea-border rounded-lg text-institutional-ea-text text-xs w-32 focus:w-44 focus:border-institutional-ea-primary transition-all outline-none font-sans"
                 />
               </div>
 
@@ -164,13 +164,13 @@ export const LiveConsole: React.FC<LiveConsoleProps> = ({ logs, onClearLogs }) =
               <select
                 value={filterService}
                 onChange={(e) => setFilterService(e.target.value)}
-                className="bg-arcade-card border border-arcade-border rounded-lg px-2 py-1 text-arcade-text text-xs outline-none font-sans cursor-pointer"
+                className="bg-institutional-ea-card border border-institutional-ea-border rounded-lg px-2 py-1 text-institutional-ea-text text-xs outline-none font-sans cursor-pointer"
                 title="Filter by background service"
               >
                 <option value="ALL">All Services</option>
                 <option value="ENGINE">Trading Engine</option>
                 <option value="BRIDGE">Bridge Server</option>
-                <option value="ARCADEFX">ArcadeFX Cloud</option>
+                <option value="INSTITUTIONAL_EA">Institutional EA Cloud</option>
                 <option value="TELEGRAM">Telegram</option>
                 <option value="SYSTEM">System</option>
               </select>
@@ -179,7 +179,7 @@ export const LiveConsole: React.FC<LiveConsoleProps> = ({ logs, onClearLogs }) =
               <select
                 value={filterLevel}
                 onChange={(e) => setFilterLevel(e.target.value)}
-                className="bg-arcade-card border border-arcade-border rounded-lg px-2 py-1 text-arcade-text text-xs outline-none font-sans cursor-pointer"
+                className="bg-institutional-ea-card border border-institutional-ea-border rounded-lg px-2 py-1 text-institutional-ea-text text-xs outline-none font-sans cursor-pointer"
                 title="Filter by severity level"
               >
                 <option value="ALL">All Levels</option>
@@ -196,7 +196,7 @@ export const LiveConsole: React.FC<LiveConsoleProps> = ({ logs, onClearLogs }) =
                 className={`p-1.5 rounded-lg border text-xs flex items-center justify-center transition cursor-pointer ${
                   autoScroll
                     ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                    : "bg-arcade-card text-arcade-textMuted border-arcade-border hover:text-arcade-text"
+                    : "bg-institutional-ea-card text-institutional-ea-textMuted border-institutional-ea-border hover:text-institutional-ea-text"
                 }`}
                 title={autoScroll ? "Auto-scroll ON (click to pause)" : "Auto-scroll OFF (click to follow)"}
                 aria-label="Auto-scroll"
@@ -208,7 +208,7 @@ export const LiveConsole: React.FC<LiveConsoleProps> = ({ logs, onClearLogs }) =
               <button
                 type="button"
                 onClick={copyToClipboard}
-                className="p-1.5 rounded-lg bg-arcade-card hover:bg-arcade-secondary text-arcade-textSecondary hover:text-arcade-text border border-arcade-border transition cursor-pointer shadow-xs"
+                className="p-1.5 rounded-lg bg-institutional-ea-card hover:bg-institutional-ea-secondary text-institutional-ea-textSecondary hover:text-institutional-ea-text border border-institutional-ea-border transition cursor-pointer shadow-xs"
                 title="Copy filtered logs to clipboard"
                 aria-label="Copy logs"
               >
@@ -223,7 +223,7 @@ export const LiveConsole: React.FC<LiveConsoleProps> = ({ logs, onClearLogs }) =
               <button
                 type="button"
                 onClick={exportToFile}
-                className="p-1.5 rounded-lg bg-arcade-card hover:bg-arcade-secondary text-arcade-textSecondary hover:text-arcade-text border border-arcade-border transition cursor-pointer shadow-xs"
+                className="p-1.5 rounded-lg bg-institutional-ea-card hover:bg-institutional-ea-secondary text-institutional-ea-textSecondary hover:text-institutional-ea-text border border-institutional-ea-border transition cursor-pointer shadow-xs"
                 title="Export logs to .log file"
                 aria-label="Export logs"
               >
@@ -234,7 +234,7 @@ export const LiveConsole: React.FC<LiveConsoleProps> = ({ logs, onClearLogs }) =
               <button
                 type="button"
                 onClick={onClearLogs}
-                className="p-1.5 rounded-lg bg-arcade-card hover:bg-rose-500/10 text-arcade-textSecondary hover:text-rose-600 border border-arcade-border transition cursor-pointer shadow-xs"
+                className="p-1.5 rounded-lg bg-institutional-ea-card hover:bg-rose-500/10 text-institutional-ea-textSecondary hover:text-rose-600 border border-institutional-ea-border transition cursor-pointer shadow-xs"
                 title="Clear console events"
                 aria-label="Clear logs"
               >
@@ -245,7 +245,7 @@ export const LiveConsole: React.FC<LiveConsoleProps> = ({ logs, onClearLogs }) =
               <button
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="p-1.5 rounded-lg bg-arcade-card hover:bg-arcade-secondary text-arcade-textSecondary hover:text-arcade-text border border-arcade-border transition cursor-pointer shadow-xs"
+                className="p-1.5 rounded-lg bg-institutional-ea-card hover:bg-institutional-ea-secondary text-institutional-ea-textSecondary hover:text-institutional-ea-text border border-institutional-ea-border transition cursor-pointer shadow-xs"
                 title={isExpanded ? "Restore default height" : "Expand console height"}
                 aria-label="Toggle Expand"
               >
@@ -262,7 +262,7 @@ export const LiveConsole: React.FC<LiveConsoleProps> = ({ logs, onClearLogs }) =
           <button
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1.5 rounded-lg bg-arcade-card hover:bg-arcade-secondary text-arcade-textSecondary hover:text-arcade-text border border-arcade-border transition cursor-pointer shadow-xs"
+            className="p-1.5 rounded-lg bg-institutional-ea-card hover:bg-institutional-ea-secondary text-institutional-ea-textSecondary hover:text-institutional-ea-text border border-institutional-ea-border transition cursor-pointer shadow-xs"
             title={isCollapsed ? "Expand Activity Console" : "Collapse Activity Console"}
             aria-label="Toggle Collapse"
           >
@@ -279,22 +279,22 @@ export const LiveConsole: React.FC<LiveConsoleProps> = ({ logs, onClearLogs }) =
       {!isCollapsed && (
         <div
           ref={scrollRef}
-          className="flex-1 bg-arcade-card border border-arcade-border rounded-xl p-3 font-mono text-xs overflow-y-auto space-y-1 select-text shadow-inner"
+          className="flex-1 bg-institutional-ea-card border border-institutional-ea-border rounded-xl p-3 font-mono text-xs overflow-y-auto space-y-1 select-text shadow-inner"
         >
           {filteredLogs.length === 0 ? (
-            <div className="text-center text-arcade-textMuted py-16 font-sans select-none space-y-1">
-              <Terminal className="w-8 h-8 mx-auto text-arcade-textMuted/40" />
+            <div className="text-center text-institutional-ea-textMuted py-16 font-sans select-none space-y-1">
+              <Terminal className="w-8 h-8 mx-auto text-institutional-ea-textMuted/40" />
               <p className="text-xs font-medium">No activity log entries match the selected filter criteria.</p>
-              <p className="text-[11px] text-arcade-textMuted">Events from MT5 bridge, trading engine, and ArcadeFX sync will stream here in real time.</p>
+              <p className="text-[11px] text-institutional-ea-textMuted">Events from MT5 bridge, trading engine, and Institutional EA sync will stream here in real time.</p>
             </div>
           ) : (
             filteredLogs.map((log) => (
               <div
                 key={log.id}
-                className="flex items-start gap-2.5 leading-relaxed hover:bg-arcade-surface/60 px-2 py-0.5 rounded-md transition-colors"
+                className="flex items-start gap-2.5 leading-relaxed hover:bg-institutional-ea-surface/60 px-2 py-0.5 rounded-md transition-colors"
               >
                 {/* Timestamp */}
-                <span className="text-arcade-textMuted shrink-0 select-none text-[11px]">
+                <span className="text-institutional-ea-textMuted shrink-0 select-none text-[11px]">
                   {log.timestamp.slice(11, 19)}
                 </span>
 
@@ -308,12 +308,12 @@ export const LiveConsole: React.FC<LiveConsoleProps> = ({ logs, onClearLogs }) =
                 </span>
 
                 {/* Service Label */}
-                <span className="text-arcade-primary shrink-0 font-bold select-none text-[11px]">
+                <span className="text-institutional-ea-primary shrink-0 font-bold select-none text-[11px]">
                   [{log.service.toUpperCase()}]
                 </span>
 
                 {/* Message Body */}
-                <span className="text-arcade-text break-all text-[11px] font-normal flex-1">
+                <span className="text-institutional-ea-text break-all text-[11px] font-normal flex-1">
                   {log.message}
                 </span>
               </div>

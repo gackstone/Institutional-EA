@@ -1,6 +1,6 @@
 """
-Unit & Integration Test Suite for MT5-OO1 Companion Desktop Application.
-Tests supervisor lifecycle, MT5 detection, EA deployment, ArcadeFX pairing contract,
+Unit & Integration Test Suite for Institutional EA Companion Desktop Application.
+Tests supervisor lifecycle, MT5 detection, EA deployment, Institutional EA pairing contract,
 port pre-flight checks, Telegram pairing & authorization, sidecar resolution,
 crash backoff recovery, and emergency shutdown.
 Tags: [SAFETY], [ARCHITECTURE], [AUTOMATION]
@@ -25,7 +25,7 @@ from src.notifications.telegram_service import TelegramCommandHandler, TelegramN
 class TestCompanionSupervisor(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
-        self.config_dir = Path(self.temp_dir) / ".arcadefx_agent"
+        self.config_dir = Path(self.temp_dir) / ".institutional_ea_agent"
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.queue_db = str(self.config_dir / "test_queue.sqlite")
         self.state_dir = Path(self.temp_dir) / "state"

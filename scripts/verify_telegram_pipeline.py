@@ -22,7 +22,7 @@ from src.notifications.telegram_service import TelegramNotifier, TelegramCommand
 def run_pipeline_verification():
     print("=" * 80)
     print("  INSTITUTIONAL TELEGRAM NOTIFICATION & COMMAND VERIFICATION")
-    print("  Bot: Mt5001_bot | Target Chat: 8649330717 (Jetsky)")
+    print("  Bot: InstitutionalEa_bot | Target Chat: 8649330717 (Jetsky)")
     print("=" * 80)
 
     cfg = TelegramConfig()

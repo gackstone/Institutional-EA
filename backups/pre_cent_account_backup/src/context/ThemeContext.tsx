@@ -13,7 +13,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const THEME_STORAGE_KEY = "alpha_coach_theme";
+const THEME_STORAGE_KEY = "institutional_ea_theme";
 
 function getSystemTheme(): Theme {
   if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {

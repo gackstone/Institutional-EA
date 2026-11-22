@@ -1,10 +1,10 @@
 //+------------------------------------------------------------------+
 //|                                              PythonBridgeEA.mq5  |
 //|                  Institutional MT5 Algorithmic Day-Trading Bridge|
-//|                                  Copyright 2026, Quant Systems   |
+//|                                  Copyright 2026, Institutional EA   |
 //+------------------------------------------------------------------+
-#property copyright "Quant Systems"
-#property link      "https://github.com/JBCyberLogics/Trading-Bot"
+#property copyright "Institutional EA"
+#property link      "https://github.com/gackstone/Institutional-EA"
 #property version   "3.10"
 #property description "Institutional MT5-Python TCP Bridge with Full Lifecycle, Single-Instance Guard & Adaptive Management"
 

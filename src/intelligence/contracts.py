@@ -1,5 +1,5 @@
 """
-Data contracts and typing definitions for the MT5-001 Adaptive Trading Intelligence (ATI) Subsystem.
+Data contracts and typing definitions for the Institutional EA Adaptive Trading Intelligence (ATI) Subsystem.
 Strictly defines models for trades, deals, audits, regimes, models, experiments, and candidates.
 """
 

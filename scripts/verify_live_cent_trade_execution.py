@@ -15,7 +15,7 @@ import MetaTrader5 as mt5
 
 def main():
     print("=" * 80)
-    print("  MT5-001 VERIFIED DEMO TRADE EXECUTION & HISTORY RECONCILIATION")
+    print("  Institutional EA VERIFIED DEMO TRADE EXECUTION & HISTORY RECONCILIATION")
     print("=" * 80)
 
     if not mt5.initialize():

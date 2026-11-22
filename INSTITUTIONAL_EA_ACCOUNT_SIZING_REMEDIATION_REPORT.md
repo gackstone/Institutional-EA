@@ -1,4 +1,4 @@
-# MT5-001 — ACCOUNT SIZING REMEDIATION REPORT
+# Institutional EA — ACCOUNT SIZING REMEDIATION REPORT
 
 **Date:** 2026-11-16  
 **Centralized Sizing Engine:** `src/risk/position_sizing.py` (`PositionSizingEngine`)

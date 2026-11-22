@@ -58,7 +58,7 @@ try:
     logger = setup_service_logger("BridgeRunner", "bridge_service.log")
 except Exception as e:
     import tempfile
-    LOGS_DIR = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "ArcadeFX" / "MT5-OO1 Companion" / "logs"
+    LOGS_DIR = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "Institutional EA" / "Institutional EA Companion" / "logs"
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
     log_file = LOGS_DIR / "bridge_service.log"
     logger = logging.getLogger("BridgeRunner")

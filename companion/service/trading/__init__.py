@@ -1,4 +1,4 @@
-"""Trading workflow services for the MT5-001 Companion Control Service."""
+"""Trading workflow services for the Institutional EA Companion Control Service."""
 
 from companion.service.trading.btcusd_sample_service import BTCUSDSampleTradingService
 

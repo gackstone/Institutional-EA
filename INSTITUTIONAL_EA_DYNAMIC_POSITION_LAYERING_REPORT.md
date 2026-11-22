@@ -1,7 +1,7 @@
-# MT5-001 — DEEP EXECUTION PIPELINE AUDIT, POSITION-LIMIT REMOVAL & DYNAMIC POSITION LAYERING REPORT
+# Institutional EA — DEEP EXECUTION PIPELINE AUDIT, POSITION-LIMIT REMOVAL & DYNAMIC POSITION LAYERING REPORT
 
 **Date:** 2026-11-16  
-**Repository:** `https://github.com/gackstone/MT5-001-Bot.git`  
+**Repository:** `https://github.com/gackstone/Institutional-EA.git`  
 **Project Root:** `C:\Users\Gackstone_Baraka\Downloads\MT5 001`  
 **Branch:** `feature/specialization-gold-jpy-btc`
 

@@ -1,4 +1,4 @@
-# MT5-001 — FINAL EXECUTION PIPELINE AUDIT REPORT
+# Institutional EA — FINAL EXECUTION PIPELINE AUDIT REPORT
 
 **Date:** 2026-11-16  
 **Project Root:** `C:\Users\Gackstone_Baraka\Downloads\MT5 001`  

@@ -1,5 +1,5 @@
 """
-Comprehensive Test Suite for MT5-001 Cent Account Compatibility & Broker Symbol Discovery.
+Comprehensive Test Suite for Institutional EA Cent Account Compatibility & Broker Symbol Discovery.
 
 Covers all 30 Required Audit Scenarios:
  1. Standard USD account detection.

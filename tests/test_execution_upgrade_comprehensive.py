@@ -1,5 +1,5 @@
 """
-Comprehensive verification tests for the ArcadeFX + MT5 001 Execution,
+Comprehensive verification tests for the Institutional EA + MT5 001 Execution,
 Adaptive Scalping/Holding, MTF Simplification, Bridge Routing, Account
 Reconciliation, and Notification/Cloud Reliability upgrades.
 """

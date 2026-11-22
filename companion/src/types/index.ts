@@ -3,7 +3,7 @@ export type BotState = "STOPPED" | "STARTING" | "RUNNING" | "PAUSED" | "ERROR";
 export type ServiceStatus = "STOPPED" | "STARTING" | "RUNNING" | "ERROR";
 
 export interface ServiceInfo {
-  id: "engine" | "bridge" | "arcadefx" | "telegram" | "health" | "logs";
+  id: "engine" | "bridge" | "institutional_ea" | "telegram" | "health" | "logs";
   name: string;
   description: string;
   status: ServiceStatus;

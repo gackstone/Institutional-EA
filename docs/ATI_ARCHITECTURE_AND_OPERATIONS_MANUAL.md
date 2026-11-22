@@ -1,14 +1,14 @@
-# MT5-001 Adaptive Trading Intelligence (ATI) — Architecture & Operating Manual
+# Institutional EA Adaptive Trading Intelligence (ATI) — Architecture & Operating Manual
 
 ## 1. System Overview
 
-The **Adaptive Trading Intelligence (ATI)** subsystem transforms MT5-001 into a self-auditing, continuously learning, and experimentally self-improving algorithmic trading platform. 
+The **Adaptive Trading Intelligence (ATI)** subsystem transforms Institutional EA into a self-auditing, continuously learning, and experimentally self-improving algorithmic trading platform. 
 
 ATI operates as a non-invasive, consultative intelligence layer alongside the active trading engine.
 
 ```
 +--------------------------------------------------------------------------------------------------+
-|                                    MT5-001 ENGINE / ORCHESTRATOR                                |
+|                                    Institutional EA ENGINE / ORCHESTRATOR                                |
 |                                                                                                  |
 |   +--------------------+     +---------------------+     +-----------------------------------+   |
 |   |   Live MT5 / EA    | <-> | TradingBot          | <-> | Risk & Order Execution Engine     |   |

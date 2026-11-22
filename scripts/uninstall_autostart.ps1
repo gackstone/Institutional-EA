@@ -1,15 +1,15 @@
 <#
 .SYNOPSIS
-    Uninstalls Arcade Fx MT5 Supervisor Windows Scheduled Task and terminates running instances.
+    Uninstalls Institutional EA MT5 Supervisor Windows Scheduled Task and terminates running instances.
 #>
 
-$TaskName = "ArcadeFX_MT5_Supervisor"
+$TaskName = "InstitutionalEA_MT5_Supervisor"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 $LockFile = Join-Path $ProjectRoot "logs\supervisor.lock"
 
 Write-Host "=========================================================================" -ForegroundColor Yellow
-Write-Host "  ARCADE FX - MT5 SUPERVISOR UNINSTALLER" -ForegroundColor Yellow
+Write-Host "  INSTITUTIONAL EA - MT5 SUPERVISOR UNINSTALLER" -ForegroundColor Yellow
 Write-Host "=========================================================================" -ForegroundColor Yellow
 
 # 1. Stop and remove Scheduled Task
@@ -19,7 +19,7 @@ Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction Silent
 
 # 2. Remove User Startup folder fallback launcher if present
 $StartupDir = [Environment]::GetFolderPath('Startup')
-$VbsFile = Join-Path $StartupDir "ArcadeFX_MT5_Supervisor.vbs"
+$VbsFile = Join-Path $StartupDir "InstitutionalEA_MT5_Supervisor.vbs"
 if (Test-Path $VbsFile) {
     Write-Host "Removing User Startup launcher ($VbsFile)..." -ForegroundColor Cyan
     Remove-Item $VbsFile -Force -ErrorAction SilentlyContinue

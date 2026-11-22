@@ -1,5 +1,5 @@
 """
-Comprehensive Test Suite for AlgoVistra Strategy Skills & Combined Pipeline.
+Comprehensive Test Suite for Institutional EA Strategy Skills & Combined Pipeline.
 Tests all 15 video cards with synthetic candle fixtures (bullish and bearish),
 plus explicit negative scenarios:
 - Wick-only break (V9)
@@ -17,7 +17,7 @@ from typing import List
 
 from src.core.contracts import Candle
 from src.engine.types import Context, SkillResult
-from src.engine.pipeline import AlgoVistraEnginePipeline, SetupLifecycleState
+from src.engine.pipeline import InstitutionalEaEnginePipeline, SetupLifecycleState
 
 # Import skills
 from src.engine.skills import (
@@ -54,7 +54,7 @@ def make_candle(t_sec: int, o: float, h: float, l: float, c: float, complete: bo
     return Candle(time=dt, open=o, high=h, low=l, close=c, complete=complete)
 
 
-class TestAlgoVistraSkills(unittest.TestCase):
+class TestInstitutionalEaSkills(unittest.TestCase):
 
     # --------------------------------------------------------------------------
     # Card 1: Inducement + OB Entry (Video 1)
@@ -369,7 +369,7 @@ class TestAlgoVistraSkills(unittest.TestCase):
     # Pipeline Integration Test (H0 -> G7 sequential evaluation)
     # --------------------------------------------------------------------------
     def test_pipeline_sequential_evaluation(self):
-        pipeline = AlgoVistraEnginePipeline(log_json_path=None)
+        pipeline = InstitutionalEaEnginePipeline(log_json_path=None)
         candles = [
             make_candle(0, 1.1000, 1.1020, 1.0990, 1.1015),
             make_candle(1, 1.1015, 1.1060, 1.1010, 1.1055), # BOS

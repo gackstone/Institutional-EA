@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-18T11:26:28.113533+00:00",
+  "generated_at": "2026-11-22T11:34:13.863068+00:00",
   "account_mode": "DEMO (JustMarkets-Demo3, Safe Simulation / Dry-Run)",
   "starting_equity_usd": 2329.71,
   "ending_equity_usd": 2470.68,
@@ -614,8 +614,8 @@
       "mae_usd": 0.0,
       "rr_achieved": 0.0,
       "planned_rr": 0.0,
-      "exit_reason": "Insufficient M15 candle history (have 0, required 20)",
-      "pass_status": "PASS",
+      "exit_reason": "WEEKEND_INACTIVE: XAUUSD trading is disabled during weekend mode.",
+      "pass_status": "FAIL",
       "verification_notes": "Confirmed zero-candle buffer is safely rejected with explicit INSUFFICIENT_DATA reason."
     },
     {
@@ -641,7 +641,7 @@
       "mae_usd": 0.0,
       "rr_achieved": 0.0,
       "planned_rr": 0.0,
-      "exit_reason": "Recovered 120 M15 bars; cycle advanced to strategy scan (No valid SMC setup for XAUUSD @ 3978.80 | Killzone: INACTIVE | HTF Bias: [] | Levels: [PWH:4134.15, PWL:4104.65, PWO:4113.40, PWC:4125.40, PWM:4119.40, CWO:4125.40, CWH:4151.55, CWL:4116.65, PDH:4180.50, PDL:4169.50, PDO:4173.00, PDC:4177.00, PDM:4175.00, CDO:4177.00, CDH:4186.30, CDL:4173.50] | Interactions: None)",
+      "exit_reason": "Recovered 120 M15 bars; cycle advanced to strategy scan (WEEKEND_INACTIVE: XAUUSD trading is disabled during weekend mode.)",
       "pass_status": "PASS",
       "verification_notes": "Proved automatic transition from 0 bars to full multi-timeframe history and normal scanning."
     },
@@ -722,7 +722,7 @@
       "mae_usd": 0.0,
       "rr_achieved": 0.0,
       "planned_rr": 0.0,
-      "exit_reason": "News filter disabled (allowed=True); pipeline proceeded to Insufficient M15 candle history (have 0, required 20)",
+      "exit_reason": "News filter disabled (allowed=True); pipeline proceeded to WEEKEND_INACTIVE: XAUUSD trading is disabled during weekend mode.",
       "pass_status": "PASS",
       "verification_notes": "Confirmed economic-calendar/news restrictions are completely removed and never block trading."
     },

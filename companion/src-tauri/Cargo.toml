@@ -1,8 +1,10 @@
 [package]
-name = "mt5_oo1_companion"
+name = "institutional_ea_companion"
 version = "1.0.0"
-description = "MT5-OO1 Arcade FX Companion Desktop Application"
-authors = ["ArcadeFX Quant Systems"]
+description = "Institutional EA Companion Desktop Application"
+authors = ["Institutional EA"]
+repository = "https://github.com/gackstone/Institutional-EA"
+homepage = "https://github.com/gackstone/Institutional-EA"
 edition = "2021"
 
 [build-dependencies]

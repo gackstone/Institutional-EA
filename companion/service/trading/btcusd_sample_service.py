@@ -122,7 +122,7 @@ class BTCUSDSampleTradingService:
     def notify_startup(self) -> None:
         self._send_tg(
             f"startup_{int(time.time() // 10)}",
-            "🤖 <b>MT5-001 BTCUSD SAMPLE TRADING</b>\n\n"
+            "🤖 <b>Institutional EA BTCUSD SAMPLE TRADING</b>\n\n"
             "Status: INITIALIZING\n"
             f"Instrument: {self.broker_symbol}\n"
             "Trading Environment: DEMO ONLY\n"
@@ -135,7 +135,7 @@ class BTCUSDSampleTradingService:
         self._send_tg(
             f"conn_ok_{symbol}_{int(time.time() // 30)}",
             "🟢 <b>MT5 CONNECTION ESTABLISHED</b>\n\n"
-            "Bot: MT5-001\n"
+            "Bot: Institutional EA\n"
             f"Broker: {broker}\n"
             "Account Mode: DEMO\n"
             f"Instrument: {symbol}\n"
@@ -149,7 +149,7 @@ class BTCUSDSampleTradingService:
         self._send_tg(
             f"exec_{ticket}_{direction}",
             f"{icon} <b>BTCUSD {direction.upper()} EXECUTED</b>\n\n"
-            "Bot: MT5-001\n"
+            "Bot: Institutional EA\n"
             f"Instrument: {symbol}\n"
             f"Direction: {direction.upper()}\n"
             f"Entry Price: {entry:.2f}\n"
@@ -225,7 +225,7 @@ class BTCUSDSampleTradingService:
     def notify_bot_stopped(self, open_count: int) -> None:
         self._send_tg(
             f"stopped_{int(time.time() // 10)}",
-            "⏹ <b>MT5-001 BTCUSD BOT STOPPED</b>\n\n"
+            "⏹ <b>Institutional EA BTCUSD BOT STOPPED</b>\n\n"
             "Status: STOPPED\n"
             "New Entries: DISABLED\n"
             f"Open Positions: {open_count}\n"
@@ -572,7 +572,7 @@ class BTCUSDSampleTradingService:
             "tp": float(signal["take_profit"]),
             "deviation": 30,
             "magic": self.mt5_sync.bot_magic,
-            "comment": "MT5-001 BTC SAMPLE",
+            "comment": "Institutional EA BTC SAMPLE",
             "type_time": getattr(mt5, "ORDER_TIME_GTC", 0),
             "type_filling": getattr(mt5, "ORDER_FILLING_IOC", 1),
         }

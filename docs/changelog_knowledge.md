@@ -1,11 +1,11 @@
-# AlgoVistra Strategy Knowledge Migration Changelog
+# Institutional EA Strategy Knowledge Migration Changelog
 
-This document tracks all strategy rules, indicators, thresholds, and execution mechanisms migrated into the MT5 Python engine and `arcadefx.live` AI coach.
+This document tracks all strategy rules, indicators, thresholds, and execution mechanisms migrated into the MT5 Python engine and `Institutional EA Cloud` AI coach.
 
 Every item is classified under the Migration Protocol:
-- **REPLACED**: Legacy item contradicted an AlgoVistra video card. Replaced with canonical video rule.
+- **REPLACED**: Legacy item contradicted an Institutional EA video card. Replaced with canonical video rule.
 - **CORRECTED**: Legacy item was conceptually aligned but vague, missing closed-candle validation, or misconfigured.
-- **ADDED**: New AlgoVistra skill/rule previously missing in the repository.
+- **ADDED**: New Institutional EA skill/rule previously missing in the repository.
 - **KEPT [ASSUMPTION] / [EXISTING]**: Non-conflicting quantitative risk, execution hygiene, or broker compatibility layers preserved.
 
 ---
@@ -178,4 +178,4 @@ Every item is classified under the Migration Protocol:
 ### 2.12 Mandatory Analysis Order: H0 HTF Pools First (`[ART-10, ART-09, ART-04]`)
 * **Rule**: Mark higher-timeframe pools first (PDH/PDL, PWH/PWL), then watch lower timeframe for reaction. Liquidity first, then structure, then the zone.
 * **Status**: **ADDED (Pipeline H0 Gate)**.
-* **Implementation**: Upgraded `AlgoVistraEnginePipeline` with an initial `H0 HTF POOL MAP` gate prior to G1.
+* **Implementation**: Upgraded `InstitutionalEaEnginePipeline` with an initial `H0 HTF POOL MAP` gate prior to G1.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive Unit & Integration Test Suite for ArcadeFx MT5 Bot Agent.
+Comprehensive Unit & Integration Test Suite for Institutional EA MT5 Bot Agent.
 Verifies all 17 requirements and operational scenarios:
 1. Fresh installation with no machine credentials.
 2. Code normalization (lowercase -> uppercase, whitespace removal, 6-char validation).
@@ -46,7 +46,7 @@ from agent.mt5_bot_agent import (
 )
 
 
-class TestArcadeFxMT5BotAgent(unittest.TestCase):
+class TestInstitutionalEaMT5BotAgent(unittest.TestCase):
 
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
@@ -79,7 +79,7 @@ class TestArcadeFxMT5BotAgent(unittest.TestCase):
 
         self.agent = MT5BotAgent(api_url="https://arcadefx.live/api/v1")
         self.agent.notify_admin = MagicMock()
-        self.agent.signing_secret = hashlib.sha256(b"arcadefx_test_signing_secret_12345").hexdigest()
+        self.agent.signing_secret = hashlib.sha256(b"institutional_ea_test_signing_secret_12345").hexdigest()
         self.agent.offline_queue = OfflineEventQueue(db_path=self.queue_db)
 
     def tearDown(self):
@@ -203,11 +203,11 @@ class TestArcadeFxMT5BotAgent(unittest.TestCase):
     @patch("agent.mt5_bot_agent.MT5BotAgent._http_request")
     def test_07_network_error_and_offline_queue(self, mock_http):
         """Proves network disconnections return clear message and queue telemetry offline."""
-        mock_http.side_effect = RuntimeError("NETWORK ERROR: Unable to reach ArcadeFX.live. [Errno 11001] getaddrinfo failed")
+        mock_http.side_effect = RuntimeError("NETWORK ERROR: Unable to reach Institutional EA Cloud. [Errno 11001] getaddrinfo failed")
 
         success, msg = self.agent.pair_with_code("NET123")
         self.assertFalse(success)
-        self.assertIn("NETWORK ERROR: Unable to reach ArcadeFX.live", msg)
+        self.assertIn("NETWORK ERROR: Unable to reach Institutional EA Cloud", msg)
 
         # Heartbeat queuing offline
         self.agent.bot_state = "RUNNING"

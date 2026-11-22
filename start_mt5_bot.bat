@@ -1,10 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
-title Institutional MT5 Trading Bot & ArcadeFx Agent
+title Institutional MT5 Trading Bot & Institutional EA Agent
 cd /d "%~dp0"
 
 echo =======================================================================
-echo   INSTITUTIONAL MT5 TRADING BOT & ARCADEFx CLOUD AGENT LAUNCHER
+echo   INSTITUTIONAL MT5 TRADING BOT & INSTITUTIONAL EA CLOUD AGENT LAUNCHER
 echo =======================================================================
 echo.
 
@@ -22,9 +22,9 @@ if %ERRORLEVEL% neq 0 (
     echo [WARNING] Diagnostic self-check reported warnings or notices. Proceeding with caution...
 )
 
-:: 3. Launch ArcadeFX MT5 Bot Agent
+:: 3. Launch Institutional EA MT5 Bot Agent
 echo.
-echo [2/3] Launching ArcadeFX Cloud Bot Agent...
+echo [2/3] Launching Institutional EA Cloud Bot Agent...
 %PYTHON_EXE% agent\mt5_bot_agent.py %*
 
 if %ERRORLEVEL% neq 0 (

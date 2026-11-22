@@ -1,5 +1,5 @@
 # ==============================================================================
-# AlgoVistra & Art of Trading Combined Confirmation Engine Configuration
+# Institutional EA & Art of Trading Combined Confirmation Engine Configuration
 # Single Source of Truth for Quantitative Trading Parameters (28 Videos)
 # Precedence: Where Part 2 (Art of Trading) says AMENDS, Part 2 wins.
 # Every [ASSUMPTION] parameter must be tested via bar-replay and walk-forward ablation.

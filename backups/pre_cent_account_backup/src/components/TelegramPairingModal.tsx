@@ -96,44 +96,44 @@ export const TelegramPairingModal: React.FC<TelegramPairingModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-bg)] backdrop-blur-sm p-4 select-none animate-fadeIn">
-      <div className="relative w-full max-w-lg bg-arcade-card border border-arcade-border rounded-xl shadow-2xl p-6 text-arcade-text">
+      <div className="relative w-full max-w-lg bg-institutional-ea-card border border-institutional-ea-border rounded-xl shadow-2xl p-6 text-institutional-ea-text">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-arcade-textMuted hover:text-arcade-text hover:bg-arcade-secondary transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-institutional-ea-textMuted hover:text-institutional-ea-text hover:bg-institutional-ea-secondary transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="flex items-center gap-3 mb-5">
-          <div className="p-2.5 rounded-xl bg-[var(--arcade-primary-soft)] border border-arcade-primary/30 text-arcade-primary">
+          <div className="p-2.5 rounded-xl bg-[var(--institutional-ea-primary-soft)] border border-institutional-ea-primary/30 text-institutional-ea-primary">
             <Send className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-arcade-text">Telegram Remote Control</h2>
-            <p className="text-xs text-arcade-textMuted">Pair your Telegram account for trade alerts and remote command execution</p>
+            <h2 className="text-xl font-bold text-institutional-ea-text">Telegram Remote Control</h2>
+            <p className="text-xs text-institutional-ea-textMuted">Pair your Telegram account for trade alerts and remote command execution</p>
           </div>
         </div>
 
         {status.isPaired ? (
           <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-[var(--arcade-profit-soft)] border border-arcade-profit/30 flex items-start gap-3">
-              <CheckCircle2 className="w-5 h-5 text-arcade-profit mt-0.5 shrink-0" />
+            <div className="p-4 rounded-xl bg-[var(--institutional-ea-profit-soft)] border border-institutional-ea-profit/30 flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-institutional-ea-profit mt-0.5 shrink-0" />
               <div className="text-sm">
-                <div className="font-semibold text-arcade-profit">Telegram Channel Verified & Active</div>
-                <div className="text-xs text-arcade-textSecondary mt-1">
-                  Bot Username: <code className="text-arcade-primary font-mono">{status.botUsername || "Configured"}</code>
+                <div className="font-semibold text-institutional-ea-profit">Telegram Channel Verified & Active</div>
+                <div className="text-xs text-institutional-ea-textSecondary mt-1">
+                  Bot Username: <code className="text-institutional-ea-primary font-mono">{status.botUsername || "Configured"}</code>
                 </div>
-                <div className="text-xs text-arcade-textSecondary">
-                  Authorized Chat ID: <code className="text-arcade-text font-mono">{status.chatIdMasked}</code>
+                <div className="text-xs text-institutional-ea-textSecondary">
+                  Authorized Chat ID: <code className="text-institutional-ea-text font-mono">{status.chatIdMasked}</code>
                 </div>
               </div>
             </div>
 
-            <div className="p-3 bg-arcade-surface rounded-xl border border-arcade-border text-xs text-arcade-textMuted space-y-1">
-              <div className="font-medium text-arcade-text flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-arcade-primary" /> Authorized Commands Available:
+            <div className="p-3 bg-institutional-ea-surface rounded-xl border border-institutional-ea-border text-xs text-institutional-ea-textMuted space-y-1">
+              <div className="font-medium text-institutional-ea-text flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-institutional-ea-primary" /> Authorized Commands Available:
               </div>
-              <div className="font-mono text-[11px] text-arcade-textSecondary pl-5">
+              <div className="font-mono text-[11px] text-institutional-ea-textSecondary pl-5">
                 /status • /positions • /pause • /resume • /closeall • /health
               </div>
             </div>
@@ -142,15 +142,15 @@ export const TelegramPairingModal: React.FC<TelegramPairingModalProps> = ({
               <button
                 onClick={handleTestAlert}
                 disabled={isTesting}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-arcade-surface hover:bg-arcade-secondary border border-arcade-border text-arcade-text font-medium text-xs flex items-center justify-center gap-2 transition"
+                className="flex-1 py-2.5 px-4 rounded-xl bg-institutional-ea-surface hover:bg-institutional-ea-secondary border border-institutional-ea-border text-institutional-ea-text font-medium text-xs flex items-center justify-center gap-2 transition"
               >
-                <Bell className="w-4 h-4 text-arcade-warning" />
+                <Bell className="w-4 h-4 text-institutional-ea-warning" />
                 {isTesting ? "Sending Test..." : "Send Test Alert"}
               </button>
 
               <button
                 onClick={handleDisconnect}
-                className="py-2.5 px-4 rounded-xl bg-[var(--arcade-loss-soft)] hover:brightness-105 border border-arcade-loss/30 text-arcade-loss font-medium text-xs transition"
+                className="py-2.5 px-4 rounded-xl bg-[var(--institutional-ea-loss-soft)] hover:brightness-105 border border-institutional-ea-loss/30 text-institutional-ea-loss font-medium text-xs transition"
               >
                 Unlink Telegram
               </button>
@@ -158,18 +158,18 @@ export const TelegramPairingModal: React.FC<TelegramPairingModalProps> = ({
           </div>
         ) : (
           <div className="space-y-4 text-xs">
-            <div className="p-3.5 rounded-xl bg-arcade-surface border border-arcade-border text-arcade-textSecondary space-y-2">
-              <div className="font-semibold text-arcade-text">How to connect your Telegram Bot:</div>
-              <ol className="list-decimal pl-4 space-y-1 text-arcade-textMuted text-[11px]">
-                <li>Open Telegram and message <span className="text-arcade-primary font-mono font-medium">@BotFather</span></li>
-                <li>Send <code className="font-mono bg-arcade-card px-1 py-0.5 rounded border border-arcade-border">/newbot</code> and follow prompts to get your Bot API Token</li>
+            <div className="p-3.5 rounded-xl bg-institutional-ea-surface border border-institutional-ea-border text-institutional-ea-textSecondary space-y-2">
+              <div className="font-semibold text-institutional-ea-text">How to connect your Telegram Bot:</div>
+              <ol className="list-decimal pl-4 space-y-1 text-institutional-ea-textMuted text-[11px]">
+                <li>Open Telegram and message <span className="text-institutional-ea-primary font-mono font-medium">@BotFather</span></li>
+                <li>Send <code className="font-mono bg-institutional-ea-card px-1 py-0.5 rounded border border-institutional-ea-border">/newbot</code> and follow prompts to get your Bot API Token</li>
                 <li>Paste the API Token below and press Start Listening</li>
-                <li>Message your new bot with <code className="font-mono bg-arcade-card px-1 py-0.5 rounded border border-arcade-border">/start</code> to bind your Chat ID</li>
+                <li>Message your new bot with <code className="font-mono bg-institutional-ea-card px-1 py-0.5 rounded border border-institutional-ea-border">/start</code> to bind your Chat ID</li>
               </ol>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-arcade-text mb-1">
+              <label className="block text-xs font-semibold text-institutional-ea-text mb-1">
                 Telegram Bot Token (Optional if set in .env)
               </label>
               <input
@@ -177,14 +177,14 @@ export const TelegramPairingModal: React.FC<TelegramPairingModalProps> = ({
                 value={botTokenInput}
                 onChange={(e) => setBotTokenInput(e.target.value)}
                 placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-                className="w-full px-3 py-2 bg-arcade-surface border border-arcade-border rounded-xl text-arcade-text font-mono text-xs focus:border-arcade-primary outline-none transition"
+                className="w-full px-3 py-2 bg-institutional-ea-surface border border-institutional-ea-border rounded-xl text-institutional-ea-text font-mono text-xs focus:border-institutional-ea-primary outline-none transition"
               />
             </div>
 
             <button
               onClick={handleStartPairing}
               disabled={isPairing}
-              className="w-full py-2.5 px-4 rounded-xl bg-arcade-primary hover:bg-arcade-primaryHover active:bg-arcade-primaryActive text-white font-bold text-xs flex items-center justify-center gap-2 transition"
+              className="w-full py-2.5 px-4 rounded-xl bg-institutional-ea-primary hover:bg-institutional-ea-primaryHover active:bg-institutional-ea-primaryActive text-white font-bold text-xs flex items-center justify-center gap-2 transition"
             >
               <RefreshCw className={`w-4 h-4 ${isPairing ? "animate-spin" : ""}`} />
               {isPairing ? "Waiting for Telegram /start command..." : "Start Listening for /start"}
@@ -194,14 +194,14 @@ export const TelegramPairingModal: React.FC<TelegramPairingModalProps> = ({
 
         {/* Feedback alerts */}
         {errorMsg && (
-          <div className="mt-4 p-3 rounded-xl bg-[var(--arcade-loss-soft)] border border-arcade-loss/30 text-arcade-loss text-xs flex items-center gap-2">
+          <div className="mt-4 p-3 rounded-xl bg-[var(--institutional-ea-loss-soft)] border border-institutional-ea-loss/30 text-institutional-ea-loss text-xs flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{errorMsg}</span>
           </div>
         )}
 
         {successMsg && (
-          <div className="mt-4 p-3 rounded-xl bg-[var(--arcade-profit-soft)] border border-arcade-profit/30 text-arcade-profit text-xs flex items-center gap-2">
+          <div className="mt-4 p-3 rounded-xl bg-[var(--institutional-ea-profit-soft)] border border-institutional-ea-profit/30 text-institutional-ea-profit text-xs flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>{successMsg}</span>
           </div>

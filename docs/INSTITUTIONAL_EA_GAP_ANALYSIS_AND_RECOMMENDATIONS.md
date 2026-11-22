@@ -35,8 +35,8 @@ Each category is evaluated on a strict institutional benchmark (0 = Non-existent
 
 ## 2. Forensic Gap Analysis: Disconnected & Incomplete Modules
 
-### Gap 1: Disconnection of the 28-Video AlgoVistra Engine
-- **Finding:** The repository contains a massive, 23-module strategy pipeline (`src/engine/pipeline.py` and `src/engine/skills/*`) implementing advanced concepts from the AlgoVistra and Art of Trading curricula (e.g. `protected_swing_marker`, `range_liquidity_loop`, `ifvg_inversion`, `inducement_ob_entry`, `five_check_model`).
+### Gap 1: Disconnection of the 28-Video Institutional EA Engine
+- **Finding:** The repository contains a massive, 23-module strategy pipeline (`src/engine/pipeline.py` and `src/engine/skills/*`) implementing advanced concepts from the Institutional EA and Art of Trading curricula (e.g. `protected_swing_marker`, `range_liquidity_loop`, `ifvg_inversion`, `inducement_ob_entry`, `five_check_model`).
 - **Operational Reality:** This pipeline is **not wired into the live production trading orchestrator** (`src/core/orchestrator.py`). It is only executed in backtest scripts and manual trade assessor tools.
 - **Risk:** An operator reading the codebase or documentation might falsely assume these 23 institutional models govern live trade execution, when live trading actually runs the fast `ContinuousScalpingEngine` and legacy `SmcStrategyEngine`.
 
@@ -87,7 +87,7 @@ Each category is evaluated on a strict institutional benchmark (0 = Non-existent
 │ (Immediate)   │ Filter on High-Impact Releases    │ blowouts during    │
 │               │ (CPI, NFP, FOMC Blackout Windows) │ NFP/FOMC events.   │
 ├───────────────┼───────────────────────────────────┼────────────────────┤
-│ **PHASE 2**   │ Wire AlgoVistra 28-Video Pipeline │ Unlocks advanced   │
+│ **PHASE 2**   │ Wire Institutional EA 28-Video Pipeline │ Unlocks advanced   │
 │ (High)        │ Directly into Orchestrator        │ institutional entry│
 │               │ (Replace legacy fallback engine)  │ models live.       │
 ├───────────────┼───────────────────────────────────┼────────────────────┤

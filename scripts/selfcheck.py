@@ -463,23 +463,23 @@ def check_python_dependencies() -> CheckResult:
     )
 
 
-def check_arcadefx_cloud_agent() -> CheckResult:
-    """Checks ArcadeFX cloud agent pairing status."""
-    config_dir = Path.home() / ".arcadefx_agent"
+def check_institutional_ea_cloud_agent() -> CheckResult:
+    """Checks Institutional EA cloud agent pairing status."""
+    config_dir = Path.home() / ".institutional_ea_agent"
     creds_file = config_dir / "credentials.enc.json"
     if creds_file.exists():
         return CheckResult(
-            name="ArcadeFx Cloud Agent Pairing",
+            name="Institutional EA Cloud Agent Pairing",
             passed=True,
             details=f"Machine credentials verified at {creds_file}",
             fix_hint=""
         )
     return CheckResult(
-        name="ArcadeFx Cloud Agent Pairing",
+        name="Institutional EA Cloud Agent Pairing",
         passed=True,
         is_warning=True,
-        details="Machine is not yet paired to ArcadeFX.live dashboard.",
-        fix_hint="Run 'python agent/mt5_bot_agent.py' to pair this machine with your ArcadeFX dashboard."
+        details="Machine is not yet paired to Institutional EA Cloud dashboard.",
+        fix_hint="Run 'python agent/mt5_bot_agent.py' to pair this machine with your Institutional EA dashboard."
     )
 
 
@@ -494,7 +494,7 @@ def run_all_checks() -> Tuple[List[CheckResult], bool]:
         check_last_heartbeat_age(),
         check_telegram_settings(),
         check_power_plan_sleep(),
-        check_arcadefx_cloud_agent(),
+        check_institutional_ea_cloud_agent(),
     ]
     all_passed = all(c.passed for c in checks)
     return checks, all_passed

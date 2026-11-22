@@ -1,7 +1,7 @@
-# MT5-001 Cent Account Compatibility, Broker Symbol Discovery & Safe Multi-Account Execution Audit Report
+# Institutional EA Cent Account Compatibility, Broker Symbol Discovery & Safe Multi-Account Execution Audit Report
 
-**Report Identifier**: `MT5-001-CENT-COMPAT-20261116`  
-**System**: MT5-001 Quantitative Trading Engine & Companion Desktop Application  
+**Report Identifier**: `INSTITUTIONAL-EA-CENT-COMPAT-20261116`  
+**System**: Institutional EA Quantitative Trading Engine & Companion Desktop Application  
 **Execution Environment**: MetaTrader 5 Terminal Build 6296 (Windows 10 x64)  
 **Date of Audit**: 2026-11-16  
 **Final Audit Status**: `PARTIALLY VERIFIED` (Live Standard Demo Fully Verified; Cent Account Compatibility Verified Deterministically via 30/30 Test Scenarios)  
@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary
 
-This audit report documents the comprehensive architectural upgrade to the MT5-001 algorithmic trading engine and companion application, extending support from conventional standard accounts to broker cent accounts (including accounts utilizing cent-denominated balances such as `USC` and cent-specific instruments with `.c` suffixes).
+This audit report documents the comprehensive architectural upgrade to the Institutional EA algorithmic trading engine and companion application, extending support from conventional standard accounts to broker cent accounts (including accounts utilizing cent-denominated balances such as `USC` and cent-specific instruments with `.c` suffixes).
 
 The upgrade strictly maintains the non-negotiable quantitative trading restrictions:
 1. **Strict 3-Instrument Universe**: Only `XAUUSD`, `BTCUSD`, and `USDJPY` (and legitimate broker-discovered variants such as `.m`, `.c`, `.micro`) are tradable. All unauthorized symbols (`EURUSD`, `GBPUSD`, `US30`, `NAS100`, `US100.std`, etc.) are unconditionally rejected at both the bridge and broker boundaries.
@@ -26,7 +26,7 @@ The implementation was validated against a 30-scenario deterministic automated t
 
 ```
 +----------------------------------------------------------------------------------------------------+
-|                                     MT5-001 TRADING ENGINE ARCHITECTURE                            |
+|                                     Institutional EA TRADING ENGINE ARCHITECTURE                            |
 +----------------------------------------------------------------------------------------------------+
                                                   │
                  ┌────────────────────────────────┴───────────────────────────────┐
@@ -320,7 +320,7 @@ Before applying modifications, a snapshot was preserved in `backups/pre_cent_acc
   - `companion/electron/` (Electron main process script)
 - **Restoration Procedure**:
   ```powershell
-  Stop-Process -Name "MT5-OO1 Companion", "mt5_trading_engine", "mt5_bridge_server", "mt5_bot_agent" -Force -ErrorAction SilentlyContinue
+  Stop-Process -Name "Institutional EA Companion", "mt5_trading_engine", "mt5_bridge_server", "mt5_bot_agent" -Force -ErrorAction SilentlyContinue
   Copy-Item -Path "backups\pre_cent_account_backup\src\*" -Destination "src" -Recurse -Force
   Copy-Item -Path "backups\pre_cent_account_backup\config\*" -Destination "config" -Recurse -Force
   Copy-Item -Path "backups\pre_cent_account_backup\companion\src\*" -Destination "companion\src" -Recurse -Force
@@ -382,7 +382,7 @@ Before applying modifications, a snapshot was preserved in `backups/pre_cent_acc
 1. Launch MetaTrader 5 and ensure terminal algorithmic trading is permitted.
 2. Launch the companion:
    ```powershell
-   & "companion\release\win-unpacked\MT5-OO1 Companion.exe"
+   & "companion\release\win-unpacked\Institutional EA Companion.exe"
    ```
 3. Or run the engine directly from Python:
    ```powershell
@@ -422,4 +422,4 @@ Before applying modifications, a snapshot was preserved in `backups/pre_cent_acc
 - In accordance with Part 10 and Part 12 instructions, because the connected live demo account is a standard account and JustMarkets does not provision demo cent accounts on the connected `JustMarkets-Demo` server, this audit explicitly and honestly claims `PARTIALLY VERIFIED`. Live standard execution is verified, and cent compatibility is mathematically, architecturally, and systematically validated through automated tests.
 
 ---
-*Report certified by MT5-001 Integration & Quantitative Execution Audit.*
+*Report certified by Institutional EA Integration & Quantitative Execution Audit.*

@@ -1,20 +1,20 @@
-# Status script for Arcade Fx MT5 Supervisor and Child Services
+# Status script for Institutional EA MT5 Supervisor and Child Services
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 $LogsDir = Join-Path $ProjectRoot "logs"
 $LockFile = Join-Path $LogsDir "supervisor.lock"
-$TaskName = "ArcadeFX_MT5_Supervisor"
+$TaskName = "InstitutionalEA_MT5_Supervisor"
 
 Write-Host "=========================================================================" -ForegroundColor Cyan
-Write-Host "  ARCADE FX - MT5 BOT AND BRIDGE SUPERVISOR STATUS REPORT" -ForegroundColor Cyan
+Write-Host "  INSTITUTIONAL EA - MT5 BOT AND BRIDGE SUPERVISOR STATUS REPORT" -ForegroundColor Cyan
 Write-Host "=========================================================================" -ForegroundColor Cyan
 
 # 1. Windows Auto-Start Status (Task Scheduler or User Startup Folder)
 Write-Host ""
 Write-Host "[1. Windows Auto-Start Registration]" -ForegroundColor Yellow
 $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-$StartupVbs = Join-Path ([Environment]::GetFolderPath('Startup')) "ArcadeFX_MT5_Supervisor.vbs"
+$StartupVbs = Join-Path ([Environment]::GetFolderPath('Startup')) "InstitutionalEA_MT5_Supervisor.vbs"
 if ($Task) {
     $TaskInfo = Get-ScheduledTaskInfo -TaskName $TaskName -ErrorAction SilentlyContinue
     Write-Host "  Method       : Windows Scheduled Task ($TaskName)" -ForegroundColor Green

@@ -74,7 +74,7 @@ The **MT5 001** trading system is an advanced, hybrid quantitative algorithmic e
           │                                │                                │
           ▼                                ▼                                ▼
 ┌──────────────────┐             ┌──────────────────┐             ┌──────────────────┐
-│ Desktop UI       │             │ ArcadeFX Cloud   │             │ Telegram Bot     │
+│ Desktop UI       │             │ Institutional EA Cloud   │             │ Telegram Bot     │
 │ companion/       │             │ agent/           │             │ src/notifications│
 │ Electron/React   │             │ mt5_bot_agent.py │             │ 2-step console   │
 │ 6 services watch │             │ Outbound HTTPS   │             │ Rate-limited     │
@@ -129,7 +129,7 @@ A forensic directory survey identifies the following core modules and responsibi
   - `dashboard.py`: Rich CLI diagnostic dashboard.
   - `health_monitor.py`: Connection latency and socket health watchdog.
 - **`companion/`**: Electron desktop companion app (`main.cjs` 2,095 lines) supervising 6 core services (Engine, Bridge, Cloud Sync, Telegram, Health, Logs) with real-time React GUI.
-- **`agent/mt5_bot_agent.py` (1,307 lines)**: Outbound-only HTTPS cloud synchronization agent connecting MT5 to ArcadeFX Cloud platform with HMAC-SHA256 signed commands.
+- **`agent/mt5_bot_agent.py` (1,307 lines)**: Outbound-only HTTPS cloud synchronization agent connecting MT5 to Institutional EA Cloud platform with HMAC-SHA256 signed commands.
 - **`scripts/supervisor.py` (707 lines)**: Autonomous Windows OS process supervisor with exponential backoff restarts, port probes, and Named Mutex locking.
 
 ---
@@ -168,7 +168,7 @@ A forensic directory survey identifies the following core modules and responsibi
 │ 8. Candlestick & Chart Pattern│ IMPLEMENTED & WIRED  │ src/patterns/candlesticks.py;   │
 │    Confluence Engine (51 Pat.)│ VIA CONFLUENCE HOOK  │ chart_patterns.py; context.py   │
 ├───────────────────────────────┼──────────────────────┼─────────────────────────────────┤
-│ 9. 28-Video AlgoVistra / Art  │ FULLY IMPLEMENTED BUT│ src/engine/pipeline.py:1-650;   │
+│ 9. 28-Video Institutional EA / Art  │ FULLY IMPLEMENTED BUT│ src/engine/pipeline.py:1-650;   │
 │    of Trading 7-Gate Pipeline │ DISCONNECTED FROM BOT│ src/engine/skills/* (23 files)  │
 ├───────────────────────────────┼──────────────────────┼─────────────────────────────────┤
 │ 10. CISD (Change in State     │ IMPLEMENTED IN EXT.  │ src/strategies/cisd.py:1-120    │
@@ -346,7 +346,7 @@ The decision engine operates deterministically through a sequential 15-stage fil
 
 | Capability Domain | Fully Verified & Active | Implemented / Wired | Disconnected / Orphaned | Not Present |
 | :--- | :---: | :---: | :---: | :---: |
-| **Market Intelligence** | Multi-Timeframe (W1..M1), EMA/RSI/ATR/ADX, SMC Structure, FVGs, OBs, Liquidity Pools. | 51 Candlestick & Chart Patterns. | AlgoVistra 28-Video Pipeline, SMT Divergence, BPR/Unicorn. | Machine Learning RL. |
+| **Market Intelligence** | Multi-Timeframe (W1..M1), EMA/RSI/ATR/ADX, SMC Structure, FVGs, OBs, Liquidity Pools. | 51 Candlestick & Chart Patterns. | Institutional EA 28-Video Pipeline, SMT Divergence, BPR/Unicorn. | Machine Learning RL. |
 | **Trading Operations** | Market execution, Pending orders, Modifications, Partial close (50%), Break-even, Trailing stops, $5 profit locks. | Multi-symbol round-robin, Manual position adoption. | CISD Module, Trendline Liquidity Module. | Triangular Arbitrage. |
 | **Quantitative Analytics** | Monetary R:R, Weighted scoring, DSR, PBO, Monte Carlo Ruin, Fractional Kelly, GARCH(1,1), EWMA. | Genetic Parameter Optimizer. | N/A | Deep Neural Networks. |
 | **Automation & Reliability** | 24/7 continuous scan, OS Mutex, Socket exclusivity, 30s Watchdog, CUSUM decay guard, Cloud agent. | Desktop Companion (Electron), Telegram console. | N/A | Cloud Auto-Scaling. |
@@ -397,22 +397,22 @@ Dataset: 2024-01-01 to 2026-06-30 (1,063 OOS setups across EURUSD, GBPUSD, USDJP
 ## 13. Security, Operational Safety & Reliability Audit
 
 1. **Credential Safety**:
-   - Zero transmission of MT5 broker account passwords over the network or to ArcadeFX Cloud.
-   - Credentials stored locally in Windows protected directories (`%LOCALAPPDATA%\ArcadeFX\...`).
-2. **ArcadeFX Cloud Link**:
+   - Zero transmission of MT5 broker account passwords over the network or to Institutional EA Cloud.
+   - Credentials stored locally in Windows protected directories (`%LOCALAPPDATA%\Institutional EA\...`).
+2. **Institutional EA Cloud Link**:
    - Outbound-only HTTPS connections; zero listening ports exposed to the public Internet.
    - All inbound cloud commands require HMAC-SHA256 signatures with nonce, timestamp, and replay expiry.
    - Hard ceilings defined in `local_limits.json` cannot be overridden by cloud commands.
 3. **Process Supervision**:
    - `scripts/supervisor.py` manages process groups (`CREATE_NEW_PROCESS_GROUP`), prevents zombie tasks, and implements exponential restart backoffs (2s -> 60s).
-   - Single-instance mutexes (`Local\ArcadeFX_MT5_Supervisor_Mutex`) prevent dual-engine conflicts.
+   - Single-instance mutexes (`Local\InstitutionalEA_MT5_Supervisor_Mutex`) prevent dual-engine conflicts.
 
 ---
 
 ## 14. Hidden, Dormant & Undocumented Capabilities
 
 The audit revealed four major functional bodies present in code but detached from live execution:
-1. **AlgoVistra / Art of Trading 28-Video Confirmation Pipeline (`src/engine/pipeline.py` & `src/engine/skills/*`)**: Contains 23 rich skill modules implementing multi-gate confirmation, range loops, and five-check models. **Executed only in backtest scripts and manual assessor; detached from live orchestrator.**
+1. **Institutional EA / Art of Trading 28-Video Confirmation Pipeline (`src/engine/pipeline.py` & `src/engine/skills/*`)**: Contains 23 rich skill modules implementing multi-gate confirmation, range loops, and five-check models. **Executed only in backtest scripts and manual assessor; detached from live orchestrator.**
 2. **Modular Strategy Pipeline Adapters (`src/strategies/*`)**: CISD, trendline liquidity, and volume distribution modules exist, but are gated behind disabled feature flags (`upgrade_enabled: false`).
 3. **SMT Divergence Engine (`src/smc/smt.py`)**: Fully coded divergence logic between correlated assets; completely unreferenced in `src/`.
 4. **BPR & Unicorn Zones (`src/smc/bpr_ifvg_helpers.py`)**: Helper functions exist and config flags are `true`, but functions are never called by `strategy_engine.py`.
@@ -497,7 +497,7 @@ It **adapts dynamically** (modulating size via volatility and win rates, trackin
 3. Sophisticated quantitative validation infrastructure (Bailey's DSR, CSCV PBO, Monte Carlo ruin, and CUSUM decay guard).
 
 ### 16. What are its weakest areas?
-1. Disconnection between the 28-video AlgoVistra pipeline (`src/engine/pipeline.py`) and the active live production engine (`orchestrator.py`).
+1. Disconnection between the 28-video Institutional EA pipeline (`src/engine/pipeline.py`) and the active live production engine (`orchestrator.py`).
 2. High-impact economic news filter is explicitly disabled in default continuous scalping configuration.
 3. Static coarse correlation clusters rather than real-time rolling portfolio covariance optimization.
 
@@ -517,7 +517,7 @@ It **adapts dynamically** (modulating size via volatility and win rates, trackin
 
 ### 20. What improvements would produce the greatest safety and performance benefits?
 1. **Re-enabling the economic news blackout filter** on CPI, NFP, and FOMC announcements.
-2. **Wiring the 28-video AlgoVistra confirmation pipeline directly into the live orchestrator**.
+2. **Wiring the 28-video Institutional EA confirmation pipeline directly into the live orchestrator**.
 3. **Upgrading the supervisor process to actively probe socket heartbeats**, rather than relying solely on process PID presence.
 
 ---
@@ -534,7 +534,7 @@ It **adapts dynamically** (modulating size via volatility and win rates, trackin
 │ (Immediate)   │ Filter on High-Impact Releases    │ blowouts during    │
 │               │ (CPI, NFP, FOMC Blackout Windows) │ NFP/FOMC events.   │
 ├───────────────┼───────────────────────────────────┼────────────────────┤
-│ **PHASE 2**   │ Wire AlgoVistra 28-Video Pipeline │ Unlocks advanced   │
+│ **PHASE 2**   │ Wire Institutional EA 28-Video Pipeline │ Unlocks advanced   │
 │ (High)        │ Directly into Orchestrator        │ institutional entry│
 │               │ (Replace legacy fallback engine)  │ models live.       │
 ├───────────────┼───────────────────────────────────┼────────────────────┤

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ArcadeFx — MT5 Bot & Bridge Supervisor (scripts/supervisor.py)
+Institutional EA — MT5 Bot & Bridge Supervisor (scripts/supervisor.py)
 Autonomous Windows process supervisor for 24/7 institutional trading operations.
 
 Supervises:
@@ -15,7 +15,7 @@ Features:
   - Hidden background execution (CREATE_NO_WINDOW) with rotating log files (5MB, 5 backups)
   - Periodic health checks (Process alive + Socket connect probe on ports 5555/5556)
   - Clean shutdown handler without zombie processes
-  - Optional EA heartbeat file gating without DLL imports (MQL5/Files/arcadefx_ea_heartbeat.txt)
+  - Optional EA heartbeat file gating without DLL imports (MQL5/Files/institutional_ea_heartbeat.txt)
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ LOGS_DIR = PROJECT_ROOT / "logs"
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 SUPERVISOR_LOCK_FILE = LOGS_DIR / "supervisor.lock"
-MUTEX_NAME = "Local\\ArcadeFX_MT5_Supervisor_Mutex"
+MUTEX_NAME = "Local\\InstitutionalEA_MT5_Supervisor_Mutex"
 
 # Default Configuration Values
 DEFAULT_POLL_INTERVAL = 3
@@ -312,14 +312,14 @@ def is_mt5_terminal_active(custom_path: Optional[str] = None) -> Tuple[bool, str
 def check_ea_heartbeat_fresh(heartbeat_path: Optional[str], max_age_seconds: int = 30) -> Tuple[bool, str]:
     """
     Checks if an Expert Advisor heartbeat file is updated within max_age_seconds.
-    Zero DLL imports needed: EA writes timestamp into MQL5/Files/arcadefx_ea_heartbeat.txt
+    Zero DLL imports needed: EA writes timestamp into MQL5/Files/institutional_ea_heartbeat.txt
     """
     if not heartbeat_path:
         appdata = os.environ.get("APPDATA", "")
         terminal_base = os.path.join(appdata, "MetaQuotes", "Terminal")
         if os.path.exists(terminal_base):
             for d in os.listdir(terminal_base):
-                cand = os.path.join(terminal_base, d, "MQL5", "Files", "arcadefx_ea_heartbeat.txt")
+                cand = os.path.join(terminal_base, d, "MQL5", "Files", "institutional_ea_heartbeat.txt")
                 if os.path.exists(cand):
                     heartbeat_path = cand
                     break
@@ -506,7 +506,7 @@ class ChildProcessManager:
 # =============================================================================
 # Main Supervisor Engine
 # =============================================================================
-class ArcadeFxSupervisor:
+class InstitutionalEaSupervisor:
     def __init__(self, visible: bool = False):
         self.visible = visible
         self.config = load_app_config()
@@ -621,11 +621,11 @@ class ArcadeFxSupervisor:
     def run(self):
         if not self.lock.acquire():
             sup_logger.write_line("LOCK", "Another supervisor instance is already running. Exiting.", "WARNING")
-            print("Another ArcadeFx supervisor instance is already active.", file=sys.stderr)
+            print("Another Institutional EA supervisor instance is already active.", file=sys.stderr)
             sys.exit(0)
 
         self.register_signals()
-        sup_logger.write_line("SUPERVISOR", f"ArcadeFx Supervisor started (PID: {os.getpid()})")
+        sup_logger.write_line("SUPERVISOR", f"Institutional EA Supervisor started (PID: {os.getpid()})")
         sup_logger.write_line("SUPERVISOR", f"Python Interpreter: {self.python_exe}")
         sup_logger.write_line("SUPERVISOR", f"MT5 Gating Required: {self.require_mt5} | EA Heartbeat Required: {self.require_ea}")
 
@@ -695,11 +695,11 @@ class ArcadeFxSupervisor:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="ArcadeFx MT5 Bot & Bridge Supervisor")
+    parser = argparse.ArgumentParser(description="Institutional EA MT5 Bot & Bridge Supervisor")
     parser.add_argument("--visible", action="store_true", help="Launch children with visible terminal consoles (debug mode)")
     args = parser.parse_args()
 
-    supervisor = ArcadeFxSupervisor(visible=args.visible)
+    supervisor = InstitutionalEaSupervisor(visible=args.visible)
     supervisor.run()
 
 

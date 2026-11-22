@@ -1,1 +1,1 @@
-"""MT5-001 Local Control Service package."""
+"""Institutional EA Local Control Service package."""

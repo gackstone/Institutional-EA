@@ -76,7 +76,7 @@
     "bridge_extensions_enabled": false,
     "validation_gates_enabled": true
   },
-  "arcadefx": {
+  "institutional_ea": {
     "api_url": "https://arcadefx.live/api/v1",
     "heartbeat_interval_seconds": 20,
     "command_poll_interval_seconds": 3

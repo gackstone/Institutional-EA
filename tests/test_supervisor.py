@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test Suite for Arcade Fx Supervisor & Tooling (tests/test_supervisor.py)
+Test Suite for Institutional EA Supervisor & Tooling (tests/test_supervisor.py)
 Verifies:
   - Single-instance locking (mutex and stale lock recovery)
   - Python interpreter resolution
@@ -35,7 +35,7 @@ from scripts.supervisor import (
     wait_for_port_ready,
     RotatingLogWriter,
     ChildProcessManager,
-    ArcadeFxSupervisor,
+    InstitutionalEaSupervisor,
     load_app_config
 )
 
@@ -59,7 +59,7 @@ class TestSupervisorTooling(unittest.TestCase):
     def test_02_single_instance_locking_and_stale_recovery(self):
         """Proves named mutex and PID lockfile enforce single-instance and reclaim stale locks."""
         lock_path = os.path.join(self.logs_dir, "test_supervisor.lock")
-        mutex_name = f"Local\\Test_ArcadeFX_Supervisor_{os.getpid()}_{int(time.time()*1000)}"
+        mutex_name = f"Local\\Test_InstitutionalEA_Supervisor_{os.getpid()}_{int(time.time()*1000)}"
 
         lock1 = SingleInstanceLock(mutex_name=mutex_name, lock_file=lock_path)
         self.assertTrue(lock1.acquire(), "Initial lock acquisition must succeed")
@@ -80,7 +80,7 @@ class TestSupervisorTooling(unittest.TestCase):
     def test_03_stale_lock_pid_recovery(self):
         """Proves that a lockfile left by a non-existent dead PID is reclaimed."""
         lock_path = os.path.join(self.logs_dir, "stale_supervisor.lock")
-        mutex_name = f"Local\\Test_ArcadeFX_Stale_{os.getpid()}_{int(time.time()*1000)}"
+        mutex_name = f"Local\\Test_InstitutionalEA_Stale_{os.getpid()}_{int(time.time()*1000)}"
 
         # Write a fake dead PID (e.g. 999999)
         with open(lock_path, "w") as f:
@@ -171,7 +171,7 @@ class TestSupervisorTooling(unittest.TestCase):
 
     def test_09_supervisor_initialization(self):
         """Proves supervisor instantiates child process managers and configuration cleanly."""
-        supervisor = ArcadeFxSupervisor(visible=False)
+        supervisor = InstitutionalEaSupervisor(visible=False)
         self.assertIsNotNone(supervisor.bridge_child)
         self.assertIsNotNone(supervisor.bot_child)
         self.assertEqual(supervisor.bridge_child.name, "bridge")

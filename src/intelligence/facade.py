@@ -1,5 +1,5 @@
 """
-Unified Facade for the MT5-001 Adaptive Trading Intelligence (ATI) Subsystem.
+Unified Facade for the Institutional EA Adaptive Trading Intelligence (ATI) Subsystem.
 Coordinates Historian, Auditor, Learning, Regime, Execution, Laboratory,
 Self-Improvement Controller, and Reporting into a coherent, thread-safe interface.
 """

@@ -1,6 +1,6 @@
 """
-MT5-001 Adaptive Trading Intelligence (ATI) Subsystem.
-Transforms MT5-001 into a continuously learning, performance-auditing,
+Institutional EA Adaptive Trading Intelligence (ATI) Subsystem.
+Transforms Institutional EA into a continuously learning, performance-auditing,
 and experimentally self-improving algorithmic trading system.
 """
 

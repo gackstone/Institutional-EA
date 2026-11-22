@@ -1,9 +1,9 @@
-# Phase 0 Master Audit Report: AlgoVistra (Part 1) & Art of Trading (Part 2) Strategy Transfer
+# Phase 0 Master Audit Report: Institutional EA (Part 1) & Art of Trading (Part 2) Strategy Transfer
 
 **Date**: 2026-11-10  
 **Author**: Senior Quant-Developer Agent (Antigravity)  
 **Target Repository**: `MT5 001` (MetaTrader 5 Python Algorithmic Trading Engine)  
-**Scope**: 28 Videos (15 AlgoVistra + 13 Art of Trading) + arcadefx.live AI Coach  
+**Scope**: 28 Videos (15 Institutional EA + 13 Art of Trading) + Institutional EA Cloud AI Coach  
 **Status**: MASTER AUDIT COMPLETE — AWAITING USER APPROVAL PRIOR TO CODE MODIFICATIONS  
 
 ---
@@ -11,7 +11,7 @@
 ## 1. Executive Summary & Precedence Hierarchy
 
 This master audit evaluates the entire repository against **28 strategy videos**:
-- **Part 1**: 15 AlgoVistra Video Cards (`[VIDEO 1]` to `[VIDEO 15]`) and Combined Confirmation Pipeline (G1 to G7).
+- **Part 1**: 15 Institutional EA Video Cards (`[VIDEO 1]` to `[VIDEO 15]`) and Combined Confirmation Pipeline (G1 to G7).
 - **Part 2**: 13 Art of Trading Video Cards (`[ART-01]` to `[ART-13]`) and Amendments (`P2-2`, `P2-4`).
 
 ### Precedence Rule
@@ -35,7 +35,7 @@ Where Part 2 states **AMENDS**, Part 2 strictly overrides Part 1:
 
 ```
 MT5 001/
-├── agent/                         # Outbound HTTPS orchestration agent for arcadefx.live
+├── agent/                         # Outbound HTTPS orchestration agent for Institutional EA Cloud
 │   ├── mt5_bot_agent.py           # Pairing, telemetry heartbeat, remote command polling
 │   └── local_limits.json          # Hard local ceilings on cloud commands
 ├── config/                        # System, risk, and strategy configurations
@@ -47,8 +47,8 @@ MT5 001/
 ├── docs/                          # Architecture, rulebooks, and audit reports
 │   ├── audit_report.md            # This master audit report
 │   ├── changelog_knowledge.md     # Knowledge migration changelog
-│   └── arcadefx_coach_prompt.md   # Generated system prompt for arcadefx.live coach
-├── engine/ & src/engine/          # AlgoVistra & Art of Trading Confirmation Engine
+│   └── institutional_ea_coach_prompt.md   # Generated system prompt for Institutional EA Cloud coach
+├── engine/ & src/engine/          # Institutional EA & Art of Trading Confirmation Engine
 │   ├── pipeline.py                # Confirmation pipeline orchestrator (H0 -> G7)
 │   ├── types.py                   # SkillResult, Context, Candle normalization
 │   └── skills/                    # 15 pure function skill modules (to be expanded for Part 2)
@@ -57,10 +57,10 @@ MT5 001/
 │   └── coach_context.md           # Markdown context block for AI coach
 ├── mql5/Experts/PythonBridgeEA.mq5# Localhost TCP bridge server/client (port 5555/5556)
 ├── reports/                       # Validation and quantitative backtest reports
-│   └── algovistra_backtest_report.md # Closed-candle backtest & ablation study
+│   └── institutional_ea_backtest_report.md # Closed-candle backtest & ablation study
 ├── scripts/                       # Operational scripts & backtest runners
 │   ├── generate_coach_prompt.py   # AI coach prompt generator
-│   └── run_algovistra_backtest.py # Bar-replay backtest harness
+│   └── run_institutional_ea_backtest.py # Bar-replay backtest harness
 ├── src/                           # Core trading engine source code
 │   ├── core/                      # Config, market data engine, contracts, sessions
 │   ├── execution/                 # OrderManager, Pre-Trade Checklist, bridge client
@@ -84,7 +84,7 @@ Every existing strategy rule, indicator, skill, doc, and prompt is audited again
 | **Breakout vs Trap Classifier** | `src/engine/skills/breakout_trap_classifier.py` | Requires 2 consecutive candle closes beyond level. TRAP flag emits no trade action. | **YES — AMENDED by ART-10 & ART-06**: Breakout confirmation accepts 2 forms: 2 closes beyond OR close beyond + retest & hold. A TRAP (wick through, close back inside) + CHOCH feeds reversal setups. | **AMEND**: Implement `sweep_breakout_classifier` (`[ART-10]`). Support dual breakout confirmation and use TRAP + CHOCH as reversal setup trigger. |
 | **Range Invalidation on Swing Break** | `src/engine/skills/premium_discount_filter.py` | Computes 50% equilibrium from leg, but does not flag range invalidation when extreme is breached. | **YES — ART-07**: "If price closes below the swing low, structure is broken, discount was not cheap after all. Step aside and draw a new range." | **AMEND**: Add `range_valid` boolean flag to `premium_discount_filter` (`[ART-07]`). Set `range_valid=False` on closed candle beyond leg extreme; block entries until new range forms. |
 | **External / Internal Liquidity Loop** | `src/smc/liquidity.py` (missing loop) | Classifies static BSL/SSL pools, but has no concept of ERL -> IRL -> ERL flow or next draw target. | **MISSING — ART-03**: "From external, price tends to draw back to internal; from internal, it draws to external. Gap is often next draw before far high." | **ADD**: Implement `range_liquidity_loop` (`[ART-03]`). Expose `next_draw` (nearest unmitigated IRL gap, else nearest ERL pool) for target selection and R:R gating. |
-| **HTF Pool Mapping (H0 Gate)** | `src/engine/pipeline.py` (starts at G1) | Pipeline evaluates LTF candles without prior mapping of HTF liquidity pools. | **YES — ART-10, ART-09, ART-04**: "Mandatory analysis order: Higher-timeframe pools first (PDH/PDL, PWH/PWL), then lower-timeframe reaction. Liquidity first, then structure, then the zone." | **ADD / AMEND**: Prepend `H0 HTF POOL MAP` (`[ART-04, ART-10]`) before G1 in `AlgoVistraEnginePipeline`. Require HTF liquidity context before evaluating LTF triggers. |
+| **HTF Pool Mapping (H0 Gate)** | `src/engine/pipeline.py` (starts at G1) | Pipeline evaluates LTF candles without prior mapping of HTF liquidity pools. | **YES — ART-10, ART-09, ART-04**: "Mandatory analysis order: Higher-timeframe pools first (PDH/PDL, PWH/PWL), then lower-timeframe reaction. Liquidity first, then structure, then the zone." | **ADD / AMEND**: Prepend `H0 HTF POOL MAP` (`[ART-04, ART-10]`) before G1 in `InstitutionalEaEnginePipeline`. Require HTF liquidity context before evaluating LTF triggers. |
 | **Market Phase Labeler** | None (missing) | Repo lacks structured 4-phase tracking. | **MISSING — ART-01**: "1 Consolidation -> 2 Expansion -> 3 Retracement -> 4 Reversal. Easy to label afterward; live, pullback and reversal look the same." | **ADD**: Implement `market_phase_labeler` (`[ART-01]`) as descriptive, lagging context in G1b. Strictly forbid standalone trade triggering on phase. |
 | **Delivery Lens (IPDA)** | None (missing) | Repo has no delivery lens labeling. | **MISSING — ART-05**: "Price seeks liquidity or rebalances. Lens only. Caveat: nobody outside can prove an algorithm exists." | **ADD**: Implement `delivery_lens_context` (`[ART-05]`). Expose `{SEEKING_LIQUIDITY, REBALANCING}` labels for logging and coach explanation. |
 | **Candle Anatomy & S/R Zones** | `src/patterns/`, `src/smc/` | Uses exact horizontal lines for S/R; pattern library uses rigid candlestick rules. | **YES — ART-11**: "Support/resistance are zones, not lines. Candle anatomy: body = who won, wicks = rejection. Wait for level, define risk before entry." | **ADD**: Implement `candle_anatomy` and `sr_zones` (`[ART-11]`) with ATR-based zone width (`~0.5 x ATR`). Mandatory invalidation price defined before order send. |
@@ -93,7 +93,7 @@ Every existing strategy rule, indicator, skill, doc, and prompt is audited again
 | **Break-Even at +1.0R / +0.5R** | `src/risk/trade_management.py:468` | Fixed +1R / +0.5R BE move was replaced in Phase 1 with structure-only trailing stop. | **NO CONFLICT — Remediated**: Now matches `[VIDEO 12]` (`be_move_mode: "structure_only"`). | **KEEP**: Structure-only trailing behind confirmed protected swings. Fixed BE remains off by default. |
 | **First Pullback Entry** | `src/execution/continuous_scalper.py` | Buys/sells immediately upon first pullback. | **YES — VIDEO 1 & ART-06**: "Do not buy the first pullback (inducement). That pullback was bait. Wait for sweep." | **REMOVE / BLOCK**: Continuous scalper first-pullback entries blocked. Only `inducement_ob_entry` or `five_check_model` permitted. |
 | **Chasing Extended Moves** | `src/execution/order_manager.py` | Rejection if live fill R:R < 1.5 or extension > 30%. | **NO CONFLICT — Aligned**: Matches `[VIDEO 14]` (`entry_quality_guard`). | **KEEP & AUGMENT**: Combine with `next_draw` target from `range_liquidity_loop` (`[ART-03]`). |
-| **AI Coach Knowledge Base** | `docs/arcadefx_coach_prompt.md`, `knowledge/forex_kb.json` | Currently contains Part 1 15-video knowledge. Lacks Part 2 13-video ICT concepts, caveats, and futures modules. | **MISSING Part 2 Modules**: Lacks `five_check_model`, `swing_hierarchy`, `liquidity_pools_bsl_ssl`, `range_liquidity_loop`, `delivery_lens`, `futures_basics`, `futures_vs_forex`. | **AUGMENT**: Update `knowledge/forex_kb.json` with Part 2 modules, mandatory caveats, and regenerate `docs/arcadefx_coach_prompt.md`. |
+| **AI Coach Knowledge Base** | `docs/institutional_ea_coach_prompt.md`, `knowledge/forex_kb.json` | Currently contains Part 1 15-video knowledge. Lacks Part 2 13-video ICT concepts, caveats, and futures modules. | **MISSING Part 2 Modules**: Lacks `five_check_model`, `swing_hierarchy`, `liquidity_pools_bsl_ssl`, `range_liquidity_loop`, `delivery_lens`, `futures_basics`, `futures_vs_forex`. | **AUGMENT**: Update `knowledge/forex_kb.json` with Part 2 modules, mandatory caveats, and regenerate `docs/institutional_ea_coach_prompt.md`. |
 
 ---
 
@@ -155,13 +155,13 @@ G7  RISK/EXEC           size from stop (never margin); spread/session filters
 --> MANAGE              stop_management_policy (structure-only trailing)
 ```
 
-### Step 5: AI Coach Update (`docs/arcadefx_coach_prompt.md`)
+### Step 5: AI Coach Update (`docs/institutional_ea_coach_prompt.md`)
 - Regenerate coach prompt and context using `scripts/generate_coach_prompt.py`.
 - Include 11 new modules, mandatory caveat phrases, futures mechanics, and forex volume limitations.
 
 ### Step 6: Test Suite & Backtest
-- Add comprehensive synthetic unit tests for Part 2 in `tests/test_algovistra_skills.py` (covering FVG formulas, OB BOS+gap, sweep vs run, swing hierarchy confirmation lag, five-check all-or-nothing, range invalidation, sizing from stop).
-- Update bar-replay backtester `scripts/run_algovistra_backtest.py` and produce refreshed report in `reports/algovistra_backtest_report.md`.
+- Add comprehensive synthetic unit tests for Part 2 in `tests/test_institutional_ea_skills.py` (covering FVG formulas, OB BOS+gap, sweep vs run, swing hierarchy confirmation lag, five-check all-or-nothing, range invalidation, sizing from stop).
+- Update bar-replay backtester `scripts/run_institutional_ea_backtest.py` and produce refreshed report in `reports/institutional_ea_backtest_report.md`.
 - Commit and push to GitHub remote `origin/main`.
 
 ---

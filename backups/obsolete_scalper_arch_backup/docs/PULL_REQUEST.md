@@ -1,4 +1,4 @@
-# Pull Request: MT5-001 High-Speed Event-Driven GOLD & BTCUSD Multi-Position Scalping Engine (v3.0.0)
+# Pull Request: Institutional EA High-Speed Event-Driven GOLD & BTCUSD Multi-Position Scalping Engine (v3.0.0)
 
 - **Source Branch**: `scalper-gold`
 - **Target Branch**: `main` *(Do NOT merge without explicit user review and approval)*

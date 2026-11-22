@@ -1,5 +1,5 @@
 """
-Thread-safe SQLite repository for MT5-001 Companion Control Centre persistence.
+Thread-safe SQLite repository for Institutional EA Companion Control Centre persistence.
 """
 
 from __future__ import annotations

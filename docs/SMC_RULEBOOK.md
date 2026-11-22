@@ -1,4 +1,4 @@
-# Canonical SMC Rulebook (`MT5-001`)
+# Canonical SMC Rulebook (`Institutional EA`)
 
 > **Single Source of Truth**: This document and [`src/smc/smc_rulebook.py`](../src/smc/smc_rulebook.py) define the canonical Smart Money Concepts (SMC) rulebook (R1–R9), default parameters, Setup Quality Gate (G1–G8), and Risk-Rule Enforcement (R9) used across the bot.
 >

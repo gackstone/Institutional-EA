@@ -1,5 +1,5 @@
 """
-Regression Tests for Critical Remediation & Compliance Verification (MT5-001).
+Regression Tests for Critical Remediation & Compliance Verification (Institutional EA).
 Covers all 18 mandatory acceptance criteria:
 - Unconditional 3-symbol lockdown (cannot be disabled by config)
 - Final MT5 submission boundary protection (OrderManager, BridgeClient, LiveMT5Broker)

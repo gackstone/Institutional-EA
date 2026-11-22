@@ -202,19 +202,19 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
   };
 
   return (
-    <div className="p-3 sm:px-4 sm:py-3.5 bg-arcade-bg transition-colors duration-150">
+    <div className="p-3 sm:px-4 sm:py-3.5 bg-institutional-ea-bg transition-colors duration-150">
       {/* Header and Tab Navigation */}
       <div className="flex flex-wrap items-center justify-between gap-2.5 mb-2.5">
         <div className="flex items-center gap-2">
           {/* Two-Tab Navigation: Open Positions | Pending Orders */}
-          <div className="inline-flex rounded-xl bg-arcade-card p-1 border border-arcade-border shadow-xs">
+          <div className="inline-flex rounded-xl bg-institutional-ea-card p-1 border border-institutional-ea-border shadow-xs">
             <button
               type="button"
               onClick={() => setActiveTab("positions")}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === "positions"
-                  ? "bg-arcade-primary text-white shadow-xs"
-                  : "text-arcade-textSecondary hover:text-arcade-text hover:bg-arcade-secondary/60"
+                  ? "bg-institutional-ea-primary text-white shadow-xs"
+                  : "text-institutional-ea-textSecondary hover:text-institutional-ea-text hover:bg-institutional-ea-secondary/60"
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -225,8 +225,8 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
               onClick={() => setActiveTab("pending")}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === "pending"
-                  ? "bg-arcade-primary text-white shadow-xs"
-                  : "text-arcade-textSecondary hover:text-arcade-text hover:bg-arcade-secondary/60"
+                  ? "bg-institutional-ea-primary text-white shadow-xs"
+                  : "text-institutional-ea-textSecondary hover:text-institutional-ea-text hover:bg-institutional-ea-secondary/60"
               }`}
             >
               <Clock className="w-3.5 h-3.5" />
@@ -276,7 +276,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                     tp: 0
                   })
                 }
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-arcade-primary hover:bg-arcade-primaryHover active:scale-[0.98] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-institutional-ea-primary hover:bg-institutional-ea-primaryHover active:scale-[0.98] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
               >
                 <PlusCircle className="w-3.5 h-3.5" />
                 <span>Place Order</span>
@@ -296,7 +296,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
           )}
 
           {activeTab === "positions" && positions.length > 0 && (
-            <span className="hidden md:inline-flex text-[11px] text-arcade-textMuted px-2.5 py-1 rounded-lg bg-arcade-card border border-arcade-border font-mono shadow-xs">
+            <span className="hidden md:inline-flex text-[11px] text-institutional-ea-textMuted px-2.5 py-1 rounded-lg bg-institutional-ea-card border border-institutional-ea-border font-mono shadow-xs">
               Auto: {automatedPositions.length} | Manual: {manualPositions.length}
             </span>
           )}
@@ -305,7 +305,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
 
       {/* Action Toast Feedback */}
       {feedback && (
-        <div className="mb-2.5 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border bg-arcade-surface text-arcade-text border-arcade-border animate-yardly-slide">
+        <div className="mb-2.5 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border bg-institutional-ea-surface text-institutional-ea-text border-institutional-ea-border animate-institutional-ea-slide">
           {feedback.type === "success" ? (
             <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
           ) : (
@@ -316,27 +316,27 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
       )}
 
       {/* Main Table / Empty State Container */}
-      <div className="yardly-card overflow-hidden shadow-xs">
+      <div className="institutional-ea-card overflow-hidden shadow-xs">
         {activeTab === "positions" ? (
           /* ========================================================================= */
           /* ACTIVE POSITIONS TABLE / EMPTY STATE                                       */
           /* ========================================================================= */
           positions.length === 0 ? (
             <div className="py-12 px-4 text-center space-y-2 select-none">
-              <div className="w-12 h-12 rounded-2xl bg-arcade-secondary border border-arcade-border flex items-center justify-center mx-auto text-arcade-textMuted">
+              <div className="w-12 h-12 rounded-2xl bg-institutional-ea-secondary border border-institutional-ea-border flex items-center justify-center mx-auto text-institutional-ea-textMuted">
                 <Layers className="w-6 h-6 stroke-[1.8]" />
               </div>
-              <h3 className="text-sm font-bold text-arcade-text tracking-tight font-sans">
+              <h3 className="text-sm font-bold text-institutional-ea-text tracking-tight font-sans">
                 No active market positions
               </h3>
-              <p className="text-xs text-arcade-textMuted max-w-md mx-auto leading-relaxed font-sans">
+              <p className="text-xs text-institutional-ea-textMuted max-w-md mx-auto leading-relaxed font-sans">
                 Your open positions will appear here as soon as trades are executed through MT5 or bot automation.
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-mono">
-                <thead className="bg-arcade-surfaceSecondary text-arcade-textSecondary text-[10px] uppercase font-sans font-bold border-b border-arcade-border select-none">
+                <thead className="bg-institutional-ea-surfaceSecondary text-institutional-ea-textSecondary text-[10px] uppercase font-sans font-bold border-b border-institutional-ea-border select-none">
                   <tr>
                     <th className="py-2.5 px-3">Ticket</th>
                     <th className="py-2.5 px-3">Origin</th>
@@ -351,7 +351,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                     <th className="py-2.5 px-3 text-center">Manage</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-arcade-border font-mono">
+                <tbody className="divide-y divide-institutional-ea-border font-mono">
                   {positions.map((pos) => {
                     const isBuy = pos.orderType === "BUY";
                     const isProfitable = pos.profit > 0.0001;
@@ -361,10 +361,10 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                     return (
                       <tr
                         key={pos.ticket}
-                        className="hover:bg-arcade-secondary/40 transition-colors"
+                        className="hover:bg-institutional-ea-secondary/40 transition-colors"
                       >
                         {/* Ticket */}
-                        <td className="py-2.5 px-3 text-arcade-textSecondary font-semibold">
+                        <td className="py-2.5 px-3 text-institutional-ea-textSecondary font-semibold">
                           #{pos.ticket}
                         </td>
 
@@ -376,7 +376,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                               MANUAL
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-arcade-primary/10 text-arcade-primary border border-arcade-primary/25">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-institutional-ea-primary/10 text-institutional-ea-primary border border-institutional-ea-primary/25">
                               <Bot className="w-2.5 h-2.5" />
                               AUTO
                             </span>
@@ -384,7 +384,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                         </td>
 
                         {/* Symbol */}
-                        <td className="py-2.5 px-3 font-bold text-arcade-text font-sans">
+                        <td className="py-2.5 px-3 font-bold text-institutional-ea-text font-sans">
                           {pos.symbol}
                         </td>
 
@@ -407,17 +407,17 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                         </td>
 
                         {/* Lots */}
-                        <td className="py-2.5 px-3 text-arcade-text font-bold">
+                        <td className="py-2.5 px-3 text-institutional-ea-text font-bold">
                           {pos.volume.toFixed(2)}
                         </td>
 
                         {/* Open Price */}
-                        <td className="py-2.5 px-3 text-arcade-textSecondary">
+                        <td className="py-2.5 px-3 text-institutional-ea-textSecondary">
                           {pos.openPrice.toFixed(5)}
                         </td>
 
                         {/* Current Price */}
-                        <td className="py-2.5 px-3 text-arcade-text font-bold">
+                        <td className="py-2.5 px-3 text-institutional-ea-text font-bold">
                           {pos.currentPrice.toFixed(5)}
                         </td>
 
@@ -437,7 +437,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                         </td>
 
                         {/* Take Profit */}
-                        <td className="py-2.5 px-3 text-arcade-textSecondary">
+                        <td className="py-2.5 px-3 text-institutional-ea-textSecondary">
                           {pos.tp > 0 ? pos.tp.toFixed(5) : "—"}
                         </td>
 
@@ -448,7 +448,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                               ? "text-emerald-600 dark:text-emerald-400"
                               : isLoss
                               ? "text-rose-600 dark:text-rose-400"
-                              : "text-arcade-text"
+                              : "text-institutional-ea-text"
                           }`}
                         >
                           <div>
@@ -456,7 +456,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                             {Math.abs(pos.normalizedProfit ?? pos.profit).toFixed(2)}
                           </div>
                           {pos.nativeProfit !== undefined && Math.abs(pos.nativeProfit) !== Math.abs(pos.normalizedProfit ?? pos.profit) && (
-                            <div className="text-[10px] text-arcade-textMuted font-mono font-normal">
+                            <div className="text-[10px] text-institutional-ea-textMuted font-mono font-normal">
                               {isProfitable ? "+" : isLoss ? "-" : ""}{Math.abs(pos.nativeProfit).toFixed(2)} USC
                             </div>
                           )}
@@ -471,7 +471,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                               onClick={() => handleBreakEven(pos.ticket)}
                               disabled={actionLoading !== null}
                               title="Move Stop Loss to Entry Price (Break-Even)"
-                              className="px-2 py-1 rounded-md bg-arcade-card hover:bg-arcade-secondary text-arcade-text border border-arcade-border text-[10px] font-bold transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+                              className="px-2 py-1 rounded-md bg-institutional-ea-card hover:bg-institutional-ea-secondary text-institutional-ea-text border border-institutional-ea-border text-[10px] font-bold transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
                             >
                               BE
                             </button>
@@ -488,9 +488,9 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                                 })
                               }
                               title="Set Trailing Stop"
-                              className="p-1 rounded-md bg-arcade-card hover:bg-arcade-secondary text-arcade-text border border-arcade-border text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
+                              className="p-1 rounded-md bg-institutional-ea-card hover:bg-institutional-ea-secondary text-institutional-ea-text border border-institutional-ea-border text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
                             >
-                              <TrendingUp className="w-3.5 h-3.5 text-arcade-primary" />
+                              <TrendingUp className="w-3.5 h-3.5 text-institutional-ea-primary" />
                             </button>
 
                             {/* Edit SL/TP */}
@@ -507,9 +507,9 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                                 })
                               }
                               title="Edit Stop Loss & Take Profit"
-                              className="p-1 rounded-md bg-arcade-card hover:bg-arcade-secondary text-arcade-text border border-arcade-border text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
+                              className="p-1 rounded-md bg-institutional-ea-card hover:bg-institutional-ea-secondary text-institutional-ea-text border border-institutional-ea-border text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
                             >
-                              <Sliders className="w-3.5 h-3.5 text-arcade-textSecondary" />
+                              <Sliders className="w-3.5 h-3.5 text-institutional-ea-textSecondary" />
                             </button>
 
                             {/* Close Position */}
@@ -544,20 +544,20 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
           /* ========================================================================= */
           pendingOrders.length === 0 ? (
             <div className="py-12 px-4 text-center space-y-2 select-none">
-              <div className="w-12 h-12 rounded-2xl bg-arcade-secondary border border-arcade-border flex items-center justify-center mx-auto text-arcade-textMuted">
+              <div className="w-12 h-12 rounded-2xl bg-institutional-ea-secondary border border-institutional-ea-border flex items-center justify-center mx-auto text-institutional-ea-textMuted">
                 <Clock className="w-6 h-6 stroke-[1.8]" />
               </div>
-              <h3 className="text-sm font-bold text-arcade-text tracking-tight font-sans">
+              <h3 className="text-sm font-bold text-institutional-ea-text tracking-tight font-sans">
                 No pending orders
               </h3>
-              <p className="text-xs text-arcade-textMuted max-w-md mx-auto leading-relaxed font-sans">
+              <p className="text-xs text-institutional-ea-textMuted max-w-md mx-auto leading-relaxed font-sans">
                 Your pending limit and stop orders submitted by bot automation or placed manually will appear here.
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-mono">
-                <thead className="bg-arcade-surfaceSecondary text-arcade-textSecondary text-[10px] uppercase font-sans font-bold border-b border-arcade-border select-none">
+                <thead className="bg-institutional-ea-surfaceSecondary text-institutional-ea-textSecondary text-[10px] uppercase font-sans font-bold border-b border-institutional-ea-border select-none">
                   <tr>
                     <th className="py-2.5 px-3">Ticket</th>
                     <th className="py-2.5 px-3">Symbol</th>
@@ -569,33 +569,33 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                     <th className="py-2.5 px-3 text-center">Manage</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-arcade-border font-mono">
+                <tbody className="divide-y divide-institutional-ea-border font-mono">
                   {pendingOrders.map((ord) => (
                     <tr
                       key={ord.ticket}
-                      className="hover:bg-arcade-secondary/40 transition-colors"
+                      className="hover:bg-institutional-ea-secondary/40 transition-colors"
                     >
-                      <td className="py-2.5 px-3 text-arcade-textSecondary font-semibold">
+                      <td className="py-2.5 px-3 text-institutional-ea-textSecondary font-semibold">
                         #{ord.ticket}
                       </td>
-                      <td className="py-2.5 px-3 font-bold text-arcade-text font-sans">
+                      <td className="py-2.5 px-3 font-bold text-institutional-ea-text font-sans">
                         {ord.symbol}
                       </td>
                       <td className="py-2.5 px-3 font-sans">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-arcade-primary/10 text-arcade-primary border border-arcade-primary/25">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-institutional-ea-primary/10 text-institutional-ea-primary border border-institutional-ea-primary/25">
                           {ord.orderType}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-arcade-text font-bold">
+                      <td className="py-2.5 px-3 text-institutional-ea-text font-bold">
                         {ord.volume.toFixed(2)}
                       </td>
-                      <td className="py-2.5 px-3 text-arcade-text font-bold">
+                      <td className="py-2.5 px-3 text-institutional-ea-text font-bold">
                         {ord.price.toFixed(5)}
                       </td>
-                      <td className="py-2.5 px-3 text-arcade-textSecondary">
+                      <td className="py-2.5 px-3 text-institutional-ea-textSecondary">
                         {ord.sl > 0 ? ord.sl.toFixed(5) : "—"}
                       </td>
-                      <td className="py-2.5 px-3 text-arcade-textSecondary">
+                      <td className="py-2.5 px-3 text-institutional-ea-textSecondary">
                         {ord.tp > 0 ? ord.tp.toFixed(5) : "—"}
                       </td>
                       <td className="py-2.5 px-3 font-sans">
@@ -615,9 +615,9 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                               })
                             }
                             title="Modify Price, SL, TP"
-                            className="p-1 rounded-md bg-arcade-card hover:bg-arcade-secondary text-arcade-text border border-arcade-border text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
+                            className="p-1 rounded-md bg-institutional-ea-card hover:bg-institutional-ea-secondary text-institutional-ea-text border border-institutional-ea-border text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
                           >
-                            <Sliders className="w-3.5 h-3.5 text-arcade-textSecondary" />
+                            <Sliders className="w-3.5 h-3.5 text-institutional-ea-textSecondary" />
                           </button>
 
                           {/* Cancel Order */}
@@ -643,17 +643,17 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
 
       {/* MODAL: Modify SL / TP / Price */}
       {modifyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-yardly-fade">
-          <div className="bg-arcade-card border border-arcade-border rounded-2xl shadow-2xl p-5 max-w-sm w-full text-arcade-text space-y-4">
-            <h3 className="text-sm font-bold flex items-center gap-2 text-arcade-text font-sans">
-              <Sliders className="w-4 h-4 text-arcade-primary" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-institutional-ea-fade">
+          <div className="bg-institutional-ea-card border border-institutional-ea-border rounded-2xl shadow-2xl p-5 max-w-sm w-full text-institutional-ea-text space-y-4">
+            <h3 className="text-sm font-bold flex items-center gap-2 text-institutional-ea-text font-sans">
+              <Sliders className="w-4 h-4 text-institutional-ea-primary" />
               <span>Modify #{modifyModal.ticket} ({modifyModal.symbol})</span>
             </h3>
 
             <div className="space-y-3 text-xs font-sans">
               {modifyModal.isPending && (
                 <div>
-                  <label className="block text-arcade-textSecondary mb-1 font-medium">Target Price</label>
+                  <label className="block text-institutional-ea-textSecondary mb-1 font-medium">Target Price</label>
                   <input
                     type="number"
                     step="any"
@@ -661,12 +661,12 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                     onChange={(e) =>
                       setModifyModal({ ...modifyModal, price: parseFloat(e.target.value) || 0 })
                     }
-                    className="w-full px-3 py-1.5 bg-arcade-surface border border-arcade-border rounded-lg font-mono text-arcade-text focus:border-arcade-primary outline-none transition"
+                    className="w-full px-3 py-1.5 bg-institutional-ea-surface border border-institutional-ea-border rounded-lg font-mono text-institutional-ea-text focus:border-institutional-ea-primary outline-none transition"
                   />
                 </div>
               )}
               <div>
-                <label className="block text-arcade-textSecondary mb-1 font-medium">Stop Loss (0 to remove)</label>
+                <label className="block text-institutional-ea-textSecondary mb-1 font-medium">Stop Loss (0 to remove)</label>
                 <input
                   type="number"
                   step="any"
@@ -674,11 +674,11 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                   onChange={(e) =>
                     setModifyModal({ ...modifyModal, sl: parseFloat(e.target.value) || 0 })
                   }
-                  className="w-full px-3 py-1.5 bg-arcade-surface border border-arcade-border rounded-lg font-mono text-arcade-text focus:border-arcade-primary outline-none transition"
+                  className="w-full px-3 py-1.5 bg-institutional-ea-surface border border-institutional-ea-border rounded-lg font-mono text-institutional-ea-text focus:border-institutional-ea-primary outline-none transition"
                 />
               </div>
               <div>
-                <label className="block text-arcade-textSecondary mb-1 font-medium">Take Profit (0 to remove)</label>
+                <label className="block text-institutional-ea-textSecondary mb-1 font-medium">Take Profit (0 to remove)</label>
                 <input
                   type="number"
                   step="any"
@@ -686,16 +686,16 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                   onChange={(e) =>
                     setModifyModal({ ...modifyModal, tp: parseFloat(e.target.value) || 0 })
                   }
-                  className="w-full px-3 py-1.5 bg-arcade-surface border border-arcade-border rounded-lg font-mono text-arcade-text focus:border-arcade-primary outline-none transition"
+                  className="w-full px-3 py-1.5 bg-institutional-ea-surface border border-institutional-ea-border rounded-lg font-mono text-institutional-ea-text focus:border-institutional-ea-primary outline-none transition"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-arcade-border">
+            <div className="flex justify-end gap-2 pt-2 border-t border-institutional-ea-border">
               <button
                 type="button"
                 onClick={() => setModifyModal(null)}
-                className="px-3.5 py-1.5 bg-arcade-surface hover:bg-arcade-secondary text-arcade-text text-xs rounded-xl border border-arcade-border transition cursor-pointer"
+                className="px-3.5 py-1.5 bg-institutional-ea-surface hover:bg-institutional-ea-secondary text-institutional-ea-text text-xs rounded-xl border border-institutional-ea-border transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -703,7 +703,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                 type="button"
                 onClick={handleSaveModify}
                 disabled={actionLoading !== null}
-                className="px-4 py-1.5 bg-arcade-primary hover:bg-arcade-primaryHover text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50"
+                className="px-4 py-1.5 bg-institutional-ea-primary hover:bg-institutional-ea-primaryHover text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50"
               >
                 Save Changes
               </button>
@@ -714,24 +714,24 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
 
       {/* MODAL: Close / Partial Close */}
       {closeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-yardly-fade">
-          <div className="bg-arcade-card border border-rose-500/40 rounded-2xl shadow-2xl p-5 max-w-sm w-full text-arcade-text space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-institutional-ea-fade">
+          <div className="bg-institutional-ea-card border border-rose-500/40 rounded-2xl shadow-2xl p-5 max-w-sm w-full text-institutional-ea-text space-y-4">
             <div className="flex items-center gap-2.5 text-rose-500">
               <div className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
                 <XCircle className="w-4 h-4 text-rose-500" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-arcade-text font-sans">
+                <h3 className="text-sm font-bold text-institutional-ea-text font-sans">
                   Close Position #{closeModal.ticket}
                 </h3>
-                <p className="text-[11px] text-arcade-textMuted font-mono">
+                <p className="text-[11px] text-institutional-ea-textMuted font-mono">
                   {closeModal.symbol} | Max Lots: {closeModal.maxVolume}
                 </p>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs text-arcade-textSecondary mb-1 font-medium font-sans">
+              <label className="block text-xs text-institutional-ea-textSecondary mb-1 font-medium font-sans">
                 Volume to Close (Lots):
               </label>
               <div className="flex items-center gap-2">
@@ -750,25 +750,25 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                       )
                     })
                   }
-                  className="w-full px-3 py-1.5 bg-arcade-surface border border-arcade-border rounded-lg font-mono text-arcade-text focus:border-arcade-primary outline-none"
+                  className="w-full px-3 py-1.5 bg-institutional-ea-surface border border-institutional-ea-border rounded-lg font-mono text-institutional-ea-text focus:border-institutional-ea-primary outline-none"
                 />
                 <button
                   type="button"
                   onClick={() =>
                     setCloseModal({ ...closeModal, volumeToClose: closeModal.maxVolume })
                   }
-                  className="px-3 py-1.5 bg-arcade-surface border border-arcade-border text-arcade-text text-xs rounded-lg hover:bg-arcade-secondary font-bold font-sans transition cursor-pointer"
+                  className="px-3 py-1.5 bg-institutional-ea-surface border border-institutional-ea-border text-institutional-ea-text text-xs rounded-lg hover:bg-institutional-ea-secondary font-bold font-sans transition cursor-pointer"
                 >
                   Full
                 </button>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-arcade-border">
+            <div className="flex justify-end gap-2 pt-2 border-t border-institutional-ea-border">
               <button
                 type="button"
                 onClick={() => setCloseModal(null)}
-                className="px-3.5 py-1.5 bg-arcade-surface hover:bg-arcade-secondary text-arcade-text text-xs rounded-xl border border-arcade-border transition cursor-pointer font-sans"
+                className="px-3.5 py-1.5 bg-institutional-ea-surface hover:bg-institutional-ea-secondary text-institutional-ea-text text-xs rounded-xl border border-institutional-ea-border transition cursor-pointer font-sans"
               >
                 Cancel
               </button>
@@ -787,18 +787,18 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
 
       {/* MODAL: Trailing Stop Setup */}
       {trailModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-yardly-fade">
-          <div className="bg-arcade-card border border-arcade-border rounded-2xl shadow-2xl p-5 max-w-sm w-full text-arcade-text space-y-4">
-            <h3 className="text-sm font-bold flex items-center gap-2 text-arcade-text font-sans">
-              <TrendingUp className="w-4 h-4 text-arcade-primary" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-institutional-ea-fade">
+          <div className="bg-institutional-ea-card border border-institutional-ea-border rounded-2xl shadow-2xl p-5 max-w-sm w-full text-institutional-ea-text space-y-4">
+            <h3 className="text-sm font-bold flex items-center gap-2 text-institutional-ea-text font-sans">
+              <TrendingUp className="w-4 h-4 text-institutional-ea-primary" />
               <span>Trailing Stop #{trailModal.ticket} ({trailModal.symbol})</span>
             </h3>
-            <p className="text-xs text-arcade-textMuted font-sans">
+            <p className="text-xs text-institutional-ea-textMuted font-sans">
               Set distance behind market price in broker points/pips.
             </p>
 
             <div>
-              <label className="block text-xs text-arcade-textSecondary mb-1 font-medium font-sans">
+              <label className="block text-xs text-institutional-ea-textSecondary mb-1 font-medium font-sans">
                 Trailing Distance (Points):
               </label>
               <input
@@ -809,7 +809,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                 onChange={(e) =>
                   setTrailModal({ ...trailModal, points: parseInt(e.target.value, 10) || 100 })
                 }
-                className="w-full px-3 py-1.5 bg-arcade-surface border border-arcade-border rounded-lg font-mono text-arcade-text focus:border-arcade-primary outline-none"
+                className="w-full px-3 py-1.5 bg-institutional-ea-surface border border-institutional-ea-border rounded-lg font-mono text-institutional-ea-text focus:border-institutional-ea-primary outline-none"
               />
               <div className="flex gap-1.5 mt-2">
                 {[100, 200, 300, 500].map((pts) => (
@@ -817,7 +817,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                     key={pts}
                     type="button"
                     onClick={() => setTrailModal({ ...trailModal, points: pts })}
-                    className="flex-1 py-1 rounded-lg bg-arcade-surface hover:bg-arcade-secondary border border-arcade-border text-[10px] font-bold font-mono transition cursor-pointer"
+                    className="flex-1 py-1 rounded-lg bg-institutional-ea-surface hover:bg-institutional-ea-secondary border border-institutional-ea-border text-[10px] font-bold font-mono transition cursor-pointer"
                   >
                     {pts} pts
                   </button>
@@ -825,11 +825,11 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-arcade-border">
+            <div className="flex justify-end gap-2 pt-2 border-t border-institutional-ea-border">
               <button
                 type="button"
                 onClick={() => setTrailModal(null)}
-                className="px-3.5 py-1.5 bg-arcade-surface hover:bg-arcade-secondary text-arcade-text text-xs rounded-xl border border-arcade-border transition cursor-pointer font-sans"
+                className="px-3.5 py-1.5 bg-institutional-ea-surface hover:bg-institutional-ea-secondary text-institutional-ea-text text-xs rounded-xl border border-institutional-ea-border transition cursor-pointer font-sans"
               >
                 Cancel
               </button>
@@ -837,7 +837,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                 type="button"
                 onClick={handleApplyTrailing}
                 disabled={actionLoading !== null}
-                className="px-4 py-1.5 bg-arcade-primary hover:bg-arcade-primaryHover text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs font-sans disabled:opacity-50"
+                className="px-4 py-1.5 bg-institutional-ea-primary hover:bg-institutional-ea-primaryHover text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs font-sans disabled:opacity-50"
               >
                 Apply Trailing
               </button>
@@ -848,34 +848,34 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
 
       {/* MODAL: Place Pending Order */}
       {placePendingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-yardly-fade">
-          <div className="bg-arcade-card border border-arcade-border rounded-2xl shadow-2xl p-5 max-w-md w-full text-arcade-text space-y-4 font-sans">
-            <h3 className="text-sm font-bold flex items-center gap-2 text-arcade-text">
-              <PlusCircle className="w-4 h-4 text-arcade-primary" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-institutional-ea-fade">
+          <div className="bg-institutional-ea-card border border-institutional-ea-border rounded-2xl shadow-2xl p-5 max-w-md w-full text-institutional-ea-text space-y-4 font-sans">
+            <h3 className="text-sm font-bold flex items-center gap-2 text-institutional-ea-text">
+              <PlusCircle className="w-4 h-4 text-institutional-ea-primary" />
               <span>Place New Pending Order</span>
             </h3>
 
             <div className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-arcade-textSecondary mb-1 font-medium">Symbol</label>
+                  <label className="block text-institutional-ea-textSecondary mb-1 font-medium">Symbol</label>
                   <input
                     type="text"
                     value={placePendingModal.symbol}
                     onChange={(e) =>
                       setPlacePendingModal({ ...placePendingModal, symbol: e.target.value.trim() })
                     }
-                    className="w-full px-3 py-1.5 bg-arcade-surface border border-arcade-border rounded-lg font-mono text-arcade-text focus:border-arcade-primary outline-none"
+                    className="w-full px-3 py-1.5 bg-institutional-ea-surface border border-institutional-ea-border rounded-lg font-mono text-institutional-ea-text focus:border-institutional-ea-primary outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-arcade-textSecondary mb-1 font-medium">Order Type</label>
+                  <label className="block text-institutional-ea-textSecondary mb-1 font-medium">Order Type</label>
                   <select
                     value={placePendingModal.type}
                     onChange={(e) =>
                       setPlacePendingModal({ ...placePendingModal, type: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 bg-arcade-surface border border-arcade-border rounded-lg font-mono text-arcade-text focus:border-arcade-primary outline-none"
+                    className="w-full px-3 py-1.5 bg-institutional-ea-surface border border-institutional-ea-border rounded-lg font-mono text-institutional-ea-text focus:border-institutional-ea-primary outline-none"
                   >
                     <option value="BUY_LIMIT">BUY LIMIT</option>
                     <option value="SELL_LIMIT">SELL LIMIT</option>
@@ -887,7 +887,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-arcade-textSecondary mb-1 font-medium">Volume (Lots)</label>
+                  <label className="block text-institutional-ea-textSecondary mb-1 font-medium">Volume (Lots)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -899,11 +899,11 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                         volume: parseFloat(e.target.value) || 0.01
                       })
                     }
-                    className="w-full px-3 py-1.5 bg-arcade-surface border border-arcade-border rounded-lg font-mono text-arcade-text focus:border-arcade-primary outline-none"
+                    className="w-full px-3 py-1.5 bg-institutional-ea-surface border border-institutional-ea-border rounded-lg font-mono text-institutional-ea-text focus:border-institutional-ea-primary outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-arcade-textSecondary mb-1 font-medium">Order Price</label>
+                  <label className="block text-institutional-ea-textSecondary mb-1 font-medium">Order Price</label>
                   <input
                     type="number"
                     step="any"
@@ -914,14 +914,14 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                         price: parseFloat(e.target.value) || 0
                       })
                     }
-                    className="w-full px-3 py-1.5 bg-arcade-surface border border-arcade-border rounded-lg font-mono text-arcade-text focus:border-arcade-primary outline-none"
+                    className="w-full px-3 py-1.5 bg-institutional-ea-surface border border-institutional-ea-border rounded-lg font-mono text-institutional-ea-text focus:border-institutional-ea-primary outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-arcade-textSecondary mb-1 font-medium">Stop Loss (optional)</label>
+                  <label className="block text-institutional-ea-textSecondary mb-1 font-medium">Stop Loss (optional)</label>
                   <input
                     type="number"
                     step="any"
@@ -932,11 +932,11 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                         sl: parseFloat(e.target.value) || 0
                       })
                     }
-                    className="w-full px-3 py-1.5 bg-arcade-surface border border-arcade-border rounded-lg font-mono text-arcade-text focus:border-arcade-primary outline-none"
+                    className="w-full px-3 py-1.5 bg-institutional-ea-surface border border-institutional-ea-border rounded-lg font-mono text-institutional-ea-text focus:border-institutional-ea-primary outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-arcade-textSecondary mb-1 font-medium">Take Profit (optional)</label>
+                  <label className="block text-institutional-ea-textSecondary mb-1 font-medium">Take Profit (optional)</label>
                   <input
                     type="number"
                     step="any"
@@ -947,17 +947,17 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                         tp: parseFloat(e.target.value) || 0
                       })
                     }
-                    className="w-full px-3 py-1.5 bg-arcade-surface border border-arcade-border rounded-lg font-mono text-arcade-text focus:border-arcade-primary outline-none"
+                    className="w-full px-3 py-1.5 bg-institutional-ea-surface border border-institutional-ea-border rounded-lg font-mono text-institutional-ea-text focus:border-institutional-ea-primary outline-none"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-arcade-border">
+            <div className="flex justify-end gap-2 pt-2 border-t border-institutional-ea-border">
               <button
                 type="button"
                 onClick={() => setPlacePendingModal(null)}
-                className="px-3.5 py-1.5 bg-arcade-surface hover:bg-arcade-secondary text-arcade-text text-xs rounded-xl border border-arcade-border transition cursor-pointer"
+                className="px-3.5 py-1.5 bg-institutional-ea-surface hover:bg-institutional-ea-secondary text-institutional-ea-text text-xs rounded-xl border border-institutional-ea-border transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -965,7 +965,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({
                 type="button"
                 onClick={handlePlacePending}
                 disabled={actionLoading !== null || placePendingModal.price <= 0}
-                className="px-4 py-1.5 bg-arcade-primary hover:bg-arcade-primaryHover text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50"
+                className="px-4 py-1.5 bg-institutional-ea-primary hover:bg-institutional-ea-primaryHover text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs disabled:opacity-50"
               >
                 Submit Order
               </button>

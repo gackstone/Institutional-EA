@@ -99,9 +99,9 @@ Every technical capability in the **MT5 001** codebase has been forensically exa
 | **Single-Instance OS Guard** | **FULLY IMPLEMENTED AND VERIFIED** | `src/core/app_paths.py:SingleInstanceLock`; `supervisor.py:MUTEX_NAME` | Win32 Named Mutex and file lock preventing duplicate instances of bridge server, engine, or supervisor. |
 | **Heartbeat Watchdog System** | **FULLY IMPLEMENTED AND VERIFIED** | `mql5/Experts/PythonBridgeEA.mq5:492`; `src/monitoring/health_monitor.py` | 30-second heartbeat ping. Native EA halts execution immediately if Python bridge connection is lost. |
 | **Desktop Companion UI** | **FULLY IMPLEMENTED AND VERIFIED** | `companion/electron/main.cjs:1-2095`; `companion/src/*` | Electron desktop app supervising 6 core services (Engine, Bridge, Cloud Sync, Telegram, Health, Logs) with real-time React UI. |
-| **ArcadeFX Cloud Telemetry Link** | **FULLY IMPLEMENTED AND VERIFIED** | `agent/mt5_bot_agent.py:1-1307`; `local_limits.json` | Outbound-only HTTPS/WSS telemetry agent. HMAC-SHA256 signed cloud commands; local limits act as an un-bypassable ceiling. |
+| **Institutional EA Cloud Telemetry Link** | **FULLY IMPLEMENTED AND VERIFIED** | `agent/mt5_bot_agent.py:1-1307`; `local_limits.json` | Outbound-only HTTPS/WSS telemetry agent. HMAC-SHA256 signed cloud commands; local limits act as an un-bypassable ceiling. |
 | **Telegram Control & Alerts** | **FULLY IMPLEMENTED AND VERIFIED** | `src/notifications/telegram_service.py:1-350`; `router.py:1-120` | Asynchronous rate-limited Telegram dispatcher with interactive two-step command console (`/status`, `/pause`, `/killswitch`). |
-| **Encrypted Credential Storage** | **FULLY IMPLEMENTED AND VERIFIED** | `src/core/app_paths.py:get_primary_credentials_file`; `mt5_bot_agent.py:95` | Secure local credential storage in `%LOCALAPPDATA%\ArcadeFX\...`. Zero transmission of MT5 broker passwords to cloud. |
+| **Encrypted Credential Storage** | **FULLY IMPLEMENTED AND VERIFIED** | `src/core/app_paths.py:get_primary_credentials_file`; `mt5_bot_agent.py:95` | Secure local credential storage in `%LOCALAPPDATA%\Institutional EA\...`. Zero transmission of MT5 broker passwords to cloud. |
 
 ---
 **Audit Verification:** Every classification substantiated with exact file locations, code paths, and architectural boundaries.

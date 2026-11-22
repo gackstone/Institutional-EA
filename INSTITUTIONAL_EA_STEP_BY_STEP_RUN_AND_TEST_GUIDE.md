@@ -1,6 +1,6 @@
-# MT5-001 — STEP-BY-STEP WINDOWS RUN AND TEST GUIDE
+# Institutional EA — STEP-BY-STEP WINDOWS RUN AND TEST GUIDE
 
-This guide explains how to install, configure, launch, test, monitor, and safely stop the **MT5-001** trading bot and Desktop Companion on **Windows**.
+This guide explains how to install, configure, launch, test, monitor, and safely stop the **Institutional EA** trading bot and Desktop Companion on **Windows**.
 
 ---
 

@@ -148,7 +148,7 @@ export const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-arcade-bg text-arcade-text transition-colors duration-150 antialiased font-sans">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-institutional-ea-bg text-institutional-ea-text transition-colors duration-150 antialiased font-sans">
       {/* 1. Header with Window Controls, Status & Theme Switcher */}
       <Header
         botState={botState}

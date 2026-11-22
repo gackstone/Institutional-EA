@@ -1,6 +1,6 @@
 # MT5 001 Multi-Pair Intelligent Scalping Engine Upgrade — Final Engineering Report
 
-**Document ID:** MT5-001-ENG-UPGRADE-2026-11  
+**Document ID:** INSTITUTIONAL-EA-ENG-UPGRADE-2026-11  
 **Project:** MT5 001 Algorithmic Trading Platform & Companion  
 **System Classification:** Institutional Algorithmic Scalping & Execution Architecture  
 **Execution Environment:** Windows Server / MT5 Terminal Build 5.0.6231+ / Python 3.12+  
@@ -58,7 +58,7 @@ The **MT5 001** system is an institutional hybrid quantitative trading system st
 - `src/risk/portfolio_risk.py` (Portfolio circuit breakers and exposure, 600 lines)
 - `src/risk/trade_management.py` (Dual-mode profit management and trailing, 1,452 lines)
 - `src/notifications/telegram_service.py` (Telegram dispatcher, 2,441 lines)
-- `agent/mt5_bot_agent.py` (ArcadeFX cloud agent, 1,307 lines)
+- `agent/mt5_bot_agent.py` (Institutional EA cloud agent, 1,307 lines)
 - `config/settings.json`, `config/strategy_config.json`, `config/risk_config.json`
 
 ---
@@ -189,7 +189,7 @@ The **MT5 001** system is an institutional hybrid quantitative trading system st
 
 - **Safe RATES Handling in MQL5:** `FormatRatesJson` performs synchronization checks (`SERIES_SYNCHRONIZED`) and transient retries before reporting error codes.
 - **Dynamic Price Digits:** Price formatting adheres to `SymbolInfoInteger(sym, SYMBOL_DIGITS)`.
-- **Service Isolation:** Telegram notification failures and ArcadeFX Cloud agent timeouts run in dedicated background threads and can never terminate or delay core trading operations.
+- **Service Isolation:** Telegram notification failures and Institutional EA Cloud agent timeouts run in dedicated background threads and can never terminate or delay core trading operations.
 - **Port Conflict Protection:** Port 5555 and 5556 bind using `SO_EXCLUSIVEADDRUSE` on Windows, preventing socket hijacking without terminating unrelated processes.
 
 ---

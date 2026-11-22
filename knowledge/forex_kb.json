@@ -1,9 +1,9 @@
 {
   "version": "2.0.0",
-  "name": "AlgoVistra & Art of Trading Institutional Strategy Knowledge Base",
+  "name": "Institutional EA & Art of Trading Institutional Strategy Knowledge Base",
   "disclaimer": "ILLUSTRATIVE DATA - EDUCATION ONLY - NOT FINANCIAL ADVICE. Trading involves substantial risk of loss. Past performance is no guarantee of future results.",
   "source_attribution": {
-    "primary_method": "OCR and frame-by-frame visual inspection of burned-in video captions (28 verified video cards: 15 AlgoVistra + 13 Art of Trading)",
+    "primary_method": "OCR and frame-by-frame visual inspection of burned-in video captions (28 verified video cards: 15 Institutional EA + 13 Art of Trading)",
     "ict_credit": "Concepts of imbalance, Fair Value Gaps, Order Blocks, Liquidity Sweeps, IPDA, and market delivery are credited to Inner Circle Trader (ICT) methodology as explicitly stated in the source materials.",
     "missing_episodes_notice": "ICT episodes 04, 06 (market structure) and 08 ('why some moves fly and others stall') were announced in video intros but not uploaded. Their content is strictly not invented."
   },
@@ -147,7 +147,7 @@
     {
       "id": "inducement_ob_entry",
       "video_number": 1,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "Inducement + Order Block Entry",
       "skill": "inducement_ob_entry",
       "claim": "The first pullback after a push looks like the perfect buy but is bait; stops sit under it, big buyers need those sell orders to fill, so price drops, takes the stops, and taps the order block.",
@@ -164,7 +164,7 @@
     {
       "id": "premium_discount_filter",
       "video_number": 2,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "Premium / Discount Location Filter",
       "skill": "premium_discount_filter",
       "claim": "Take the last move up from the protected low to the high, cut it in half. Top half = premium, bottom half = discount. In an uptrend buy in discount, not just anywhere.",
@@ -179,7 +179,7 @@
     {
       "id": "protected_swing_marker",
       "video_number": 3,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "Protected Low Marker",
       "skill": "protected_swing_marker",
       "claim": "Many swing lows exist; most are noise. The one that counts: the low that started the move that broke the last high. While it holds, buyers are in control.",
@@ -194,7 +194,7 @@
     {
       "id": "trend_by_structure",
       "video_number": 4,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "Trend by Structure",
       "skill": "trend_by_structure",
       "claim": "Trend is structure, not the last candle. Higher highs + higher lows = uptrend. A hard drop that stops above the last higher low changes nothing. Only a candle close below that low puts the uptrend in trouble.",
@@ -209,7 +209,7 @@
     {
       "id": "sweep_fvg_entry",
       "video_number": 5,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "Liquidity Sweep + FVG Entry",
       "skill": "sweep_fvg_entry",
       "claim": "Price breaks obvious lows, but it was a sweep, not a breakdown: stops taken, big buyer filled, price snaps back, candle leaves an FVG. When price returns, if the gap holds, that is the entry.",
@@ -225,7 +225,7 @@
     {
       "id": "breakout_trap_classifier",
       "video_number": 6,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "Breakout vs Trap Classifier",
       "skill": "breakout_trap_classifier",
       "claim": "Price runs above the high. While candle is forming you cannot know. Trap: falls straight back inside. Breakout: close above AND stays outside.",
@@ -240,7 +240,7 @@
     {
       "id": "liquidity_mapper",
       "video_number": 7,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "Liquidity Map",
       "skill": "liquidity_mapper",
       "claim": "Obvious highs and equal highs attract stops. A large player needs counterparties, so price pushes into them, orders trigger, player fills, price snaps back.",
@@ -255,7 +255,7 @@
     {
       "id": "ifvg_inversion",
       "video_number": 8,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "Failed FVG / Inversion",
       "skill": "ifvg_inversion",
       "claim": "A close through an FVG does not kill it; price often returns from the other side. Old support becomes resistance.",
@@ -270,7 +270,7 @@
     {
       "id": "fvg_quality_score",
       "video_number": 9,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "FVG Quality Score",
       "skill": "fvg_quality_score",
       "claim": "A gap is only as good as the move that made it. Strong when it broke previous high with body close; weak inside choppy range.",
@@ -285,7 +285,7 @@
     {
       "id": "fvg_return_classifier",
       "video_number": 10,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "FVG Return and Close",
       "skill": "fvg_return_classifier",
       "claim": "Depth is not the signal; watch the close. Bullish held: candle wicks into gap but closes back above 50%. Broken: close through gap.",
@@ -299,7 +299,7 @@
     {
       "id": "fvg_context_guard",
       "video_number": 11,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "Why FVGs Get Revisited",
       "skill": "fvg_context_guard",
       "claim": "An FVG is an imbalance from fast one-sided delivery. Price does not have to come back; an FVG is not a magnet. Context tells you if return matters.",
@@ -314,7 +314,7 @@
     {
       "id": "stop_management_policy",
       "video_number": 12,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "Break-Even Too Early",
       "skill": "stop_management_policy",
       "claim": "Moving stop to BE too early stops out winning trades on normal pullbacks. Price does not know where you entered. Move stop when market gives a reason.",
@@ -329,7 +329,7 @@
     {
       "id": "range_location_filter",
       "video_number": 13,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "Middle of the Range Filter",
       "skill": "range_location_filter",
       "claim": "In the middle of a range price is far from both edges, with room against you either way, no clear advantage. Sometimes best location is somewhere else.",
@@ -344,7 +344,7 @@
     {
       "id": "entry_quality_guard",
       "video_number": 14,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "Right Direction, Bad Entry",
       "skill": "entry_quality_guard",
       "claim": "Entering late after extension expands risk and shrinks room to target. Right direction, bad entry. Don't chase the move; wait for new setup or let it go.",
@@ -360,7 +360,7 @@
     {
       "id": "structure_momentum_monitor",
       "video_number": 15,
-      "series": "AlgoVistra",
+      "series": "Institutional EA",
       "title": "Weakening Pushes & Momentum Decay",
       "skill": "structure_momentum_monitor",
       "claim": "New HH != strong trend. When moves get smaller this usually means trend may end or enter big correction. Caution flag, not a reversal trigger.",

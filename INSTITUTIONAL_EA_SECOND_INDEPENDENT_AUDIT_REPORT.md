@@ -1,4 +1,4 @@
-# MT5-001 — SECOND INDEPENDENT CODEBASE AUDIT REPORT
+# Institutional EA — SECOND INDEPENDENT CODEBASE AUDIT REPORT
 
 **Audit Date:** 2026-11-16  
 **Project Root:** `C:\Users\Gackstone_Baraka\Downloads\MT5 001`  

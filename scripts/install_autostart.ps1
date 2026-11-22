@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    Installs Arcade Fx MT5 Supervisor as an autonomous background Windows Scheduled Task.
+    Installs Institutional EA MT5 Supervisor as an autonomous background Windows Scheduled Task.
 
 .DESCRIPTION
-    Configures a robust scheduled task that automatically launches the Arcade Fx supervisor
+    Configures a robust scheduled task that automatically launches the Institutional EA supervisor
     using pythonw.exe (completely hidden, zero console windows) on user logon and/or system startup.
     Includes auto-restart on failure, execution on battery, and multiple instance protection.
 
@@ -19,13 +19,13 @@ param (
     [switch]$RunWhetherOrNotLoggedOn = $false
 )
 
-$TaskName = "ArcadeFX_MT5_Supervisor"
+$TaskName = "InstitutionalEA_MT5_Supervisor"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 $SupervisorScript = Join-Path $ScriptDir "supervisor.py"
 
 Write-Host "=========================================================================" -ForegroundColor Cyan
-Write-Host "  ARCADE FX - AUTONOMOUS MT5 SUPERVISOR INSTALLER" -ForegroundColor Cyan
+Write-Host "  INSTITUTIONAL EA - AUTONOMOUS MT5 SUPERVISOR INSTALLER" -ForegroundColor Cyan
 Write-Host "=========================================================================" -ForegroundColor Cyan
 Write-Host "Project Root : $ProjectRoot"
 Write-Host "Supervisor   : $SupervisorScript"
@@ -119,9 +119,9 @@ try {
     Write-Host "Registering Windows Scheduled Task '$TaskName'..." -ForegroundColor Cyan
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
     if ($Principal) {
-        Register-ScheduledTask -TaskName $TaskName -Trigger $Triggers -Action $Action -Principal $Principal -Settings $Settings -Description 'Arcade Fx Autonomous MT5 Bot and Bridge Supervisor' -ErrorAction Stop | Out-Null
+        Register-ScheduledTask -TaskName $TaskName -Trigger $Triggers -Action $Action -Principal $Principal -Settings $Settings -Description 'Institutional EA Autonomous MT5 Bot and Bridge Supervisor' -ErrorAction Stop | Out-Null
     } else {
-        Register-ScheduledTask -TaskName $TaskName -Trigger $Triggers -Action $Action -Settings $Settings -Description 'Arcade Fx Autonomous MT5 Bot and Bridge Supervisor' -ErrorAction Stop | Out-Null
+        Register-ScheduledTask -TaskName $TaskName -Trigger $Triggers -Action $Action -Settings $Settings -Description 'Institutional EA Autonomous MT5 Bot and Bridge Supervisor' -ErrorAction Stop | Out-Null
     }
     
     # 7. Start the task immediately
@@ -133,14 +133,14 @@ try {
     Write-Host "Falling back to User Startup Folder autostart (seamless zero-admin mode)..." -ForegroundColor Yellow
 
     $StartupDir = [Environment]::GetFolderPath('Startup')
-    $VbsFile = Join-Path $StartupDir "ArcadeFX_MT5_Supervisor.vbs"
+    $VbsFile = Join-Path $StartupDir "InstitutionalEA_MT5_Supervisor.vbs"
     $VbsContent = "Set WshShell = CreateObject(""WScript.Shell"")`r`nWshShell.CurrentDirectory = ""$ProjectRoot""`r`nWshShell.Run """"""$PythonwExe"""" """"$SupervisorScript"""""", 0, False`r`n"
     [System.IO.File]::WriteAllText($VbsFile, $VbsContent)
     Write-Host "Configured invisible startup launcher: $VbsFile" -ForegroundColor Green
 
     # Launch supervisor immediately in background
     Start-Process $PythonwExe -ArgumentList ('"{0}"' -f $SupervisorScript) -WorkingDirectory $ProjectRoot
-    Write-Host "SUCCESS: Arcade Fx Supervisor started in background." -ForegroundColor Green
+    Write-Host "SUCCESS: Institutional EA Supervisor started in background." -ForegroundColor Green
 }
 
 $SupLog = Join-Path $ProjectRoot "logs\supervisor.log"

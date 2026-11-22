@@ -1,5 +1,5 @@
 """
-Security and authentication utilities for the MT5-001 Local Control Service.
+Security and authentication utilities for the Institutional EA Local Control Service.
 Enforces localhost-only binding, session token authentication, origin checks,
 and secret redaction in logs/outputs.
 """
@@ -16,7 +16,7 @@ from typing import Mapping, Optional
 SECRET_PATTERNS = [
     re.compile(r"(TELEGRAM_BOT_TOKEN\s*=\s*)([^\s\"']+)", re.IGNORECASE),
     re.compile(r"(MT5_PASSWORD\s*=\s*)([^\s\"']+)", re.IGNORECASE),
-    re.compile(r"(ARCADEFX_DEVICE_TOKEN\s*=\s*)([^\s\"']+)", re.IGNORECASE),
+    re.compile(r"(INSTITUTIONAL_EA_DEVICE_TOKEN\s*=\s*)([^\s\"']+)", re.IGNORECASE),
     re.compile(r"(Authorization:\s*Bearer\s+)([^\s]+)", re.IGNORECASE),
     re.compile(r"(bot[0-9]{6,}:[A-Za-z0-9_-]{20,})"),
 ]

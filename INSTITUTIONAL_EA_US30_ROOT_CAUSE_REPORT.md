@@ -1,4 +1,4 @@
-# MT5-001 — US30 ROOT-CAUSE INVESTIGATION REPORT
+# Institutional EA — US30 ROOT-CAUSE INVESTIGATION REPORT
 
 **Date:** 2026-11-16  
 **MT5 Demo Account:** `2002270203` (`JustMarkets-Demo`, Hedging Mode)

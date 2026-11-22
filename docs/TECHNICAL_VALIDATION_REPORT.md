@@ -1,6 +1,6 @@
 # MASTER ENGINEERING & VALIDATION REPORT: MT5 ALGORITHMIC SCALPING BOT
 
-**Generated At:** `2026-11-18T11:26:28.113533+00:00`  
+**Generated At:** `2026-11-22T11:34:13.863068+00:00`  
 **Account Mode:** `DEMO (JustMarkets-Demo3, Safe Simulation / Dry-Run)`  
 **Starting Demo Equity:** `$2,329.71` | **Simulated Ending Equity:** `$2,470.68`
 
@@ -69,11 +69,11 @@ The MT5 Algorithmic Scalping System (`PythonBridgeEA.mq5` + Python ICT/SMC Multi
 | # | Scenario Code | Symbol (TF) | Guard / Filter Tested | Outcome / Rejection Reason | Status |
 | :-: | :--- | :--- | :--- | :--- | :---: |
 | 21 | `V01_HTF_CONFLICT_REJECTION` | `EURUSD.m` (M15) | `HTF_CONFLICT_FILTER` | INSTRUMENT_NOT_ALLOWED: Instrument 'EURUSD' is excluded from the trading universe. Only XAUUSD, BTCUSD are permitted. | **FAIL** |
-| 22 | `V02_INSUFFICIENT_HISTORY_REJECTION` | `XAUUSD.m` (M15) | `DATA_GUARD` | Insufficient M15 candle history (have 0, required 20) | **PASS** |
-| 23 | `V03_AUTOMATIC_HISTORY_RECOVERY` | `XAUUSD.m` (M15) | `HISTORY_RECOVERY` | Recovered 120 M15 bars; cycle advanced to strategy scan (No valid SMC setup for XAUUSD @ 3978.80 | Killzone: INACTIVE | HTF Bias: [] | Levels: [PWH:4134.15, PWL:4104.65, PWO:4113.40, PWC:4125.40, PWM:4119.40, CWO:4125.40, CWH:4151.55, CWL:4116.65, PDH:4180.50, PDL:4169.50, PDO:4173.00, PDC:4177.00, PDM:4175.00, CDO:4177.00, CDH:4186.30, CDL:4173.50] | Interactions: None) | **PASS** |
+| 22 | `V02_INSUFFICIENT_HISTORY_REJECTION` | `XAUUSD.m` (M15) | `DATA_GUARD` | WEEKEND_INACTIVE: XAUUSD trading is disabled during weekend mode. | **FAIL** |
+| 23 | `V03_AUTOMATIC_HISTORY_RECOVERY` | `XAUUSD.m` (M15) | `HISTORY_RECOVERY` | Recovered 120 M15 bars; cycle advanced to strategy scan (WEEKEND_INACTIVE: XAUUSD trading is disabled during weekend mode.) | **PASS** |
 | 24 | `V04_STALE_DATA_REJECTION` | `GBPUSD.m` (M15) | `STALE_DATA_GUARD` | INSTRUMENT_NOT_ALLOWED: Instrument 'GBPUSD' is excluded from the trading universe. Only XAUUSD, BTCUSD are permitted. | **FAIL** |
 | 25 | `V05_SPREAD_TELEMETRY_TRACKING` | `EURUSD.m` (M15) | `SPREAD_TELEMETRY` | Spread recorded in metadata (non-blocking) | **FAIL** |
-| 26 | `V06_NEWS_FILTER_REMOVED` | `XAUUSD.m` (M15) | `NEWS_FILTER_REMOVED` | News filter disabled (allowed=True); pipeline proceeded to Insufficient M15 candle history (have 0, required 20) | **PASS** |
+| 26 | `V06_NEWS_FILTER_REMOVED` | `XAUUSD.m` (M15) | `NEWS_FILTER_REMOVED` | News filter disabled (allowed=True); pipeline proceeded to WEEKEND_INACTIVE: XAUUSD trading is disabled during weekend mode. | **PASS** |
 | 27 | `V07_DAILY_LOSS_LIMIT_REMOVED` | `EURUSD.m` (M15) | `PERMISSIVE_EXECUTION` | Permitted under permissive engine (daily loss circuit breaker removed) | **FAIL** |
 | 28 | `V08_DUPLICATE_SIGNAL_PREVENTION` | `EURUSD.m` (M15) | `IDEMPOTENCY_GUARD` | Duplicate signal blocked for key EURUSD_BUY_2026-11-03T15:00:00+00:00 | **PASS** |
 

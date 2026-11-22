@@ -1,8 +1,8 @@
-# Phase 1 Audit Report: MT5-OO1 Companion Desktop Application
+# Phase 1 Audit Report: Institutional EA Companion Desktop Application
 
 > **Document Version:** 1.0.0  
-> **Target:** MT5-OO1 Arcade FX Desktop Companion  
-> **Repository:** `https://github.com/gackstonew-lgtm/MT5-OO1.git`  
+> **Target:** Institutional EA Desktop Companion  
+> **Repository:** `https://github.com/gackstone/Institutional-EA.git`  
 > **Auditor:** Principal Quantitative Systems & Desktop Software Architect  
 > **Classification Tagging:** `[SAFETY]` (Protective controls & trading invariants), `[ARCHITECTURE]` (Design & IPC contracts), `[DERIVED]` (Execution pipeline requirements).
 
@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary
 
-This audit establishes the factual foundation for building the **MT5-OO1 Companion** desktop application. The companion application serves as the production desktop runtime, process supervisor, and synchronization controller for the existing algorithmic trading engine, eliminating the need for manual command-line execution (`python scripts/start_bot.py`, `python scripts/run_bridge_server.py`, or manual pairing scripts).
+This audit establishes the factual foundation for building the **Institutional EA Companion** desktop application. The companion application serves as the production desktop runtime, process supervisor, and synchronization controller for the existing algorithmic trading engine, eliminating the need for manual command-line execution (`python scripts/start_bot.py`, `python scripts/run_bridge_server.py`, or manual pairing scripts).
 
 The existing codebase contains robust, institutional-grade components:
 - A multi-timeframe quantitative scalping engine (`src/core/orchestrator.py`, `scripts/start_bot.py`).
@@ -44,15 +44,15 @@ The existing codebase contains robust, institutional-grade components:
 - **Communication Protocol:** Newline-delimited JSON (`\n`) wire format.
 - **Reliability:** Built-in `WatchdogManager` monitoring a 60-second heartbeat thread. Pre-flight socket check (`run_startup_selfcheck`) detects port conflicts before binding. Rotating log writer in `logs/bridge_service.log` (10 MB, 14 backups).
 
-### 2.3. ArcadeFX.live Pairing & Synchronization (`agent/mt5_bot_agent.py`)
-- **Role:** Outbound-only HTTPS orchestration agent communicating with ArcadeFX Cloud.
+### 2.3. Institutional EA Cloud Pairing & Synchronization (`agent/mt5_bot_agent.py`)
+- **Role:** Outbound-only HTTPS orchestration agent communicating with Institutional EA Cloud.
 - **Endpoints & Contracts:**
   - `POST /bot/pairing/claim`: Submits `{"pairingCode": "XXXXXX", "instanceName": "NAME-MT5", "engineVersion": "1.2.0"}`.
   - Returns `{"success": true, "deviceToken": "...", "instanceId": "...", "signingSecret": "..."}`.
   - `POST /bot/heartbeat`: Pushes account equity, balance, active positions, EA connection state, and local limits every 15–30 seconds.
   - `POST /bot/commands/poll`: Retrieves signed cloud commands (`start`, `stop`, `pause`, `resume`, `close_all`, `kill_switch`).
   - `POST /bot/commands/:id/ack`: Acknowledges executed command status.
-  - `POST /bot/events/sync`: Synchronizes queued offline events from `~/.arcadefx_agent/offline_queue.sqlite`.
+  - `POST /bot/events/sync`: Synchronizes queued offline events from `~/.institutional_ea_agent/offline_queue.sqlite`.
 - **Security:** Zero open inbound listening ports on the host. Cryptographic HMAC-SHA256 signature verification with nonce and 5-minute timestamp expiration. Local machine hard ceilings (`agent/local_limits.json`) prevent remote cloud commands from increasing risk or enabling live trading without local physical authorization.
 
 ### 2.4. MQL5 Expert Advisor (`mql5/Experts/PythonBridgeEA.mq5`)
@@ -69,7 +69,7 @@ The existing codebase contains robust, institutional-grade components:
 - **Key Mechanics:**
   - Detects `terminal64.exe` MT5 terminal process presence.
   - Enforces start order: Bridge ports 5555 and 5556 must be listening before starting `start_bot.py`.
-  - Single-instance locking via named Windows Mutex (`Local\ArcadeFX_MT5_Supervisor_Mutex`) and `logs/supervisor.lock`.
+  - Single-instance locking via named Windows Mutex (`Local\InstitutionalEA_MT5_Supervisor_Mutex`) and `logs/supervisor.lock`.
   - Independent exponential restart backoff (2s $\rightarrow$ 60s).
   - Background process execution using `CREATE_NO_WINDOW` and clean child termination on shutdown.
 
@@ -78,12 +78,12 @@ The existing codebase contains robust, institutional-grade components:
 ## 3. Architecture & Startup Dependency Graph
 
 ```
-                                [ MT5-OO1 Companion App ]
+                                [ Institutional EA Companion App ]
                                             │
                      ┌──────────────────────┴──────────────────────┐
                      ▼                                             ▼
-          [ 1. Environment & Pre-Flight ]               [ 2. ArcadeFX.live Pairing ]
-          - OS & Architecture Check                     - Verify ~/.arcadefx_agent/credentials
+          [ 1. Environment & Pre-Flight ]               [ 2. Institutional EA Cloud Pairing ]
+          - OS & Architecture Check                     - Verify ~/.institutional_ea_agent/credentials
           - MT5 Terminal Detection                      - If missing: prompt 6-char code
           - Ports 5555 & 5556 Conflict Check            - Authenticate with POST /bot/pairing/claim
                      │                                             │
@@ -141,7 +141,7 @@ companion/
 │   │   ├── supervisor.rs         # Native child process manager & health checks
 │   │   ├── mt5.rs                # MT5 installation scanner & EA deployer
 │   │   ├── bridge.rs             # Bridge socket probe & diagnostics
-│   │   └── arcadefx.rs           # ArcadeFX pairing client
+│   │   └── institutional_ea.rs           # Institutional EA pairing client
 │   ├── Cargo.toml                # Rust dependencies
 │   └── tauri.conf.json           # Tauri 2 configuration & bundle metadata
 ├── electron/                     # Cross-platform Electron runtime runner

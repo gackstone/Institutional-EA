@@ -29,7 +29,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   cancelAllPendingOrders: () => ipcRenderer.invoke("cancel-all-pending-orders"),
   emergencyKillSwitch: (closeAll) => ipcRenderer.invoke("emergency-kill-switch", closeAll),
 
-  // ArcadeFX.live Cloud Pairing
+  // Institutional EA Cloud Pairing
   getPairingStatus: () => ipcRenderer.invoke("get-pairing-status"),
   submitPairingCode: (code, instanceName) => ipcRenderer.invoke("submit-pairing-code", code, instanceName),
   disconnectPairing: () => ipcRenderer.invoke("disconnect-pairing"),

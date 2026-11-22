@@ -5,33 +5,33 @@
 @tailwind utilities;
 
 :root, [data-theme="light"] {
-  /* Yardly Automotive Light Palette */
-  --arcade-bg: #F1F5F4;
-  --arcade-card: #FFFFFF;
-  --arcade-surface: #FFFFFF;
-  --arcade-surface-secondary: #F5F7F7;
-  --arcade-surface-tertiary: #DFE7E5;
-  --arcade-surface-hover: #F5F7F7;
-  --arcade-border: #DFE7E5;
-  --arcade-border-subtle: #EBF1F0;
-  --arcade-border-strong: #CBD6D4;
-  --arcade-text: #102A2A;
-  --arcade-text-secondary: #526579;
-  --arcade-text-muted: #6C7E8F;
-  --arcade-primary: #0057B8;
-  --arcade-primary-hover: #004694;
-  --arcade-primary-active: #003875;
-  --arcade-primary-soft: #E8F1FF;
-  --arcade-profit: #10B981;
-  --arcade-profit-soft: rgba(16, 185, 129, 0.12);
-  --arcade-loss: #EF4444;
-  --arcade-loss-soft: rgba(239, 68, 68, 0.12);
-  --arcade-error: #EF4444;
-  --arcade-error-soft: rgba(239, 68, 68, 0.12);
-  --arcade-warning: #F59E0B;
-  --arcade-warning-soft: rgba(245, 158, 11, 0.12);
-  --arcade-info: #0057B8;
-  --arcade-info-soft: #E8F1FF;
+  /* Institutional EA Light Palette */
+  --institutional-ea-bg: #F1F5F4;
+  --institutional-ea-card: #FFFFFF;
+  --institutional-ea-surface: #FFFFFF;
+  --institutional-ea-surface-secondary: #F5F7F7;
+  --institutional-ea-surface-tertiary: #DFE7E5;
+  --institutional-ea-surface-hover: #F5F7F7;
+  --institutional-ea-border: #DFE7E5;
+  --institutional-ea-border-subtle: #EBF1F0;
+  --institutional-ea-border-strong: #CBD6D4;
+  --institutional-ea-text: #102A2A;
+  --institutional-ea-text-secondary: #526579;
+  --institutional-ea-text-muted: #6C7E8F;
+  --institutional-ea-primary: #0057B8;
+  --institutional-ea-primary-hover: #004694;
+  --institutional-ea-primary-active: #003875;
+  --institutional-ea-primary-soft: #E8F1FF;
+  --institutional-ea-profit: #10B981;
+  --institutional-ea-profit-soft: rgba(16, 185, 129, 0.12);
+  --institutional-ea-loss: #EF4444;
+  --institutional-ea-loss-soft: rgba(239, 68, 68, 0.12);
+  --institutional-ea-error: #EF4444;
+  --institutional-ea-error-soft: rgba(239, 68, 68, 0.12);
+  --institutional-ea-warning: #F59E0B;
+  --institutional-ea-warning-soft: rgba(245, 158, 11, 0.12);
+  --institutional-ea-info: #0057B8;
+  --institutional-ea-info-soft: #E8F1FF;
 
   --scrollbar-track: #F1F5F4;
   --scrollbar-thumb: #DFE7E5;
@@ -40,33 +40,33 @@
 }
 
 .dark, [data-theme="dark"] {
-  /* Yardly Automotive Dark Palette */
-  --arcade-bg: #080A0B;
-  --arcade-card: #101112;
-  --arcade-surface: #101112;
-  --arcade-surface-secondary: #15191C;
-  --arcade-surface-tertiary: #1D2327;
-  --arcade-surface-hover: #181D21;
-  --arcade-border: #202629;
-  --arcade-border-subtle: #15191C;
-  --arcade-border-strong: #2D353A;
-  --arcade-text: #F5F7FA;
-  --arcade-text-secondary: #A6B2BD;
-  --arcade-text-muted: #768491;
-  --arcade-primary: #3284FF;
-  --arcade-primary-hover: #4F96FF;
-  --arcade-primary-active: #2672E0;
-  --arcade-primary-soft: #172B45;
-  --arcade-profit: #34D399;
-  --arcade-profit-soft: rgba(52, 211, 153, 0.15);
-  --arcade-loss: #F87171;
-  --arcade-loss-soft: rgba(248, 113, 113, 0.15);
-  --arcade-error: #F87171;
-  --arcade-error-soft: rgba(248, 113, 113, 0.15);
-  --arcade-warning: #FBBF24;
-  --arcade-warning-soft: rgba(251, 191, 36, 0.15);
-  --arcade-info: #3284FF;
-  --arcade-info-soft: #172B45;
+  /* Institutional EA Dark Palette */
+  --institutional-ea-bg: #080A0B;
+  --institutional-ea-card: #101112;
+  --institutional-ea-surface: #101112;
+  --institutional-ea-surface-secondary: #15191C;
+  --institutional-ea-surface-tertiary: #1D2327;
+  --institutional-ea-surface-hover: #181D21;
+  --institutional-ea-border: #202629;
+  --institutional-ea-border-subtle: #15191C;
+  --institutional-ea-border-strong: #2D353A;
+  --institutional-ea-text: #F5F7FA;
+  --institutional-ea-text-secondary: #A6B2BD;
+  --institutional-ea-text-muted: #768491;
+  --institutional-ea-primary: #3284FF;
+  --institutional-ea-primary-hover: #4F96FF;
+  --institutional-ea-primary-active: #2672E0;
+  --institutional-ea-primary-soft: #172B45;
+  --institutional-ea-profit: #34D399;
+  --institutional-ea-profit-soft: rgba(52, 211, 153, 0.15);
+  --institutional-ea-loss: #F87171;
+  --institutional-ea-loss-soft: rgba(248, 113, 113, 0.15);
+  --institutional-ea-error: #F87171;
+  --institutional-ea-error-soft: rgba(248, 113, 113, 0.15);
+  --institutional-ea-warning: #FBBF24;
+  --institutional-ea-warning-soft: rgba(251, 191, 36, 0.15);
+  --institutional-ea-info: #3284FF;
+  --institutional-ea-info-soft: #172B45;
 
   --scrollbar-track: #080A0B;
   --scrollbar-thumb: #202629;
@@ -76,8 +76,8 @@
 
 @layer base {
   body {
-    background-color: var(--arcade-bg);
-    color: var(--arcade-text);
+    background-color: var(--institutional-ea-bg);
+    color: var(--institutional-ea-text);
     font-family: "Inter", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -89,46 +89,46 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--arcade-primary);
+    outline: 2px solid var(--institutional-ea-primary);
     outline-offset: 2px;
   }
 }
 
-/* Yardly Component Styling */
-.yardly-glass {
+/* Institutional EA Component Styling */
+.institutional-ea-glass {
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid var(--arcade-border);
+  border: 1px solid var(--institutional-ea-border);
 }
 
-.dark .yardly-glass {
+.dark .institutional-ea-glass {
   background: rgba(16, 17, 18, 0.88);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid var(--arcade-border);
+  border: 1px solid var(--institutional-ea-border);
 }
 
-.yardly-card {
-  background-color: var(--arcade-card);
-  border: 1px solid var(--arcade-border);
+.institutional-ea-card {
+  background-color: var(--institutional-ea-card);
+  border: 1px solid var(--institutional-ea-border);
   border-radius: 0.875rem;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .yardly-card:hover {
-    border-color: var(--arcade-border-strong);
+  .institutional-ea-card:hover {
+    border-color: var(--institutional-ea-border-strong);
   }
 }
 
-/* Yardly Animations */
-@keyframes yardly-fade-in {
+/* Institutional EA Animations */
+@keyframes institutional-ea-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes yardly-slide-up {
+@keyframes institutional-ea-slide-up {
   from {
     opacity: 0;
     transform: translateY(8px);
@@ -139,12 +139,12 @@
   }
 }
 
-.animate-yardly-fade {
-  animation: yardly-fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.animate-institutional-ea-fade {
+  animation: institutional-ea-fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.animate-yardly-slide {
-  animation: yardly-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.animate-institutional-ea-slide {
+  animation: institutional-ea-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Custom Scrollbar */

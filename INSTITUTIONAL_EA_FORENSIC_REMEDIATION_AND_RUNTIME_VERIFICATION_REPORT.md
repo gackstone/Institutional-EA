@@ -1,8 +1,8 @@
-# MT5-001 — FORENSIC REMEDIATION, DYNAMIC POSITION LAYERING & RUNTIME VERIFICATION AUDIT REPORT
+# Institutional EA — FORENSIC REMEDIATION, DYNAMIC POSITION LAYERING & RUNTIME VERIFICATION AUDIT REPORT
 
 **Date of Audit & Verification:** 2026-11-16  
 **Auditor:** Principal Quantitative Systems Auditor & Independent Execution Reliability Engineer  
-**Repository:** `https://github.com/gackstone/MT5-001-Bot.git`  
+**Repository:** `https://github.com/gackstone/Institutional-EA.git`  
 **Local Project Directory:** `C:\Users\Gackstone_Baraka\Downloads\MT5 001`  
 **Active Git Branch:** `feature/specialization-gold-jpy-btc`  
 **Execution Environment:** Windows 10 Pro / Python 3.12.10 (AMD64) / MetaTrader 5 Build 4410+  
@@ -17,7 +17,7 @@ Previous audit and remediation attempts reported that the `Maximum simultaneous 
 
 ### 2. Forensic Finding: The Stale Sidecar Disconnect
 A thorough forensic process trace conducted via Windows Management Instrumentation (WMI / CIM) revealed that the running system was **not executing the modified Python source code files**. Instead:
-- The Companion desktop application (`MT5-OO1 Companion.exe`, PIDs `14112`, `13412`, `13988`, `1964`) was running packaged Electron binaries from `companion\release\win-unpacked\`.
+- The Companion desktop application (`Institutional EA Companion.exe`, PIDs `14112`, `13412`, `13988`, `1964`) was running packaged Electron binaries from `companion\release\win-unpacked\`.
 - Under `companion\electron\main.cjs`, `resolveSidecar("mt5_trading_engine")` prioritizes packaged executable sidecars found in `resources/bin/`.
 - Consequently, the Companion was continuously spawning and supervising `companion\release\win-unpacked\resources\bin\mt5_trading_engine.exe` (PIDs `9524`, `516`, `13528`, `8844`).
 - These binary executables had been compiled via PyInstaller on **15/11/2026 at 17:09 UTC**—before any of the remediation code, symbol universe whitelists, or dynamic capacity engines were implemented!
@@ -25,7 +25,7 @@ A thorough forensic process trace conducted via Windows Management Instrumentati
 - Furthermore, when the stale executable exited, the Electron supervisor automatically restarted it from the stale binary, perpetuating the 3/3 cap and `US30` execution.
 
 ### 3. Remediation & Verification Outcome
-1. **Clean Process Termination:** All stale companion executables, sidecars, and zombie processes (`mt5_trading_engine.exe`, `mt5_bridge_server.exe`, `mt5_bot_agent.exe`, `MT5-OO1 Companion.exe`) were cleanly terminated using verified OS process signals.
+1. **Clean Process Termination:** All stale companion executables, sidecars, and zombie processes (`mt5_trading_engine.exe`, `mt5_bridge_server.exe`, `mt5_bot_agent.exe`, `Institutional EA Companion.exe`) were cleanly terminated using verified OS process signals.
 2. **Sidecar Recompilation:** All 4 standalone sidecars (`mt5_trading_engine.exe`, `mt5_bridge_server.exe`, `mt5_bot_agent.exe`, `mt5_control_service.exe`) were completely rebuilt from the updated source code using PyInstaller 6.22.3 and deployed to both `companion/resources/bin/` and `companion/release/win-unpacked/resources/bin/`.
 3. **Electron Runtime Resolution Upgrade:** `companion/electron/main.cjs` was updated to support `PREFER_PYTHON_SOURCE=1` and prioritize local virtual environment execution.
 4. **Live MT5 Demo Demonstration:** Real execution against demo account `2002270203` proved:
@@ -43,11 +43,11 @@ A thorough forensic process trace conducted via Windows Management Instrumentati
 
 | Process Name | Initial PID | Executable Binary Path | Command Line | Parent Process | Source Code or Binary? | Status / Action Taken |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `mt5_trading_engine.exe` | 9524 / 516 / 13528 | `...\companion\release\win-unpacked\resources\bin\mt5_trading_engine.exe` | `"mt5_trading_engine.exe"` | `MT5-OO1 Companion.exe` (14112) | Frozen Binary (Compiled 15/11/2026) | Terminated & Recompiled from Python Source |
+| `mt5_trading_engine.exe` | 9524 / 516 / 13528 | `...\companion\release\win-unpacked\resources\bin\mt5_trading_engine.exe` | `"mt5_trading_engine.exe"` | `Institutional EA Companion.exe` (14112) | Frozen Binary (Compiled 15/11/2026) | Terminated & Recompiled from Python Source |
 | `mt5_bot_agent.exe` | 1616 | `...\companion\release\win-unpacked\resources\bin\mt5_bot_agent.exe` | `"mt5_bot_agent.exe" --daemon` | `services.exe` | Frozen Binary (Compiled 15/11/2026) | Terminated & Recompiled from Python Source |
 | `mt5_bridge_server.exe` | 2976 | `...\companion\release\win-unpacked\resources\bin\mt5_bridge_server.exe` | `"mt5_bridge_server.exe"` | `cmd.exe` | Frozen Binary (Compiled 15/11/2026) | Terminated & Recompiled from Python Source |
 | `mt5_bridge_server.exe` | 10832 | `...\companion\release\win-unpacked\resources\bin\mt5_bridge_server.exe` | `"mt5_bridge_server.exe"` | `cmd.exe` | Frozen Binary (Compiled 15/11/2026) | Terminated & Recompiled from Python Source |
-| `MT5-OO1 Companion.exe` | 14112 | `...\companion\release\win-unpacked\MT5-OO1 Companion.exe` | `"MT5-OO1 Companion.exe" "arcadefx-companion://open/"` | `explorer.exe` | Electron UI Packaged App | Gracefully stopped during sidecar rebuild |
+| `Institutional EA Companion.exe` | 14112 | `...\companion\release\win-unpacked\Institutional EA Companion.exe` | `"Institutional EA Companion.exe" "institutional-ea-companion://open/"` | `explorer.exe` | Electron UI Packaged App | Gracefully stopped during sidecar rebuild |
 | `terminal64.exe` | 8904 | `C:\Program Files\JustForex MT5 Terminal\terminal64.exe` | `"terminal64.exe"` | `explorer.exe` | MetaTrader 5 Terminal Build 4410 | Running, Active, Connected to `JustMarkets-Demo` |
 
 ---
@@ -55,7 +55,7 @@ A thorough forensic process trace conducted via Windows Management Instrumentati
 ## SECTION C — ROOT CAUSE ANALYSIS: STALE EXECUTABLE OVERRIDE & US30 / 3-POSITION CAP PERSISTENCE
 
 ### 1. Dual Deployment Pathway Conflict
-The MT5-001 repository contains two operational runtime modes:
+The Institutional EA repository contains two operational runtime modes:
 1. **Developer Mode:** Direct Python script execution via `.venv\Scripts\python.exe scripts\start_bot.py`.
 2. **Packaged Companion Application Mode:** An Electron desktop application located in `companion/` that launches compiled sidecar binaries located in `companion/release/win-unpacked/resources/bin/`.
 
@@ -285,7 +285,7 @@ The live runtime verification suite (`scripts/verify_live_runtime_execution.py`)
 ### 1. Process Termination Verification
 All stale executables were terminated using PowerShell and CMD commands:
 ```powershell
-taskkill /F /IM "MT5-OO1 Companion.exe" /IM "mt5_trading_engine.exe" /IM "mt5_bridge_server.exe" /IM "mt5_bot_agent.exe"
+taskkill /F /IM "Institutional EA Companion.exe" /IM "mt5_trading_engine.exe" /IM "mt5_bridge_server.exe" /IM "mt5_bot_agent.exe"
 ```
 Verification command confirmed zero lingering processes:
 ```text
@@ -361,11 +361,11 @@ To launch the full desktop GUI with Electron:
 ```powershell
 # Set environment override to use Python source directly
 $env:PREFER_PYTHON_SOURCE = "1"
-& "companion\release\win-unpacked\MT5-OO1 Companion.exe"
+& "companion\release\win-unpacked\Institutional EA Companion.exe"
 ```
 Or, launch using the freshly recompiled sidecars:
 ```powershell
-& "companion\release\win-unpacked\MT5-OO1 Companion.exe"
+& "companion\release\win-unpacked\Institutional EA Companion.exe"
 ```
 
 ### 3. Operational Verification Checklist

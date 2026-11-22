@@ -13,32 +13,32 @@ const PROJECT_ROOT = isPackaged
   ? path.join(process.resourcesPath)
   : path.resolve(__dirname, "../../");
 
-// Centralized Windows Writable Application Data Directory (%LOCALAPPDATA%\ArcadeFX\MT5-OO1 Companion)
+// Centralized Windows Writable Application Data Directory (%LOCALAPPDATA%\InstitutionalEA\Institutional EA Companion)
 const LOCAL_APP_DATA = process.env.LOCALAPPDATA || (app.getPath ? app.getPath("appData") : path.join(os.homedir(), "AppData", "Local"));
-const ARCADEFX_DATA_DIR = process.platform === "win32"
-  ? path.join(LOCAL_APP_DATA, "ArcadeFX", "MT5-OO1 Companion")
-  : (app.getPath ? app.getPath("userData") : path.join(os.homedir(), ".arcadefx", "mt5-oo1-companion"));
+const INSTITUTIONAL_EA_DATA_DIR = process.platform === "win32"
+  ? path.join(LOCAL_APP_DATA, "InstitutionalEA", "Institutional EA Companion")
+  : (app.getPath ? app.getPath("userData") : path.join(os.homedir(), ".institutional-ea", "institutional-ea-companion"));
 
-const USER_DATA_DIR = ARCADEFX_DATA_DIR;
-const APP_LOGS_DIR = path.join(ARCADEFX_DATA_DIR, "logs");
-const APP_STATE_DIR = path.join(ARCADEFX_DATA_DIR, "state");
-const APP_CREDENTIALS_DIR = path.join(ARCADEFX_DATA_DIR, "credentials");
-const APP_CONFIG_DIR = path.join(ARCADEFX_DATA_DIR, "config");
-const APP_RUNTIME_DIR = path.join(ARCADEFX_DATA_DIR, "runtime");
-const APP_BACKUPS_DIR = path.join(ARCADEFX_DATA_DIR, "backups");
-const APP_CACHE_DIR = path.join(ARCADEFX_DATA_DIR, "cache");
+const USER_DATA_DIR = INSTITUTIONAL_EA_DATA_DIR;
+const APP_LOGS_DIR = path.join(INSTITUTIONAL_EA_DATA_DIR, "logs");
+const APP_STATE_DIR = path.join(INSTITUTIONAL_EA_DATA_DIR, "state");
+const APP_CREDENTIALS_DIR = path.join(INSTITUTIONAL_EA_DATA_DIR, "credentials");
+const APP_CONFIG_DIR = path.join(INSTITUTIONAL_EA_DATA_DIR, "config");
+const APP_RUNTIME_DIR = path.join(INSTITUTIONAL_EA_DATA_DIR, "runtime");
+const APP_BACKUPS_DIR = path.join(INSTITUTIONAL_EA_DATA_DIR, "backups");
+const APP_CACHE_DIR = path.join(INSTITUTIONAL_EA_DATA_DIR, "cache");
 
 const APP_CONFIG_FILE = path.join(APP_CONFIG_DIR, "companion_desktop.json");
 const PRIMARY_CREDENTIALS_FILE = path.join(APP_CREDENTIALS_DIR, "credentials.json");
-const LEGACY_ARCADEFX_DIR = path.join(os.homedir(), ".arcadefx_agent");
-const LEGACY_CREDENTIALS_FILE = path.join(LEGACY_ARCADEFX_DIR, "credentials.enc.json");
+const LEGACY_INSTITUTIONAL_EA_DIR = path.join(os.homedir(), ".institutional_ea_agent");
+const LEGACY_CREDENTIALS_FILE = path.join(LEGACY_INSTITUTIONAL_EA_DIR, "credentials.enc.json");
 const CREDENTIALS_FILE = PRIMARY_CREDENTIALS_FILE;
-const DOTENV_FILE = path.join(ARCADEFX_DATA_DIR, ".env");
+const DOTENV_FILE = path.join(INSTITUTIONAL_EA_DATA_DIR, ".env");
 
 // Ensure all standard writable subdirectories exist
 try {
   [
-    ARCADEFX_DATA_DIR,
+    INSTITUTIONAL_EA_DATA_DIR,
     APP_LOGS_DIR,
     APP_STATE_DIR,
     APP_CREDENTIALS_DIR,
@@ -46,7 +46,7 @@ try {
     APP_RUNTIME_DIR,
     APP_BACKUPS_DIR,
     APP_CACHE_DIR,
-    LEGACY_ARCADEFX_DIR
+    LEGACY_INSTITUTIONAL_EA_DIR
   ].forEach((dir) => {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   });
@@ -111,7 +111,7 @@ const logHistory = [];
 const serviceStates = {
   engine: { id: "engine", name: "Trading Engine", description: "Multi-Timeframe Scalping Engine (mt5_trading_engine)", status: "STOPPED", pid: null, cpu: 0, memoryMb: 0, uptimeSeconds: 0, restarts: 0, lastHeartbeat: null, lastError: null },
   bridge: { id: "bridge", name: "Bridge Server", description: "Persistent TCP Socket IPC on 5555/5556 (mt5_bridge_server)", status: "STOPPED", pid: null, cpu: 0, memoryMb: 0, uptimeSeconds: 0, restarts: 0, lastHeartbeat: null, lastError: null },
-  arcadefx: { id: "arcadefx", name: "ArcadeFX Cloud Sync", description: "Telemetry, heartbeats & signed controls (mt5_bot_agent)", status: "STOPPED", pid: null, cpu: 0, memoryMb: 0, uptimeSeconds: 0, restarts: 0, lastHeartbeat: null, lastError: null },
+  institutional_ea: { id: "institutional_ea", name: "Institutional EA Cloud Sync", description: "Telemetry, heartbeats & signed controls (mt5_bot_agent)", status: "STOPPED", pid: null, cpu: 0, memoryMb: 0, uptimeSeconds: 0, restarts: 0, lastHeartbeat: null, lastError: null },
   telegram: { id: "telegram", name: "Telegram Dispatcher", description: "Real-time alerts & operator remote command switchboard", status: "STOPPED", pid: null, cpu: 0, memoryMb: 0, uptimeSeconds: 0, restarts: 0, lastHeartbeat: null, lastError: null },
   health: { id: "health", name: "Health & Watchdog", description: "CUSUM decay guard, process probe & socket ping", status: "STOPPED", pid: null, cpu: 0, memoryMb: 0, uptimeSeconds: 0, restarts: 0, lastHeartbeat: null, lastError: null },
   logs: { id: "logs", name: "Log Manager", description: "Rotating diagnostics buffer & audit exporter", status: "RUNNING", pid: process.pid, cpu: 0.1, memoryMb: 45, uptimeSeconds: 1, restarts: 0, lastHeartbeat: new Date().toISOString(), lastError: null }
@@ -1038,7 +1038,7 @@ function getTelegramStatus() {
     isPaired,
     botTokenMasked,
     chatIdMasked,
-    botUsername: config.telegramUsername || "ArcadeFX Bot",
+    botUsername: config.telegramUsername || "Institutional EA Bot",
     enabled
   };
 }
@@ -1172,7 +1172,7 @@ function pollTelegramUpdates(token, expectedCode, botUsername, initialResolve) {
 
                 // Send confirmation back to Telegram
                 const confirmMsg = encodeURIComponent(
-                  `✅ <b>MT5-OO1 Telegram Pairing Verified!</b>\n\n` +
+                  `✅ <b>Institutional EA Telegram Pairing Verified!</b>\n\n` +
                   `👤 <b>Authorized User:</b> ${senderName}\n` +
                   `🆔 <b>Chat ID:</b> <code>${chatId}</code>\n\n` +
                   `You can now supervise this desktop bot using:\n` +
@@ -1215,7 +1215,7 @@ function testTelegramMessage() {
       return;
     }
 
-    const testText = encodeURIComponent("🔔 <b>MT5-OO1 Desktop Companion Test Alert:</b> Notification pipeline operational!");
+    const testText = encodeURIComponent("🔔 <b>Institutional EA Desktop Companion Test Alert:</b> Notification pipeline operational!");
     https.get(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${testText}&parse_mode=HTML`, (res) => {
       let body = "";
       res.on("data", (c) => (body += c));
@@ -1708,8 +1708,8 @@ async function startBotServices() {
       return { success: false, message: launchRes.message };
     }
 
-    // === STAGE D: START ARCADEFX BOT AGENT (DAEMON MODE) ===
-    appendLog("SYSTEM", "INFO", "=== STAGE D: STARTING ARCADEFX CLOUD AGENT ===");
+    // === STAGE D: START INSTITUTIONAL_EA BOT AGENT (DAEMON MODE) ===
+    appendLog("SYSTEM", "INFO", "=== STAGE D: STARTING INSTITUTIONAL_EA CLOUD AGENT ===");
     if (!agentProcess) {
       const agentSidecar = resolveSidecar("mt5_bot_agent");
       if (agentSidecar) {
@@ -1717,13 +1717,13 @@ async function startBotServices() {
           const agentEnv = {
             ...process.env,
             PROJECT_ROOT: PROJECT_ROOT,
-            ARCADEFX_APP_DATA_DIR: ARCADEFX_DATA_DIR,
+            INSTITUTIONAL_EA_APP_DATA_DIR: INSTITUTIONAL_EA_DATA_DIR,
             MT5_APP_DATA_DIR: USER_DATA_DIR,
-            ARCADEFX_API_URL: "https://www.arcadefx.live/api/v1"
+            INSTITUTIONAL_EA_API_URL: "https://www.arcadefx.live/api/v1"
           };
 
           if (agentSidecar.type === "binary") {
-            appendLog("ARCADEFX", "INFO", `Launching packaged cloud agent: ${agentSidecar.path}`);
+            appendLog("INSTITUTIONAL_EA", "INFO", `Launching packaged cloud agent: ${agentSidecar.path}`);
             agentProcess = spawn(agentSidecar.path, ["--daemon"], {
               cwd: USER_DATA_DIR,
               env: agentEnv,
@@ -1731,7 +1731,7 @@ async function startBotServices() {
               stdio: ["ignore", "pipe", "pipe"]
             });
           } else {
-            appendLog("ARCADEFX", "INFO", `Launching cloud agent script: ${agentSidecar.python} ${agentSidecar.script} --daemon`);
+            appendLog("INSTITUTIONAL_EA", "INFO", `Launching cloud agent script: ${agentSidecar.python} ${agentSidecar.script} --daemon`);
             agentProcess = spawn(agentSidecar.python, [agentSidecar.script, "--daemon"], {
               cwd: PROJECT_ROOT,
               env: { ...agentEnv, PYTHONPATH: PROJECT_ROOT },
@@ -1740,17 +1740,17 @@ async function startBotServices() {
             });
           }
 
-          serviceStates.arcadefx.pid = agentProcess.pid;
-          serviceStates.arcadefx.status = fs.existsSync(PRIMARY_CREDENTIALS_FILE) || fs.existsSync(LEGACY_CREDENTIALS_FILE)
+          serviceStates.institutional_ea.pid = agentProcess.pid;
+          serviceStates.institutional_ea.status = fs.existsSync(PRIMARY_CREDENTIALS_FILE) || fs.existsSync(LEGACY_CREDENTIALS_FILE)
             ? "RUNNING"
             : "WAITING_FOR_PAIRING";
 
           agentProcess.stdout.on("data", (d) => {
             for (const l of d.toString().split("\n")) {
               if (l.trim()) {
-                appendLog("ARCADEFX", "INFO", l.trim());
+                appendLog("INSTITUTIONAL_EA", "INFO", l.trim());
                 if (l.includes("ONLINE") || l.includes("Heartbeat sent")) {
-                  serviceStates.arcadefx.status = "RUNNING";
+                  serviceStates.institutional_ea.status = "RUNNING";
                 }
               }
             }
@@ -1758,22 +1758,22 @@ async function startBotServices() {
 
           agentProcess.stderr.on("data", (d) => {
             for (const l of d.toString().split("\n")) {
-              if (l.trim()) appendLog("ARCADEFX", parseSeverityFromLog(l.trim(), "INFO"), l.trim());
+              if (l.trim()) appendLog("INSTITUTIONAL_EA", parseSeverityFromLog(l.trim(), "INFO"), l.trim());
             }
           });
 
           agentProcess.on("exit", (code) => {
-            appendLog("ARCADEFX", code === 0 ? "INFO" : "WARNING", `Cloud agent process exited with code ${code}`);
-            serviceStates.arcadefx.status = "STOPPED";
-            serviceStates.arcadefx.pid = null;
+            appendLog("INSTITUTIONAL_EA", code === 0 ? "INFO" : "WARNING", `Cloud agent process exited with code ${code}`);
+            serviceStates.institutional_ea.status = "STOPPED";
+            serviceStates.institutional_ea.pid = null;
             agentProcess = null;
           });
         } catch (e) {
-          appendLog("ARCADEFX", "WARNING", `Notice launching cloud agent: ${e.message}`);
+          appendLog("INSTITUTIONAL_EA", "WARNING", `Notice launching cloud agent: ${e.message}`);
         }
       }
     } else {
-      appendLog("ARCADEFX", "INFO", `Cloud agent already running (PID ${agentProcess.pid}).`);
+      appendLog("INSTITUTIONAL_EA", "INFO", `Cloud agent already running (PID ${agentProcess.pid}).`);
     }
 
     // === STAGE E: REAL READINESS VERIFICATION ===
@@ -1888,8 +1888,8 @@ async function stopBotServices() {
   serviceStates.engine.pid = null;
   serviceStates.bridge.status = "STOPPED";
   serviceStates.bridge.pid = null;
-  serviceStates.arcadefx.status = "STOPPED";
-  serviceStates.arcadefx.pid = null;
+  serviceStates.institutional_ea.status = "STOPPED";
+  serviceStates.institutional_ea.pid = null;
   botState = "STOPPED";
 
   if (mainWindow) mainWindow.webContents.send("state-changed", botState);
@@ -1908,7 +1908,7 @@ function createWindow() {
     minHeight: 720,
     frame: false,
     backgroundColor: "#0b0e14",
-    title: "MT5-OO1 Companion — Arcade FX",
+    title: "Institutional EA Companion",
     icon: path.join(__dirname, "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -1945,10 +1945,10 @@ function createTray() {
     : nativeImage.createEmpty();
 
   tray = new Tray(icon);
-  tray.setToolTip("MT5-OO1 Arcade FX Companion");
+  tray.setToolTip("Institutional EA Companion");
 
   const contextMenu = Menu.buildFromTemplate([
-    { label: "MT5-OO1 Companion", enabled: false },
+    { label: "Institutional EA Companion", enabled: false },
     { type: "separator" },
     { label: "Open Dashboard", click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
     { label: "Start Bot", click: () => startBotServices() },
@@ -2202,7 +2202,7 @@ ipcMain.handle("deploy-ea", (_e, targetExpertsDir) => {
   }
 });
 
-// ArcadeFX.live Pairing Handlers
+// Institutional EA Cloud Pairing Handlers
 ipcMain.handle("get-pairing-status", () => {
   let isPaired = false;
   let instanceId = null;
@@ -2250,7 +2250,7 @@ ipcMain.handle("get-pairing-status", () => {
 function postWithRedirects(targetUrl, postData, redirectCount = 0) {
   return new Promise((resolve) => {
     if (redirectCount > 3) {
-      resolve({ success: false, message: "Too many redirects contacting ArcadeFX server." });
+      resolve({ success: false, message: "Too many redirects contacting Institutional EA server." });
       return;
     }
 
@@ -2264,7 +2264,7 @@ function postWithRedirects(targetUrl, postData, redirectCount = 0) {
         headers: {
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(postData),
-          "User-Agent": "MT5-OO1-Companion/1.2.0"
+          "User-Agent": "Institutional-EA-Companion/1.2.0"
         },
         timeout: 12000
       },
@@ -2272,7 +2272,7 @@ function postWithRedirects(targetUrl, postData, redirectCount = 0) {
         // Handle 301, 302, 307, 308 redirects smoothly
         if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
           const newUrl = new URL(res.headers.location, targetUrl).toString();
-          appendLog("ARCADEFX", "INFO", `Following redirect [HTTP ${res.statusCode}] -> ${newUrl}`);
+          appendLog("INSTITUTIONAL_EA", "INFO", `Following redirect [HTTP ${res.statusCode}] -> ${newUrl}`);
           resolve(postWithRedirects(newUrl, postData, redirectCount + 1));
           return;
         }
@@ -2296,7 +2296,7 @@ function postWithRedirects(targetUrl, postData, redirectCount = 0) {
     );
 
     req.on("error", (e) => {
-      resolve({ success: false, message: `Network error reaching ArcadeFX: ${e.message}` });
+      resolve({ success: false, message: `Network error reaching Institutional EA: ${e.message}` });
     });
 
     req.write(postData);
@@ -2312,7 +2312,7 @@ ipcMain.handle("submit-pairing-code", async (_e, code, instanceName) => {
     return { success: false, message: "Invalid pairing code. Code must be exactly 6 alphanumeric characters." };
   }
 
-  appendLog("ARCADEFX", "INFO", `Submitting pairing claim for [${cleanCode}]...`);
+  appendLog("INSTITUTIONAL_EA", "INFO", `Submitting pairing claim for [${cleanCode}]...`);
 
   const postData = JSON.stringify({
     pairingCode: cleanCode,
@@ -2348,7 +2348,7 @@ ipcMain.handle("submit-pairing-code", async (_e, code, instanceName) => {
 
     // Mirror to legacy path for backward compatibility
     try {
-      fs.mkdirSync(LEGACY_ARCADEFX_DIR, { recursive: true });
+      fs.mkdirSync(LEGACY_INSTITUTIONAL_EA_DIR, { recursive: true });
       fs.writeFileSync(LEGACY_CREDENTIALS_FILE, JSON.stringify(credObj, null, 2), "utf-8");
     } catch (e) {}
 
@@ -2357,17 +2357,17 @@ ipcMain.handle("submit-pairing-code", async (_e, code, instanceName) => {
       fs.writeFileSync(path.join(APP_STATE_DIR, "pairing_request.json"), JSON.stringify({ pairingCode: cleanCode, instanceName: machineName }));
     } catch (e) {}
 
-    appendLog("ARCADEFX", "INFO", "Device paired successfully to ArcadeFX.live!");
-    serviceStates.arcadefx.status = "RUNNING";
+    appendLog("INSTITUTIONAL_EA", "INFO", "Device paired successfully to Institutional EA Cloud!");
+    serviceStates.institutional_ea.status = "RUNNING";
     return { success: true, message: "Device successfully paired." };
   } else {
-    appendLog("ARCADEFX", "ERROR", `Pairing failed: ${result.message}`);
+    appendLog("INSTITUTIONAL_EA", "ERROR", `Pairing failed: ${result.message}`);
     return { success: false, message: result.message };
   }
 });
 
 ipcMain.handle("disconnect-pairing", () => {
-  appendLog("ARCADEFX", "INFO", "Unpairing device from ArcadeFX Cloud...");
+  appendLog("INSTITUTIONAL_EA", "INFO", "Unpairing device from Institutional EA Cloud...");
   try {
     fs.writeFileSync(path.join(APP_STATE_DIR, "unpair_request.json"), JSON.stringify({ unpair: true, timestamp: new Date().toISOString() }));
   } catch (e) {}
@@ -2383,7 +2383,7 @@ ipcMain.handle("disconnect-pairing", () => {
     fs.writeFileSync(statePath, JSON.stringify({ status: "NOT_PAIRED", isPaired: false, error: null }), "utf-8");
   } catch (e) {}
 
-  serviceStates.arcadefx.status = "STOPPED";
+  serviceStates.institutional_ea.status = "STOPPED";
   if (mainWindow) {
     mainWindow.webContents.send("pairing-status-changed", {
       isPaired: false,
@@ -2393,8 +2393,8 @@ ipcMain.handle("disconnect-pairing", () => {
     });
   }
 
-  appendLog("ARCADEFX", "INFO", "ArcadeFX pairing credentials revoked and local state reset.");
-  return { success: true, message: "Device successfully unpaired from ArcadeFX Cloud." };
+  appendLog("INSTITUTIONAL_EA", "INFO", "Institutional EA pairing credentials revoked and local state reset.");
+  return { success: true, message: "Device successfully unpaired from Institutional EA Cloud." };
 });
 
 // Telegram Pairing Handlers
@@ -2420,7 +2420,7 @@ ipcMain.handle("run-diagnostics", async () => {
   const p5555 = p5556;
   const terminals = scanMT5Terminals();
   const pySidecar = resolveSidecar("mt5_trading_engine");
-  const arcadeStatus = fs.existsSync(CREDENTIALS_FILE);
+  const institutionalEaStatus = fs.existsSync(CREDENTIALS_FILE);
   const telStatus = getTelegramStatus().isPaired;
 
   return [
@@ -2430,7 +2430,7 @@ ipcMain.handle("run-diagnostics", async () => {
     { id: "4", name: "Port 5556 (Internal IPC Switchboard)", status: p5556 ? "PASS" : "INFO", details: p5556 ? "Port 5556 is clear and ready" : "Port 5556 is listening" },
     { id: "5", name: "MT5 Terminal Detection", status: terminals.length > 0 ? "PASS" : "WARN", details: terminals.length > 0 ? `Detected: ${terminals[0].name}` : "No MT5 terminals detected" },
     { id: "6", name: "PythonBridgeEA.mq5 File", status: fs.existsSync(EA_SOURCE_PATH) ? "PASS" : "FAIL", details: fs.existsSync(EA_SOURCE_PATH) ? "Source EA verified" : "EA file missing" },
-    { id: "7", name: "ArcadeFX.live Cloud Pairing", status: arcadeStatus ? "PASS" : "WARN", details: arcadeStatus ? "Device paired" : "Pairing required for cloud sync" },
+    { id: "7", name: "Institutional EA Cloud Pairing", status: institutionalEaStatus ? "PASS" : "WARN", details: institutionalEaStatus ? "Device paired" : "Pairing required for cloud sync" },
     { id: "8", name: "Telegram Remote Control", status: telStatus ? "PASS" : "INFO", details: telStatus ? "Authorized chat paired" : "Optional remote control not configured" },
     { id: "9", name: "Local Disk Space & State Storage", status: "PASS", details: `User data directory: ${USER_DATA_DIR}` }
   ];

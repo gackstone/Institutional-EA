@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-Version `3.0.0` upgrades the MT5-001 Dual-Market Scalper on branch `scalper-gold` into a low-latency, event-driven, multi-position scalping engine for **GOLD (`XAUUSD.m`) on weekdays (Monday–Friday)** and **BTCUSD (`BTCUSD.m`) on weekends (Saturday–Sunday)** while preserving 100% backward compatibility with the v1/v2 `GoldScalperEngine` and manual position management subsystems.
+Version `3.0.0` upgrades the Institutional EA Dual-Market Scalper on branch `scalper-gold` into a low-latency, event-driven, multi-position scalping engine for **GOLD (`XAUUSD.m`) on weekdays (Monday–Friday)** and **BTCUSD (`BTCUSD.m`) on weekends (Saturday–Sunday)** while preserving 100% backward compatibility with the v1/v2 `GoldScalperEngine` and manual position management subsystems.
 
 ---
 

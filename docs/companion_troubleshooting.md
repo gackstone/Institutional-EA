@@ -1,4 +1,4 @@
-# MT5-OO1 Companion Troubleshooting & Diagnostic Runbook
+# Institutional EA Companion Troubleshooting & Diagnostic Runbook
 
 ## 1. Quick Diagnostic Checklist
 
@@ -54,7 +54,7 @@ The MT5 Setup Wizard displays "No MetaTrader 5 Terminals Detected".
 
 ---
 
-## 4. ArcadeFX.live Pairing Errors
+## 4. Institutional EA Cloud Pairing Errors
 
 ### Error: "Invalid pairing code format"
 - **Cause**: The entered code is not exactly 6 alphanumeric characters.
@@ -62,7 +62,7 @@ The MT5 Setup Wizard displays "No MetaTrader 5 Terminals Detected".
 
 ### Error: "Pairing code expired or already claimed"
 - **Cause**: Pairing codes are ephemeral and expire after 15 minutes.
-- **Fix**: Generate a fresh code in the ArcadeFX.live dashboard and enter it within 15 minutes.
+- **Fix**: Generate a fresh code in the Institutional EA Cloud dashboard and enter it within 15 minutes.
 
 ### Error: "Cloud cannot override local limits"
 - **Cause**: A remote command attempted to execute a trade with risk higher than `agent/local_limits.json` or switch to a live account.

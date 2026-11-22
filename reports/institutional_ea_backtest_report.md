@@ -1,6 +1,6 @@
-# AlgoVistra & Art of Trading Quantitative Backtest & Filter Ablation Report (28 Videos)
+# Institutional EA & Art of Trading Quantitative Backtest & Filter Ablation Report (28 Videos)
 
-> **Source of Truth**: 28-Video Curriculum (15 AlgoVistra + 13 Art of Trading Videos)
+> **Source of Truth**: 28-Video Curriculum (15 Institutional EA + 13 Art of Trading Videos)
 > **Execution Mode**: Simulation on Closed Candles Only `[GROUND RULE 4, VIDEO 6, 10, 15, ART-06, ART-10]`
 > **Disclaimer**: Educational illustration only (`[GROUND RULE 3]`). Past simulated performance does not guarantee live results.
 

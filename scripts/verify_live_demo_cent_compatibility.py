@@ -36,7 +36,7 @@ def run_live_verification():
     }
 
     print("=" * 80)
-    print("MT5-001 LIVE DEMO AUDIT & VERIFICATION")
+    print("Institutional EA LIVE DEMO AUDIT & VERIFICATION")
     print("=" * 80)
 
     # 1. Initialize MT5

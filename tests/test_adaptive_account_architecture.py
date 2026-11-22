@@ -1,5 +1,5 @@
 """
-Comprehensive Verification Suite for MT5-001 Adaptive Account Architecture.
+Comprehensive Verification Suite for Institutional EA Adaptive Account Architecture.
 Tests Standard USD reference preservation, Micro USD automatic normalization,
 Cent USC automatic normalization, broker volume constraints, and trade eligibility rules:
 - Accounts are eligible when broker specifications and risk budget permit.

@@ -14,7 +14,7 @@ def create_backup():
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     backup_dir = Path("reports/backups")
     backup_dir.mkdir(parents=True, exist_ok=True)
-    archive_path = backup_dir / f"trading_bot_backup_{timestamp}.tar.gz"
+    archive_path = backup_dir / f"institutional_ea_backup_{timestamp}.tar.gz"
 
     print(f"Creating backup at {archive_path}...")
     with tarfile.open(archive_path, "w:gz") as tar:

@@ -43,7 +43,7 @@ Trading setups in the codebase are classified into six distinct operational cate
 │ 8. Candlestick & Chart Pattern│ IMPLEMENTED & WIRED  │ src/patterns/candlesticks.py;   │
 │    Confluence Engine (51 Pat.)│ VIA CONFLUENCE HOOK  │ chart_patterns.py; context.py   │
 ├───────────────────────────────┼──────────────────────┼─────────────────────────────────┤
-│ 9. 28-Video AlgoVistra / Art  │ FULLY IMPLEMENTED BUT│ src/engine/pipeline.py:1-650;   │
+│ 9. 28-Video Institutional EA / Art  │ FULLY IMPLEMENTED BUT│ src/engine/pipeline.py:1-650;   │
 │    of Trading 7-Gate Pipeline │ DISCONNECTED FROM BOT│ src/engine/skills/* (23 files)  │
 ├───────────────────────────────┼──────────────────────┼─────────────────────────────────┤
 │ 10. CISD (Change in State     │ IMPLEMENTED IN EXT.  │ src/strategies/cisd.py:1-120    │
@@ -255,10 +255,10 @@ This section examines the mathematical and programmatic implementation of every 
 
 A critical finding of this audit is the existence of several sophisticated strategy modules that are fully coded in the repository but completely disconnected from the active production loop:
 
-1. **The AlgoVistra / Art of Trading 28-Video Pipeline (`src/engine/pipeline.py`)**:
+1. **The Institutional EA / Art of Trading 28-Video Pipeline (`src/engine/pipeline.py`)**:
    - Contains 23 separate skill modules implementing a 7-gate confirmation framework (H0 through G7).
    - Includes `protected_swing_marker.py`, `five_check_model.py`, `ifvg_inversion.py`, `inducement_ob_entry.py`, `range_liquidity_loop.py`, `breakout_trap_classifier.py`.
-   - **Audit Finding:** This pipeline is executed ONLY in `scripts/run_algovistra_backtest.py` and `tests/test_algovistra_skills.py`, and referenced in `src/manual_mgmt/assessor.py`. The live bot engine (`scripts/start_bot.py` -> `TradingBotOrchestrator`) does NOT import or call `AlgoVistraPipeline`.
+   - **Audit Finding:** This pipeline is executed ONLY in `scripts/run_institutional_ea_backtest.py` and `tests/test_institutional_ea_skills.py`, and referenced in `src/manual_mgmt/assessor.py`. The live bot engine (`scripts/start_bot.py` -> `TradingBotOrchestrator`) does NOT import or call `InstitutionalEaPipeline`.
 2. **Modular Strategy Pipeline Adapters (`src/strategies/`)**:
    - `src/strategies/cisd.py` (Change in State of Delivery): Detects liquidity sweep + body close through opening price of manipulation leg.
    - `src/strategies/trendline_liquidity.py`: Generates trendlines across swings and trades false breakouts.

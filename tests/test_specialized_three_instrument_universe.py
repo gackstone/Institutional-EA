@@ -1,5 +1,5 @@
 """
-Tests for MT5-001 Three-Instrument Trading Specialization:
+Tests for Institutional EA Three-Instrument Trading Specialization:
 1. Strict Three-Symbol Universe (XAUUSD, BTCUSD, USDJPY)
 2. Broker-Aware Symbol Resolution (.m, .pro, .raw, etc.)
 3. Weekday XAUUSD Primary Trading Mode (Priority 1: Gold, Priority 2: USDJPY)

@@ -1,5 +1,5 @@
 {
-  "description": "MT5-001 Broker Compatibility Registry for Account Detection & Symbol Conventions",
+  "description": "Institutional EA Broker Compatibility Registry for Account Detection & Symbol Conventions",
   "version": "1.0.0",
   "known_cent_currencies": [
     "USC",

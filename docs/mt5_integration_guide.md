@@ -1,8 +1,8 @@
-# MT5-OO1 MetaTrader 5 Integration Guide
+# Institutional EA MetaTrader 5 Integration Guide
 
 ## 1. Overview & Architecture
 
-MT5-OO1 integrates with MetaTrader 5 via a dual-mode communication bridge:
+Institutional EA integrates with MetaTrader 5 via a dual-mode communication bridge:
 
 ```mermaid
 flowchart LR
@@ -11,10 +11,10 @@ flowchart LR
         Terminal[MT5 Terminal / Wine MT5]
     end
 
-    subgraph MT5-OO1 Desktop Companion / Supervisor
+    subgraph Institutional EA Desktop Companion / Supervisor
         Bridge[run_bridge_server.py\nSocket Bridge Server]
         Engine[start_bot.py\nQuantitative Engine]
-        Agent[mt5_bot_agent.py\nArcadeFX Agent]
+        Agent[mt5_bot_agent.py\nInstitutional EA Agent]
     end
 
     Terminal --> EA

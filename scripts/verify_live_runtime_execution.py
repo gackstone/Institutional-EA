@@ -1,5 +1,5 @@
 """
-Live MT5 Demo Runtime Verification Script for MT5-001.
+Live MT5 Demo Runtime Verification Script for Institutional EA.
 
 Tests real MT5 Demo execution on account 2002270203 (JustMarkets-Demo):
 1. Account reconciliation & existing position audit (including unauthorized US30/EURUSD).
@@ -52,7 +52,7 @@ def make_candidate(cand_id: str, symbol: str, direction: OrderType, entry: float
 
 def run_live_verification():
     print("=" * 80)
-    print("MT5-001 LIVE RUNTIME VERIFICATION SUITE")
+    print("Institutional EA LIVE RUNTIME VERIFICATION SUITE")
     print("Target Account: JustMarkets-Demo (2002270203)")
     print("=" * 80)
 

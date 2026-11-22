@@ -1,5 +1,5 @@
 """
-Comprehensive test suite for the MT5-001 Companion Local Control Service,
+Comprehensive test suite for the Institutional EA Companion Local Control Service,
 SQLite persistence, security/auth, config versioning, MT5 sync & reconciliation,
 engine lifecycle, allowlisted PowerShell operations, and HTTP Control API.
 """
@@ -90,7 +90,7 @@ class _FakeMT5:
                 tp=2656.0,
                 profit=4.0,
                 magic=100101,
-                comment="MT5-001",
+                comment="Institutional EA",
             ),
             SimpleNamespace(
                 ticket=1002,

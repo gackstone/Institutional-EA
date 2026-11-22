@@ -1,6 +1,6 @@
 # Notification Layer & Telegram Message Catalog
 
-The MT5-OO1 Python SMC/ICT Engine uses a structured, three-tier notification layer (`src/notifications/`) that separates engine log lines from user-facing Telegram HTML cards.
+The Institutional EA Python SMC/ICT Engine uses a structured, three-tier notification layer (`src/notifications/`) that separates engine log lines from user-facing Telegram HTML cards.
 
 ---
 

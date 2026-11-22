@@ -1,10 +1,10 @@
 {
-  "productName": "MT5-001 Companion",
-  "appId": "live.arcadefx.mt5oo1",
+  "productName": "Institutional EA Companion",
+  "appId": "com.institutionalea.app",
   "version": "1.2.0",
   "platform": "windows",
   "architecture": "x64",
-  "filename": "MT5-001-Companion-Setup.exe",
+  "filename": "Institutional-EA-Companion-Setup.exe",
   "fileSizeBytes": 156942722,
   "sha256": "6957cbddf60820a365057595adb200a30d462898a77cff890805619b0b4ebcba",
   "buildDate": "2026-11-11T08:48:47Z",
@@ -25,7 +25,7 @@
     {
       "name": "mt5_bot_agent",
       "executable": "bin/mt5_bot_agent.exe",
-      "purpose": "ArcadeFX.live cloud telemetry sync, pairing claim handler & remote commands"
+      "purpose": "Institutional EA cloud telemetry sync, pairing claim handler & remote commands"
     }
   ],
   "bundledAssets": [

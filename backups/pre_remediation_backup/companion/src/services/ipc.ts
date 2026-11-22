@@ -85,7 +85,7 @@ let mockLogs: LogMessage[] = [
     timestamp: new Date().toISOString(),
     service: "SYSTEM",
     level: "INFO",
-    message: "MT5-OO1 Companion Desktop Runtime initialized.",
+    message: "Institutional EA Companion Desktop Runtime initialized.",
   },
   {
     id: "2",
@@ -97,7 +97,7 @@ let mockLogs: LogMessage[] = [
   {
     id: "3",
     timestamp: new Date().toISOString(),
-    service: "ARCADEFX",
+    service: "INSTITUTIONAL_EA",
     level: "INFO",
     message: "Ready for device pairing via https://arcadefx.live/api/v1/bot/pairing/claim.",
   }
@@ -139,8 +139,8 @@ let mockServices: ServiceInfo[] = [
     lastError: null,
   },
   {
-    id: "arcadefx",
-    name: "ArcadeFX Cloud Sync",
+    id: "institutional_ea",
+    name: "Institutional EA Cloud Sync",
     description: "Telemetry, heartbeats & signed cloud controls (mt5_bot_agent)",
     status: "STOPPED",
     pid: null,
@@ -419,7 +419,7 @@ export const IPC = {
       { id: "4", name: "Port 5556 (Internal IPC Switchboard)", status: "PASS", details: "Port 5556 is ready" },
       { id: "5", name: "MT5 Terminal Detection", status: "PASS", details: "Found: MetaTrader 5" },
       { id: "6", name: "PythonBridgeEA.mq5 File", status: "PASS", details: "PythonBridgeEA.mq5 verified" },
-      { id: "7", name: "ArcadeFX.live Cloud Pairing", status: "PASS", details: "Cloud sync primed" },
+      { id: "7", name: "Institutional EA Cloud Pairing", status: "PASS", details: "Cloud sync primed" },
       { id: "8", name: "Telegram Remote Control", status: "PASS", details: "Notification channel verified" },
       { id: "9", name: "Local Disk Space & State Storage", status: "PASS", details: "> 25 GB free" },
     ];

@@ -1,5 +1,5 @@
 """
-Thread-safe SQLite repository for the MT5-001 Adaptive Trading Intelligence (ATI) Subsystem.
+Thread-safe SQLite repository for the Institutional EA Adaptive Trading Intelligence (ATI) Subsystem.
 Provides atomic transactions, idempotency guarantees, and safe queries.
 """
 

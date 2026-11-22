@@ -1,5 +1,5 @@
 """
-Automated Regression Tests for Dynamic Position Layering & Removal of 3-Position Ceiling (MT5-001).
+Automated Regression Tests for Dynamic Position Layering & Removal of 3-Position Ceiling (Institutional EA).
 Covers Scenarios A through L in Phase 9.
 """
 

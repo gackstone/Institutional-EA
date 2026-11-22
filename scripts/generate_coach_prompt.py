@@ -1,6 +1,6 @@
 """
-Generates arcadefx.live AI Coach System Prompt and Context from knowledge/forex_kb.json.
-Guarantees zero contradiction with verified video cards (28 videos: Part 1 AlgoVistra + Part 2 Art of Trading).
+Generates Institutional EA Cloud AI Coach System Prompt and Context from knowledge/forex_kb.json.
+Guarantees zero contradiction with verified video cards (28 videos: Part 1 Institutional EA + Part 2 Art of Trading).
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ def generate_coach_docs():
     pedagogy = kb.get("pedagogical_rules", [])
 
     content = []
-    content.append("# ArcadeFx.live AI Trading Coach — Master System Prompt & Knowledge Context (28 Videos)\n")
-    content.append("> **Operational Purpose**: Educational quantitative coaching engine powered by AlgoVistra & Art of Trading institutional price-action methodology and MT5 quantitative engine.\n")
+    content.append("# Institutional EA Cloud AI Trading Coach — Master System Prompt & Knowledge Context (28 Videos)\n")
+    content.append("> **Operational Purpose**: Educational quantitative coaching engine powered by Institutional EA & Art of Trading institutional price-action methodology and MT5 quantitative engine.\n")
     
     content.append("## Mandatory Educational Disclaimer")
     content.append(f"> **{kb.get('disclaimer')}**\n")
@@ -54,7 +54,7 @@ def generate_coach_docs():
 
     content.append("## The 28 Verified Strategy Video Cards\n")
     for card in cards:
-        series = card.get("series", "AlgoVistra")
+        series = card.get("series", "Institutional EA")
         vid_num = card.get("video_number")
         art_f = f" (File: {card.get('art_file')})" if "art_file" in card else ""
         content.append(f"### Video {vid_num} [{series}{art_f}]: {card.get('title')} (`{card.get('id')}`)")
@@ -86,7 +86,7 @@ def generate_coach_docs():
 
     full_text = "\n".join(content)
 
-    out_md = Path("docs/arcadefx_coach_prompt.md")
+    out_md = Path("docs/institutional_ea_coach_prompt.md")
     with open(out_md, "w", encoding="utf-8") as f:
         f.write(full_text)
 

@@ -1,6 +1,6 @@
 """
 Centralized Notification Policy and Smart Deduplication Manager.
-Enforces the MT5-001 Success-First Alert System:
+Enforces the Institutional EA Success-First Alert System:
 - Suppresses repetitive rejected-trade alerts (ORDER REJECTED, SETUP SKIPPED, PRE-CHECK FAILED)
 - Emits confirmed execution, closure, and validated signal alerts
 - Guarantees immediate delivery of critical risk, connectivity, and circuit-breaker alerts

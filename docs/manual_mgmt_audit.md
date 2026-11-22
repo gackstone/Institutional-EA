@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-The MT5 Bot codebase possesses a rich suite of pure strategy skills (AlgoVistra 15 videos + Art of Trading 13 videos, 26 verified unit tests) and a multi-tier risk architecture. However, **prior to this audit, the bot was architected under the implicit assumption that every position returned by the MT5 terminal belonged to the bot**.
+The MT5 Bot codebase possesses a rich suite of pure strategy skills (Institutional EA 15 videos + Art of Trading 13 videos, 26 verified unit tests) and a multi-tier risk architecture. However, **prior to this audit, the bot was architected under the implicit assumption that every position returned by the MT5 terminal belonged to the bot**.
 
 Under existing code paths, if a user opens a manual position on their desktop or mobile MT5 terminal while the bot is active, the bot's trade manager would:
 1. Subject the user's manual position to automatic `$5.00+` scalper profit-taking, break-even ratchets, or session-end flattening.
@@ -33,7 +33,7 @@ This audit documents the entire codebase landscape, maps all dangerous code path
 | **Trade Manager** | `src/risk/trade_management.py` | Position lifecycle manager: calculates Net Floating Profit (gross + commission + swap), dynamic $5+ profit ratchet, break-even at +1.0R (or +0.5R scalping), structural trailing stops, time-stops, session-end flatten. |
 | **Config Layer** | `src/core/config.py`<br>`config/strategy.yaml`<br>`config/risk_config.json`<br>`config/settings.json`<br>`config/account_profiles.json` | Strongly typed dataclasses (`AppConfig`, `RiskConfig`, `SymbolConfig`). Central YAML and JSON config files defining magic numbers, risk percentages, session windows. |
 | **Logging & Alerting** | `src/notifications/telegram_service.py`<br>`src/notifications/alerts.py`<br>`src/execution/analytics/tca.py` | Structured Python logging, transaction cost analysis (TCA), Telegram broadcast engine with role-based routing (Admin vs Operator) and HTML templates. |
-| **Test Suite & Mocks** | `tests/test_algovistra_skills.py`<br>`tests/test_broker_adapters.py`<br>`tests/test_execution_bridge.py`<br>`src/adapters/sim_broker.py` | 50+ unit/integration tests executable via `python -m unittest`. `SimBroker` provides full in-memory execution simulation with slippage, margin checks, commissions, and SL/TP triggers. |
+| **Test Suite & Mocks** | `tests/test_institutional_ea_skills.py`<br>`tests/test_broker_adapters.py`<br>`tests/test_execution_bridge.py`<br>`src/adapters/sim_broker.py` | 50+ unit/integration tests executable via `python -m unittest`. `SimBroker` provides full in-memory execution simulation with slippage, margin checks, commissions, and SL/TP triggers. |
 
 ---
 

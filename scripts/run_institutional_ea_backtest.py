@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AlgoVistra Bar-Replay Backtest Harness & Ablation Runner.
+Institutional EA Bar-Replay Backtest Harness & Ablation Runner.
 [GROUND RULE 3: Backtest / demo / paper mode only]
 [GROUND RULE 4: Closed candles only]
 [GROUND RULE 2: Tagged with video cards]
@@ -9,7 +9,7 @@ Executes bar-replay simulation over historical JSON candle data.
 Simulates order fills, SL/TP triggers, and stop management.
 Computes Total Trades, Win Rate, Profit Factor, Expectancy (R), Max Drawdown.
 Runs filter ablation study: All Gates vs (G2 off) vs (G5 off) vs (G6 off) vs Baseline.
-Outputs report to reports/algovistra_backtest_report.md.
+Outputs report to reports/institutional_ea_backtest_report.md.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 from src.core.contracts import Candle
 from src.engine.types import Context, normalize_to_candles
-from src.engine.pipeline import AlgoVistraEnginePipeline, PipelineEvaluationResult
+from src.engine.pipeline import InstitutionalEaEnginePipeline, PipelineEvaluationResult
 from src.engine.skills import (
     protected_swing_marker,
     trend_by_structure,
@@ -127,7 +127,7 @@ def simulate_backtest(
         }
     )
 
-    pipeline = AlgoVistraEnginePipeline(
+    pipeline = InstitutionalEaEnginePipeline(
         config={"max_spread_pct_of_sl": 25.0},
         log_json_path=None  # Disable per-candle log I/O for high-speed simulation
     )
@@ -300,7 +300,7 @@ def simulate_backtest(
 def run_full_ablation_study():
     """Runs backtest across multiple assets and ablation regimes."""
     print("=" * 70)
-    print("Running AlgoVistra Backtest & Ablation Suite (Closed Candles Only)...")
+    print("Running Institutional EA Backtest & Ablation Suite (Closed Candles Only)...")
     print("=" * 70)
 
     historical_dir = ROOT_DIR / "data" / "historical"
@@ -357,11 +357,11 @@ def run_full_ablation_study():
     # Generate Markdown Report
     reports_dir = ROOT_DIR / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
-    report_file = reports_dir / "algovistra_backtest_report.md"
+    report_file = reports_dir / "institutional_ea_backtest_report.md"
 
     with open(report_file, "w", encoding="utf-8") as f:
-        f.write("# AlgoVistra & Art of Trading Quantitative Backtest & Filter Ablation Report (28 Videos)\n\n")
-        f.write("> **Source of Truth**: 28-Video Curriculum (15 AlgoVistra + 13 Art of Trading Videos)\n")
+        f.write("# Institutional EA & Art of Trading Quantitative Backtest & Filter Ablation Report (28 Videos)\n\n")
+        f.write("> **Source of Truth**: 28-Video Curriculum (15 Institutional EA + 13 Art of Trading Videos)\n")
         f.write("> **Execution Mode**: Simulation on Closed Candles Only `[GROUND RULE 4, VIDEO 6, 10, 15, ART-06, ART-10]`\n")
         f.write("> **Disclaimer**: Educational illustration only (`[GROUND RULE 3]`). Past simulated performance does not guarantee live results.\n\n")
 

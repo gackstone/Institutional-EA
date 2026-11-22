@@ -1,7 +1,7 @@
-# MT5-001 — CRITICAL REMEDIATION REPORT
+# Institutional EA — CRITICAL REMEDIATION REPORT
 
 **Date:** 2026-11-16  
-**Repository:** `https://github.com/gackstone/MT5-001-Bot.git`  
+**Repository:** `https://github.com/gackstone/Institutional-EA.git`  
 **Local Project Root:** `C:\Users\Gackstone_Baraka\Downloads\MT5 001`  
 **Branch:** `feature/specialization-gold-jpy-btc` (base commit `2042a3002717b22d7cb0493df6e7339d5f16faaf`)  
 **Recoverable Backup Location:** `backups\pre_remediation_backup\`

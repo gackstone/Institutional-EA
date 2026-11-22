@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the Institutional Multi-Timeframe Algorithmic Trading Bot (`MT5-OO1`) are documented in this file.
+All notable changes to the Institutional Multi-Timeframe Algorithmic Trading Bot (`Institutional EA`) are documented in this file.
 
 ## [3.10.0] - 2026-11-10
 
@@ -38,16 +38,16 @@ All notable changes to the Institutional Multi-Timeframe Algorithmic Trading Bot
   - Added 13 unit tests in `tests/test_manual_management.py` (100% passing).
 
 
-### Added - ArcadeFx.live Cloud Pairing Code Authentication & Remote Control Engine
+### Added - Institutional EA Cloud Pairing Code Authentication & Remote Control Engine
 - **Interactive Pairing Flow (`agent/mt5_bot_agent.py`)**:
-  - Implemented interactive terminal onboarding interface with step-by-step guidance to connect local MT5 to `https://arcadefx.live`.
+  - Implemented interactive terminal onboarding interface with step-by-step guidance to connect local MT5 to `https://Institutional EA Cloud`.
   - Automatic uppercase normalization, accidental whitespace trimming, and strict 6-character alphanumeric validation.
   - Interactive retry loop with clear diagnostic messaging (`INVALID CODE`, `EXPIRED CODE`, `ALREADY USED`, `NETWORK ERROR`, `SERVER ERROR`).
   - Supports non-interactive CLI pairing flag `python agent/mt5_bot_agent.py --pair <CODE>`.
 - **Cloud API Integration (`/api/v1/bot`)**:
-  - Direct integration with existing ArcadeFx endpoints: `POST /bot/pairing/claim`, `POST /bot/heartbeat`, `POST /bot/commands/poll`, `POST /bot/commands/:id/ack`, `POST /bot/events/sync`.
+  - Direct integration with existing Institutional EA endpoints: `POST /bot/pairing/claim`, `POST /bot/heartbeat`, `POST /bot/commands/poll`, `POST /bot/commands/:id/ack`, `POST /bot/events/sync`.
   - Outbound-only HTTPS architecture; zero open inbound listening ports on the host machine.
-  - Machine-bound credential store (`~/.arcadefx_agent/credentials.enc.json`) and SQLite-backed offline event queue.
+  - Machine-bound credential store (`~/.institutional_ea_agent/credentials.enc.json`) and SQLite-backed offline event queue.
 - **Real MT5 Status & Telemetry Synchronization**:
   - Heartbeat telemetry synchronizes live MT5 terminal connectivity, active bridge status, broker name, masked login (`***57798`), real account balance, equity, leverage, open positions, and local limits snapshot.
 - **Signed Cloud Controls & Local Hard Ceilings (`agent/local_limits.json`)**:
@@ -56,7 +56,7 @@ All notable changes to the Institutional Multi-Timeframe Algorithmic Trading Bot
   - Enforces local machine hard ceilings: cloud commands cannot increase risk percentage above local limit or force live trading without local physical confirmation.
 - **Windows VPS Launchers & Diagnostics**:
   - Created `start_mt5_agent.bat` and `start_mt5_bot.bat` for Windows VPS operations.
-  - Integrated ArcadeFX agent pairing check into `scripts/selfcheck.py`.
+  - Integrated Institutional EA agent pairing check into `scripts/selfcheck.py`.
 
 
 ## [3.8.0] - 2026-11-08

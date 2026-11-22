@@ -1,4 +1,4 @@
-# Arcade Fx MT5 Bot Agent Dependencies
+# Institutional EA MT5 Bot Agent Dependencies
 # Standard library modules power core outbound communications.
 # MetaTrader5 provides direct MT5 terminal integration on Windows.
 MetaTrader5>=5.0.45; platform_system=="Windows"

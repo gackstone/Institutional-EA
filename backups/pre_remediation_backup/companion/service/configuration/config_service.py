@@ -1,5 +1,5 @@
 """
-Authoritative Configuration Service for the MT5-001 Companion & Trading Engine.
+Authoritative Configuration Service for the Institutional EA Companion & Trading Engine.
 Validates all configuration updates, enforces DEMO-only safety locks, tracks
 versioned configuration history in SQLite, supports preview/rollback/export/import,
 and identifies settings requiring an engine restart.

@@ -1,5 +1,5 @@
 """
-Authenticated Localhost-Only Control API & SSE Event Stream for the MT5-001 Companion.
+Authenticated Localhost-Only Control API & SSE Event Stream for the Institutional EA Companion.
 Binds exclusively to 127.0.0.1 and validates Bearer/X-Companion-Token on every request.
 """
 
@@ -89,7 +89,7 @@ def create_request_handler(ctx: ControlServiceContext):
             query = parse_qs(parsed.query)
 
             if path == "/healthz":
-                self._send_json(200, {"status": "ok", "service": "mt5-001-control-service"})
+                self._send_json(200, {"status": "ok", "service": "institutional-ea-control-service"})
                 return
 
             if not self._is_authorized(query):
@@ -300,7 +300,7 @@ def create_request_handler(ctx: ControlServiceContext):
                     ok, msg = ctx.telegram_notifier.verify_connection()
                     if ok and body.get("send_message", True):
                         ctx.telegram_notifier.send_raw_html(
-                            "🧪 <b>MT5-001 TELEGRAM TEST</b>\n\nConnection verified from Companion Control Centre (DEMO mode)."
+                            "🧪 <b>Institutional EA TELEGRAM TEST</b>\n\nConnection verified from Companion Control Centre (DEMO mode)."
                         )
                     self._send_json(200, {"success": ok, "message": msg})
             elif path == "/api/ati/sync":
