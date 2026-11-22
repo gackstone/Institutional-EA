@@ -25,10 +25,12 @@ import {
 import {
   buildNormalizedDashboardData,
   buildSymbolChartBundle,
+  CandleBar,
   ChartSymbol,
   ChartTimeframe,
   DataFeedStatus,
 } from "../../services/dashboardDataAdapter";
+import { ControlSymbolSpec } from "../../types";
 import {
   calculateTradeMetrics,
   validateTightenOnlyStopLoss,
@@ -48,6 +50,8 @@ export const DashboardScreen: React.FC<
     onNavigate: (s: ScreenId) => void;
     trades?: TradeHistoryRecord[];
     feedStatus?: DataFeedStatus;
+    initialSymbol?: ChartSymbol;
+    readOnlyMobile?: boolean;
   }
 > = ({
   status,
@@ -56,27 +60,33 @@ export const DashboardScreen: React.FC<
   onActionMessage,
   trades = [],
   feedStatus = "LIVE_SSE",
+  initialSymbol = "XAUUSD",
+  readOnlyMobile = false,
 }) => {
-  const [selectedSymbol, setSelectedSymbol] = useState<ChartSymbol>("XAUUSD");
+  const [selectedSymbol, setSelectedSymbol] = useState<ChartSymbol>(initialSymbol);
   const [selectedTimeframe, setSelectedTimeframe] = useState<ChartTimeframe>("M5");
+  const [realCandles, setRealCandles] = useState<CandleBar[]>([]);
+  const [liveQuote, setLiveQuote] = useState<ControlSymbolSpec | null>(null);
   const [utcClockText, setUtcClockText] = useState<string>(() =>
     `${new Date().toISOString().slice(11, 19)} UTC`
   );
-  const [dataTick, setDataTick] = useState<number>(0);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
-  // Two-step confirmation modal state for Close All Bot Positions
-  const [confirmModal, setConfirmModal] = useState<{ step: 1 | 2 } | null>(null);
+  // Sync external symbol jump (e.g., clicking a row in Live Signal Grid)
+  useEffect(() => {
+    setSelectedSymbol(initialSymbol);
+  }, [initialSymbol]);
+
+  // Two-step confirmation modal state for Close All Bot Positions or Mobile Pause
+  const [confirmModal, setConfirmModal] = useState<{
+    type: "CLOSE_ALL" | "PAUSE";
+    step: 1 | 2;
+  } | null>(null);
 
   // Tighten-Only Stop Loss modification modal state
   const [slModalPos, setSlModalPos] = useState<ControlPosition | null>(null);
   const [proposedSlInput, setProposedSlInput] = useState<string>("");
   const [proposedTpInput, setProposedTpInput] = useState<string>("");
-
-  // Local optimistic modifications for positions (when in DEMO preview/simulation)
-  const [localPositionOverrides, setLocalPositionOverrides] = useState<
-    Record<number, Partial<ControlPosition> & { closed?: boolean }>
-  >({});
 
   // Lightweight 1-second UTC clock (isolated from chart series)
   useEffect(() => {
@@ -86,50 +96,79 @@ export const DashboardScreen: React.FC<
     return () => clearInterval(timer);
   }, []);
 
-  // Batched 3-second market tick pulse for DEMO chart quote updates
+  // Fetch real OHLC candles directly from MT5 via Control Service (/api/market/candles)
   useEffect(() => {
-    const timer = setInterval(() => {
-      setDataTick((c) => (c + 1) % 24);
-    }, 3000);
-    return () => clearInterval(timer);
-  }, []);
+    let cancelled = false;
+    const loadCandles = async () => {
+      try {
+        const res = await controlClient.getCandles(selectedSymbol, selectedTimeframe, 120);
+        if (!cancelled) {
+          setRealCandles(res.candles || []);
+          setLiveQuote(res.quote || null);
+        }
+      } catch {
+        if (!cancelled) {
+          setRealCandles([]);
+          setLiveQuote(null);
+        }
+      }
+    };
+    loadCandles();
+    const timer = setInterval(loadCandles, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [selectedSymbol, selectedTimeframe]);
 
-  // Build normalized dashboard state
+  // Build normalized dashboard state strictly from real MT5/bot data
   const dash = useMemo(
     () => buildNormalizedDashboardData(status, trades),
     [status, trades]
   );
 
-  // Apply local optimistic overrides to positions
-  const activePositions = useMemo(() => {
-    return dash.status.mt5.positions
-      .filter((p) => !localPositionOverrides[p.ticket]?.closed)
-      .map((p) => ({
-        ...p,
-        ...(localPositionOverrides[p.ticket] || {}),
-      }));
-  }, [dash.status.mt5.positions, localPositionOverrides]);
+  const activePositions = dash.status.mt5.positions;
+  const effectiveStatus = dash.status;
 
-  const effectiveStatus: ControlStatusPayload = useMemo(
-    () => ({
-      ...dash.status,
-      mt5: {
-        ...dash.status.mt5,
-        positions: activePositions,
-      },
-    }),
-    [dash.status, activePositions]
+  // Build Live Chart bundle strictly from real MT5 candles & positions
+  const chartBundle = useMemo(
+    () =>
+      buildSymbolChartBundle(
+        selectedSymbol,
+        selectedTimeframe,
+        effectiveStatus,
+        realCandles,
+        liveQuote
+      ),
+    [selectedSymbol, selectedTimeframe, effectiveStatus, realCandles, liveQuote]
   );
-
-  // Build Live Chart bundle for selected symbol & timeframe
-  const chartBundle = useMemo(() => {
-    const jitter = Math.sin(dataTick * 0.65) * 0.25;
-    return buildSymbolChartBundle(selectedSymbol, selectedTimeframe, effectiveStatus, jitter);
-  }, [selectedSymbol, selectedTimeframe, effectiveStatus, dataTick]);
 
   const eng = effectiveStatus.engine;
   const kpis = dash.kpis;
   const botOpenCount = activePositions.filter((p) => p.ownership === "BOT").length;
+  const provenanceLabel = dash.provenance.connected
+    ? `${dash.provenance.source}${
+        dash.provenance.updatedAt
+          ? ` · ${new Date(dash.provenance.updatedAt).toISOString().slice(11, 19)}`
+          : ""
+      }`
+    : "Waiting for MT5";
+
+  const handleSaveScreenshot = async (
+    ticket: number,
+    symbol: string,
+    stage: string,
+    dataUrl: string
+  ) => {
+    try {
+      const res = await controlClient.saveTradeScreenshot(ticket, symbol, stage, dataUrl);
+      if (res.success && stage === "MANUAL") {
+        onActionMessage(`Saved chart PNG (${res.filename})`);
+      }
+    } catch {
+      // ignore offline
+    }
+  };
 
   // Execute existing Control Service endpoints safely
   const executeControlAction = async (
@@ -148,26 +187,24 @@ export const DashboardScreen: React.FC<
     }
   };
 
-  // Two-step confirmation handler for Close All Bot Positions
+  // Two-step confirmation handler for Close All Bot Positions or Pause
   const handleConfirmTwoStep = async () => {
     if (!confirmModal) return;
     if (confirmModal.step === 1) {
-      setConfirmModal({ step: 2 });
+      setConfirmModal({ ...confirmModal, step: 2 });
       return;
     }
 
+    const actionType = confirmModal.type;
     setConfirmModal(null);
-    await executeControlAction("Close All", async () => {
-      const res = await controlClient.closeAllBotPositions(true);
-      const nextOverrides = { ...localPositionOverrides };
-      for (const p of activePositions) {
-        if (p.ownership === "BOT") {
-          nextOverrides[p.ticket] = { closed: true };
-        }
-      }
-      setLocalPositionOverrides(nextOverrides);
-      return res;
-    });
+    if (actionType === "PAUSE") {
+      await executeControlAction(
+        eng.pause_flag_active ? "Resume" : "Pause",
+        () => (eng.pause_flag_active ? controlClient.resumeEntries() : controlClient.pauseEntries())
+      );
+      return;
+    }
+    await executeControlAction("Close All", () => controlClient.closeAllBotPositions(true));
   };
 
   // Partial Close 50%
@@ -176,14 +213,6 @@ export const DashboardScreen: React.FC<
     setBusyAction(`50% #${pos.ticket}`);
     try {
       const res = await IPC.closePosition(pos.ticket, halfVol);
-      setLocalPositionOverrides((prev) => ({
-        ...prev,
-        [pos.ticket]: {
-          ...(prev[pos.ticket] || {}),
-          volume: Number(Math.max(0.01, pos.volume - halfVol).toFixed(2)),
-          profit: Number((pos.profit * 0.5).toFixed(2)),
-        },
-      }));
       onActionMessage(`50% closed #${pos.ticket} (${halfVol.toFixed(2)}L). ${res.message}`);
       await onRefresh();
     } catch (e: any) {
@@ -198,10 +227,6 @@ export const DashboardScreen: React.FC<
     setBusyAction(`Close #${pos.ticket}`);
     try {
       const res = await controlClient.closePosition(pos.ticket, true);
-      setLocalPositionOverrides((prev) => ({
-        ...prev,
-        [pos.ticket]: { closed: true },
-      }));
       onActionMessage(`Closed #${pos.ticket}: ${res.message}`);
       await onRefresh();
     } catch (e: any) {
@@ -235,10 +260,6 @@ export const DashboardScreen: React.FC<
     setBusyAction(`BE #${pos.ticket}`);
     try {
       const res = await controlClient.modifyPosition(pos.ticket, targetBeSl, pos.tp);
-      setLocalPositionOverrides((prev) => ({
-        ...prev,
-        [pos.ticket]: { ...(prev[pos.ticket] || {}), sl: targetBeSl, protected: true },
-      }));
       onActionMessage(`#${pos.ticket} SL -> BE+ (${targetBeSl.toFixed(digits)}) ${res.message || ""}`);
       await onRefresh();
     } catch (e: any) {
@@ -287,15 +308,6 @@ export const DashboardScreen: React.FC<
     setBusyAction(`SL+ #${slModalPos.ticket}`);
     try {
       const res = await controlClient.modifyPosition(slModalPos.ticket, newSl, newTp);
-      setLocalPositionOverrides((prev) => ({
-        ...prev,
-        [slModalPos.ticket]: {
-          ...(prev[slModalPos.ticket] || {}),
-          sl: newSl,
-          tp: newTp,
-          protected: true,
-        },
-      }));
       onActionMessage(`SL+ #${slModalPos.ticket} -> ${newSl}: ${res.message}`);
       setSlModalPos(null);
       await onRefresh();
@@ -439,19 +451,21 @@ export const DashboardScreen: React.FC<
           </div>
         </div>
 
-        {/* Right: Safety-Critical Controls (Pause / Stop / Close All) */}
+        {/* Right: Safety-Critical Controls (Mobile read-only shows two-step Pause only) */}
         <div className="flex items-center gap-2">
           <button
             type="button"
             disabled={busyAction !== null}
             onClick={() =>
-              executeControlAction(
-                eng.pause_flag_active ? "Resume" : "Pause",
-                () =>
-                  eng.pause_flag_active
-                    ? controlClient.resumeEntries()
-                    : controlClient.pauseEntries()
-              )
+              readOnlyMobile
+                ? setConfirmModal({ type: "PAUSE", step: 1 })
+                : executeControlAction(
+                    eng.pause_flag_active ? "Resume" : "Pause",
+                    () =>
+                      eng.pause_flag_active
+                        ? controlClient.resumeEntries()
+                        : controlClient.pauseEntries()
+                  )
             }
             aria-label={eng.pause_flag_active ? "Resume new trade entries" : "Pause new trade entries"}
             title={
@@ -465,29 +479,33 @@ export const DashboardScreen: React.FC<
             <span>{eng.pause_flag_active ? "Resume" : "Pause"}</span>
           </button>
 
-          <button
-            type="button"
-            disabled={busyAction !== null}
-            onClick={() => executeControlAction("Stop", () => controlClient.stopEngine())}
-            aria-label="Stop trading engine"
-            title="Stop trading engine process (open positions remain protected)"
-            className="iea-pill-control px-3.5 py-1.5 disabled:opacity-40 text-[#F4F7FF] text-xs font-semibold inline-flex items-center space-x-1.5 transition duration-200"
-          >
-            <Square className="w-3.5 h-3.5 text-[#FF5A6E]" />
-            <span>Stop</span>
-          </button>
+          {!readOnlyMobile && (
+            <>
+              <button
+                type="button"
+                disabled={busyAction !== null}
+                onClick={() => executeControlAction("Stop", () => controlClient.stopEngine())}
+                aria-label="Stop trading engine"
+                title="Stop trading engine process (open positions remain protected)"
+                className="iea-pill-control px-3.5 py-1.5 disabled:opacity-40 text-[#F4F7FF] text-xs font-semibold inline-flex items-center space-x-1.5 transition duration-200"
+              >
+                <Square className="w-3.5 h-3.5 text-[#FF5A6E]" />
+                <span>Stop</span>
+              </button>
 
-          <button
-            type="button"
-            disabled={busyAction !== null}
-            onClick={() => setConfirmModal({ step: 1 })}
-            aria-label="Close all bot-owned positions (two-step confirmation)"
-            title="Close all bot-owned positions at market (2-step confirmation)"
-            className="px-4 py-1.5 rounded-full bg-gradient-to-r from-[#FF5A6E] to-[#E11D48] hover:brightness-110 disabled:opacity-40 text-white text-xs font-bold inline-flex items-center space-x-1.5 shadow-[0_4px_16px_rgba(255,90,110,0.4)] transition duration-200"
-          >
-            <XCircle className="w-3.5 h-3.5" />
-            <span>Close All</span>
-          </button>
+              <button
+                type="button"
+                disabled={busyAction !== null}
+                onClick={() => setConfirmModal({ type: "CLOSE_ALL", step: 1 })}
+                aria-label="Close all bot-owned positions (two-step confirmation)"
+                title="Close all bot-owned positions at market (2-step confirmation)"
+                className="px-4 py-1.5 rounded-full bg-gradient-to-r from-[#FF5A6E] to-[#E11D48] hover:brightness-110 disabled:opacity-40 text-white text-xs font-bold inline-flex items-center space-x-1.5 shadow-[0_4px_16px_rgba(255,90,110,0.4)] transition duration-200"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                <span>Close All</span>
+              </button>
+            </>
+          )}
         </div>
       </section>
 
@@ -501,40 +519,53 @@ export const DashboardScreen: React.FC<
         {/* 1. Bal / Eq */}
         <div
           className="iea-glass-card p-4 flex flex-col justify-between min-h-[112px]"
-          title={UI_COPY.kpis.balEq.tooltip}
+          title={`${UI_COPY.kpis.balEq.tooltip} · ${provenanceLabel}`}
         >
           <div className="flex items-center justify-between text-xs text-[#B6C5E0]">
             <span className="font-medium">{UI_COPY.kpis.balEq.label}</span>
             <span
-              title="Account Margin Leverage"
-              className="font-mono text-[10px] text-[#B0F648] bg-[#B0F648]/14 border border-[#B0F648]/30 px-2 py-0.5 rounded-full"
+              className={`font-mono text-[10px] px-2 py-0.5 rounded-full border ${
+                dash.provenance.stale
+                  ? "text-[#FBBF24] bg-[#FBBF24]/15 border-[#FBBF24]/35"
+                  : "text-[#B0F648] bg-[#B0F648]/14 border-[#B0F648]/30"
+              }`}
             >
-              Lev 1:{effectiveStatus.mt5.account.leverage}
+              {dash.connected
+                ? `Lev 1:${effectiveStatus.mt5.account.leverage}`
+                : "Waiting"}
             </span>
           </div>
           <div className="text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight text-[#F4F7FF] mt-2">
-            ${kpis.equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {kpis.equity !== null
+              ? `$${kpis.equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : "—"}
           </div>
           <div className="text-[11px] font-mono tabular-nums text-[#8496B8] mt-1.5 flex items-center justify-between">
-            <span>Bal ${kpis.balance.toLocaleString(undefined, { minimumFractionDigits: 0 })}</span>
-            <span
-              className={
-                kpis.floatingPnl >= 0 ? "text-[#B0F648] font-semibold" : "text-[#FF5A6E] font-semibold"
-              }
-            >
-              {kpis.floatingPnl >= 0 ? "+" : ""}${kpis.floatingPnl.toFixed(2)}
+            <span>
+              {kpis.balance !== null
+                ? `Bal $${kpis.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : provenanceLabel}
             </span>
+            {kpis.floatingPnl !== null && (
+              <span
+                className={
+                  kpis.floatingPnl >= 0 ? "text-[#B0F648] font-semibold" : "text-[#FF5A6E] font-semibold"
+                }
+              >
+                {kpis.floatingPnl >= 0 ? "+" : ""}${kpis.floatingPnl.toFixed(2)}
+              </span>
+            )}
           </div>
         </div>
 
         {/* 2. Today P&L (Primary Accent Highlight) */}
         <div
           className="iea-glass-card-lime p-4 flex flex-col justify-between min-h-[112px]"
-          title={UI_COPY.kpis.todayPnl.tooltip}
+          title={`${UI_COPY.kpis.todayPnl.tooltip} · ${provenanceLabel}`}
         >
           <div className="flex items-center justify-between text-xs text-[#C2F076]">
             <span className="font-medium">{UI_COPY.kpis.todayPnl.label}</span>
-            {kpis.todayPnlUsd >= 0 ? (
+            {(kpis.todayPnlUsd ?? 0) >= 0 ? (
               <TrendingUp className="w-4 h-4 text-[#B0F648]" />
             ) : (
               <TrendingDown className="w-4 h-4 text-[#FF5A6E]" />
@@ -542,17 +573,31 @@ export const DashboardScreen: React.FC<
           </div>
           <div
             className={`text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight mt-2 ${
-              kpis.todayPnlUsd >= 0 ? "text-[#B0F648]" : "text-[#FF5A6E]"
+              kpis.todayPnlUsd === null
+                ? "text-[#8496B8]"
+                : kpis.todayPnlUsd >= 0
+                ? "text-[#B0F648]"
+                : "text-[#FF5A6E]"
             }`}
           >
-            {kpis.todayPnlUsd >= 0 ? "+" : ""}${kpis.todayPnlUsd.toFixed(2)}{" "}
-            <span className="text-xs font-semibold">
-              ({kpis.todayPnlR >= 0 ? "+" : ""}
-              {kpis.todayPnlR.toFixed(2)}R)
-            </span>
+            {kpis.todayPnlUsd !== null ? (
+              <>
+                {kpis.todayPnlUsd >= 0 ? "+" : ""}${kpis.todayPnlUsd.toFixed(2)}{" "}
+                {kpis.todayPnlR !== null && (
+                  <span className="text-xs font-semibold">
+                    ({kpis.todayPnlR >= 0 ? "+" : ""}
+                    {kpis.todayPnlR.toFixed(2)}R)
+                  </span>
+                )}
+              </>
+            ) : (
+              "—"
+            )}
           </div>
           <div className="text-[11px] font-mono tabular-nums text-[#B6C5E0] mt-1.5">
-            1R = ${(kpis.balance * 0.005).toFixed(2)} (0.5%)
+            {kpis.balance !== null
+              ? `1R = $${(kpis.balance * 0.005).toFixed(2)} · ${provenanceLabel}`
+              : provenanceLabel}
           </div>
         </div>
 
@@ -652,6 +697,7 @@ export const DashboardScreen: React.FC<
             feedStatus={feedStatus}
             onSelectSymbol={setSelectedSymbol}
             onSelectTimeframe={setSelectedTimeframe}
+            onCaptureScreenshot={handleSaveScreenshot}
           />
         </div>
       </section>
@@ -799,59 +845,63 @@ export const DashboardScreen: React.FC<
                       </td>
 
                       <td className="py-2.5 pr-4 text-right font-sans">
-                        <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handlePartialClose50(pos)}
-                            aria-label={`Partial close 50% of ticket ${pos.ticket}`}
-                            title="Partial Close 50% volume"
-                            className="px-2.5 py-1 rounded-full bg-[#192F5A] hover:bg-[#234078] border border-[rgba(186,214,255,0.18)] text-[#F4F7FF] text-[10px] font-semibold inline-flex items-center space-x-1 transition"
-                          >
-                            <Scissors className="w-2.5 h-2.5 text-[#5EEAD4]" />
-                            <span>50%</span>
-                          </button>
+                        {readOnlyMobile ? (
+                          <span className="text-[10px] text-[#8496B8] font-mono">READ-ONLY</span>
+                        ) : (
+                          <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handlePartialClose50(pos)}
+                              aria-label={`Partial close 50% of ticket ${pos.ticket}`}
+                              title="Partial Close 50% volume"
+                              className="px-2.5 py-1 rounded-full bg-[#192F5A] hover:bg-[#234078] border border-[rgba(186,214,255,0.18)] text-[#F4F7FF] text-[10px] font-semibold inline-flex items-center space-x-1 transition"
+                            >
+                              <Scissors className="w-2.5 h-2.5 text-[#5EEAD4]" />
+                              <span>50%</span>
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => handleMoveToBreakEven(pos)}
-                            aria-label={`Move stop loss to break-even for ticket ${pos.ticket}`}
-                            title="Lock Stop Loss at Break-Even+"
-                            className="px-2.5 py-1 rounded-full bg-[#5EEAD4]/15 hover:bg-[#5EEAD4]/25 border border-[#5EEAD4]/40 text-[#5EEAD4] text-[10px] font-semibold transition"
-                          >
-                            BE+
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMoveToBreakEven(pos)}
+                              aria-label={`Move stop loss to break-even for ticket ${pos.ticket}`}
+                              title="Lock Stop Loss at Break-Even+"
+                              className="px-2.5 py-1 rounded-full bg-[#5EEAD4]/15 hover:bg-[#5EEAD4]/25 border border-[#5EEAD4]/40 text-[#5EEAD4] text-[10px] font-semibold transition"
+                            >
+                              BE+
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => openTightenSlModal(pos)}
-                            aria-label={`Tighten stop loss for ticket ${pos.ticket}`}
-                            title="Tighten Stop Loss (Rule R9.3)"
-                            className="px-2.5 py-1 rounded-full bg-[#B0F648]/16 hover:bg-[#B0F648]/28 border border-[#B0F648]/45 text-[#C2F076] text-[10px] font-semibold transition"
-                          >
-                            SL+
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => openTightenSlModal(pos)}
+                              aria-label={`Tighten stop loss for ticket ${pos.ticket}`}
+                              title="Tighten Stop Loss (Rule R9.3)"
+                              className="px-2.5 py-1 rounded-full bg-[#B0F648]/16 hover:bg-[#B0F648]/28 border border-[#B0F648]/45 text-[#C2F076] text-[10px] font-semibold transition"
+                            >
+                              SL+
+                            </button>
 
-                          <button
-                            type="button"
-                            disabled
-                            aria-disabled="true"
-                            title="Hard Safety Rule R9.3: Widening or removing Stop Loss is permanently disabled"
-                            className="px-2.5 py-1 rounded-full bg-[#0A152B]/60 border border-[rgba(186,214,255,0.1)] text-[#8496B8] text-[10px] font-medium cursor-not-allowed opacity-60 inline-flex items-center space-x-1"
-                          >
-                            <Lock className="w-2.5 h-2.5" />
-                            <span>Widen</span>
-                          </button>
+                            <button
+                              type="button"
+                              disabled
+                              aria-disabled="true"
+                              title="Hard Safety Rule R9.3: Widening or removing Stop Loss is permanently disabled"
+                              className="px-2.5 py-1 rounded-full bg-[#0A152B]/60 border border-[rgba(186,214,255,0.1)] text-[#8496B8] text-[10px] font-medium cursor-not-allowed opacity-60 inline-flex items-center space-x-1"
+                            >
+                              <Lock className="w-2.5 h-2.5" />
+                              <span>Widen</span>
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => handleCloseSinglePosition(pos)}
-                            aria-label={`Close position ticket ${pos.ticket}`}
-                            title="Close position at market"
-                            className="px-2.5 py-1 rounded-full bg-[#FF5A6E]/90 hover:bg-[#FF5A6E] text-white text-[10px] font-bold transition"
-                          >
-                            Close
-                          </button>
-                        </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCloseSinglePosition(pos)}
+                              aria-label={`Close position ticket ${pos.ticket}`}
+                              title="Close position at market"
+                              className="px-2.5 py-1 rounded-full bg-[#FF5A6E]/90 hover:bg-[#FF5A6E] text-white text-[10px] font-bold transition"
+                            >
+                              Close
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -876,19 +926,32 @@ export const DashboardScreen: React.FC<
             <div className="flex items-center space-x-2 text-[#FF5A6E]">
               <ShieldAlert className="w-5 h-5 shrink-0" />
               <h3 id="two-step-confirm-title" className="text-sm font-bold text-[#F4F7FF]">
-                Close all bot trades? ({confirmModal.step}/2)
+                {confirmModal.type === "PAUSE"
+                  ? `${eng.pause_flag_active ? "Resume" : "Pause"} new entries? (${confirmModal.step}/2)`
+                  : `Close all bot trades? (${confirmModal.step}/2)`}
               </h3>
             </div>
 
             {confirmModal.step === 1 ? (
               <p className="text-xs text-[#B6C5E0]">
-                Close{" "}
-                <strong className="text-[#F4F7FF]">{botOpenCount} bot positions</strong> at market on
-                DEMO <span className="font-mono">{dash.maskedAccount}</span>?
+                {confirmModal.type === "PAUSE" ? (
+                  <>
+                    {eng.pause_flag_active ? "Resume" : "Pause"} automated entries on DEMO{" "}
+                    <span className="font-mono">{dash.maskedAccount}</span>? Existing SL/TP stay active.
+                  </>
+                ) : (
+                  <>
+                    Close{" "}
+                    <strong className="text-[#F4F7FF]">{botOpenCount} bot positions</strong> at market on
+                    DEMO <span className="font-mono">{dash.maskedAccount}</span>?
+                  </>
+                )}
               </p>
             ) : (
               <div className="p-3 rounded-xl bg-[#FF5A6E]/18 border border-[#FF5A6E]/50 text-xs text-[#FFD9DF] font-semibold">
-                Final step: Confirm immediate market closure on {dash.maskedAccount}.
+                {confirmModal.type === "PAUSE"
+                  ? `Final step: Confirm ${eng.pause_flag_active ? "resuming" : "pausing"} entries.`
+                  : `Final step: Confirm immediate market closure on ${dash.maskedAccount}.`}
               </div>
             )}
 
@@ -905,7 +968,13 @@ export const DashboardScreen: React.FC<
                 onClick={handleConfirmTwoStep}
                 className="px-4 py-1.5 rounded-full bg-gradient-to-r from-[#FF5A6E] to-[#E11D48] hover:brightness-110 text-xs font-bold text-white"
               >
-                {confirmModal.step === 1 ? "Next →" : "Close All"}
+                {confirmModal.step === 1
+                  ? "Next →"
+                  : confirmModal.type === "PAUSE"
+                  ? eng.pause_flag_active
+                    ? "Resume"
+                    : "Pause"
+                  : "Close All"}
               </button>
             </div>
           </div>

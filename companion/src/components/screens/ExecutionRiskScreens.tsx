@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Edit3, Trash2, XCircle } from "lucide-react";
+import { Edit3, Play, Trash2, XCircle } from "lucide-react";
 import { controlClient } from "../../services/ipc";
 import { ControlPosition, ControlStatusPayload, TradeHistoryRecord } from "../../types";
 import { getSymbolChipSpec } from "../../styles/designTokens";
@@ -8,7 +8,8 @@ export const PositionsScreen: React.FC<{
   status: ControlStatusPayload | null;
   onRefresh: () => Promise<void>;
   onActionMessage: (msg: string, isError?: boolean) => void;
-}> = ({ status, onRefresh, onActionMessage }) => {
+  readOnly?: boolean;
+}> = ({ status, onRefresh, onActionMessage, readOnly = false }) => {
   const positions = status?.mt5.positions || [];
   const pendingOrders = status?.mt5.pending_orders || [];
   const [editing, setEditing] = useState<ControlPosition | null>(null);
@@ -86,13 +87,15 @@ export const PositionsScreen: React.FC<{
           <h2 className="text-lg font-light text-[#F4F7FF]" title="MT5 positions reconciled by Magic Number">
             Open Pos ({positions.length})
           </h2>
-          <button
-            disabled={busy || positions.filter((p) => p.ownership === "BOT").length === 0}
-            onClick={handleCloseAllBot}
-            className="px-4 py-1.5 bg-gradient-to-r from-[#FF5A6E] to-[#E11D48] hover:brightness-110 disabled:opacity-40 text-white text-xs font-bold rounded-full shadow-[0_4px_16px_rgba(255,90,110,0.35)]"
-          >
-            Close Bot Pos
-          </button>
+          {!readOnly && (
+            <button
+              disabled={busy || positions.filter((p) => p.ownership === "BOT").length === 0}
+              onClick={handleCloseAllBot}
+              className="px-4 py-1.5 bg-gradient-to-r from-[#FF5A6E] to-[#E11D48] hover:brightness-110 disabled:opacity-40 text-white text-xs font-bold rounded-full shadow-[0_4px_16px_rgba(255,90,110,0.35)]"
+            >
+              Close Bot Pos
+            </button>
+          )}
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-[rgba(186,214,255,0.12)]">
@@ -162,21 +165,27 @@ export const PositionsScreen: React.FC<{
                         {p.profit >= 0 ? "+" : ""}${p.profit.toFixed(2)}
                       </td>
                       <td className="py-3 pr-4 text-right space-x-1.5 font-sans">
-                        <button
-                          onClick={() => openModify(p)}
-                          className="iea-pill-control px-2.5 py-1 text-[#F4F7FF] inline-flex items-center space-x-1"
-                        >
-                          <Edit3 className="w-3 h-3 text-[#B0F648]" />
-                          <span>SL/TP</span>
-                        </button>
-                        <button
-                          disabled={busy}
-                          onClick={() => handleClose(p.ticket)}
-                          className="px-2.5 py-1 bg-[#FF5A6E]/90 hover:bg-[#FF5A6E] text-white rounded-full inline-flex items-center space-x-1 font-semibold"
-                        >
-                          <XCircle className="w-3 h-3" />
-                          <span>Close</span>
-                        </button>
+                        {readOnly ? (
+                          <span className="text-[10px] text-[#8496B8] font-mono">READ-ONLY</span>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => openModify(p)}
+                              className="iea-pill-control px-2.5 py-1 text-[#F4F7FF] inline-flex items-center space-x-1"
+                            >
+                              <Edit3 className="w-3 h-3 text-[#B0F648]" />
+                              <span>SL/TP</span>
+                            </button>
+                            <button
+                              disabled={busy}
+                              onClick={() => handleClose(p.ticket)}
+                              className="px-2.5 py-1 bg-[#FF5A6E]/90 hover:bg-[#FF5A6E] text-white rounded-full inline-flex items-center space-x-1 font-semibold"
+                            >
+                              <XCircle className="w-3 h-3" />
+                              <span>Close</span>
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   );
@@ -263,10 +272,11 @@ export const PositionsScreen: React.FC<{
   );
 };
 
-export const TradeHistoryScreen: React.FC<{ trades: TradeHistoryRecord[]; onReload: () => Promise<void> }> = ({
-  trades,
-  onReload,
-}) => {
+export const TradeHistoryScreen: React.FC<{
+  trades: TradeHistoryRecord[];
+  onReload: () => Promise<void>;
+  onReplayTrade?: (ticket: number) => void;
+}> = ({ trades, onReload, onReplayTrade }) => {
   const [symbolFilter, setSymbolFilter] = useState("ALL");
   const filtered = trades.filter((t) => symbolFilter === "ALL" || t.symbol.includes(symbolFilter));
 
@@ -307,14 +317,15 @@ export const TradeHistoryScreen: React.FC<{ trades: TradeHistoryRecord[]; onRelo
               <th className="py-3 pr-3">In</th>
               <th className="py-3 pr-3">Out</th>
               <th className="py-3 pr-3">P&amp;L</th>
-              <th className="py-3 pr-4">Result</th>
+              <th className="py-3 pr-3">Result</th>
+              <th className="py-3 pr-4 text-right">Replay</th>
             </tr>
           </thead>
           <tbody className="font-mono">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-8 text-center text-[#8496B8] font-sans">
-                  0 closed trades.
+                <td colSpan={9} className="py-8 text-center text-[#8496B8] font-sans">
+                  No closed trades yet.
                 </td>
               </tr>
             ) : (
@@ -343,7 +354,7 @@ export const TradeHistoryScreen: React.FC<{ trades: TradeHistoryRecord[]; onRelo
                     <td className={`py-3 pr-3 font-bold ${t.profit >= 0 ? "text-[#B0F648]" : "text-[#FF5A6E]"}`}>
                       {t.profit >= 0 ? "+" : ""}${t.profit.toFixed(2)}
                     </td>
-                    <td className="py-3 pr-4 font-sans">
+                    <td className="py-3 pr-3 font-sans">
                       <span
                         className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
                           t.profit >= 0
@@ -353,6 +364,18 @@ export const TradeHistoryScreen: React.FC<{ trades: TradeHistoryRecord[]; onRelo
                       >
                         {t.status}
                       </span>
+                    </td>
+                    <td className="py-3 pr-4 text-right font-sans">
+                      {onReplayTrade && (
+                        <button
+                          type="button"
+                          onClick={() => onReplayTrade(t.ticket)}
+                          className="iea-pill-control px-2.5 py-1 text-[11px] text-[#B0F648] hover:text-[#C2F076] inline-flex items-center space-x-1 font-semibold"
+                        >
+                          <Play className="w-3 h-3" />
+                          <span>Replay</span>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

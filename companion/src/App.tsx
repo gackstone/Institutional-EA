@@ -3,6 +3,7 @@ import {
   Activity,
   AlertOctagon,
   BarChart3,
+  Bell,
   CheckCircle2,
   Database,
   FileText,
@@ -17,6 +18,7 @@ import {
   Settings as SettingsIcon,
   Terminal,
   X,
+  Zap,
 } from "lucide-react";
 import { DashboardScreen } from "./components/screens/CoreTradingScreens";
 import {
@@ -33,12 +35,18 @@ import {
   SettingsScreen,
   SystemHealthScreen,
 } from "./components/screens/MonitoringSettingsScreens";
+import {
+  AlertCentreScreen,
+  SignalsGridScreen,
+} from "./components/screens/SignalsAlertsScreens";
 import { PairingModal } from "./components/PairingModal";
 import { TelegramPairingModal } from "./components/TelegramPairingModal";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
+import { TradeReplayModal } from "./components/TradeReplayModal";
 
 import {
   AuditLogRecord,
+  BalanceSnapshotRecord,
   ControlLogEntry,
   ControlStatusPayload,
   PairingStatus,
@@ -48,6 +56,7 @@ import {
 import { controlClient, IPC } from "./services/ipc";
 import {
   buildNormalizedDashboardData,
+  ChartSymbol,
   DataFeedStatus,
   normalizeLogEntries,
 } from "./services/dashboardDataAdapter";
@@ -70,6 +79,8 @@ interface NavGroupSpec {
 const VALID_SCREENS = new Set<ScreenId>([
   "dashboard",
   "positions",
+  "signals",
+  "alerts",
   "history",
   "analytics",
   "mt5",
@@ -82,6 +93,18 @@ const VALID_SCREENS = new Set<ScreenId>([
 export const App: React.FC = () => {
   const [activeScreen, setActiveScreenState] = useState<ScreenId>("dashboard");
   const [feedStatus, setFeedStatus] = useState<DataFeedStatus>("LOADING");
+  const [chartJumpSymbol, setChartJumpSymbol] = useState<ChartSymbol>("XAUUSD");
+  const [replayTicket, setReplayTicket] = useState<number | null>(null);
+  const [balanceSnapshots, setBalanceSnapshots] = useState<BalanceSnapshotRecord[]>([]);
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() =>
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const onResize = () => setIsMobileViewport(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // Safe navigation: redirect any unknown/removed route to Dashboard
   const setActiveScreen = useCallback((screen: ScreenId | string) => {
@@ -188,10 +211,16 @@ export const App: React.FC = () => {
 
   const reloadTrades = useCallback(async () => {
     try {
-      const res = await controlClient.getTradeHistory();
+      const res = await controlClient.getAnalyticsEquity();
       setTrades(res.trades || []);
+      setBalanceSnapshots(res.snapshots || []);
     } catch {
-      // fallback handled by normalized data
+      try {
+        const res = await controlClient.getTradeHistory();
+        setTrades(res.trades || []);
+      } catch {
+        setTrades([]);
+      }
     }
   }, []);
 
@@ -302,7 +331,7 @@ export const App: React.FC = () => {
   const effectiveStatus = normalized.status;
   const openPosCount = effectiveStatus.mt5.positions.length;
 
-  // 9 kept screens grouped cleanly under MONITOR / CONTROL / DIAGNOSE
+  // Kept screens + Live Signals & Alert Centre grouped cleanly under MONITOR / CONTROL / DIAGNOSE
   const navGroups: NavGroupSpec[] = useMemo(
     () => [
       {
@@ -310,6 +339,8 @@ export const App: React.FC = () => {
         items: [
           { id: "dashboard", ...UI_COPY.nav.screens.dashboard, icon: LayoutDashboard, badge: "LIVE" },
           { id: "positions", ...UI_COPY.nav.screens.positions, icon: Layers, badge: openPosCount },
+          { id: "signals", ...UI_COPY.nav.screens.signals, icon: Zap },
+          { id: "alerts", ...UI_COPY.nav.screens.alerts, icon: Bell },
           { id: "history", ...UI_COPY.nav.screens.history, icon: History, badge: normalized.recentTrades.length },
           { id: "analytics", ...UI_COPY.nav.screens.analytics, icon: BarChart3 },
         ],
@@ -335,6 +366,14 @@ export const App: React.FC = () => {
 
   const isElectron = useMemo(() => IPC.isElectron(), []);
   const titlebarHeightPx = isElectron ? 36 : 0;
+
+  const handleJumpToChart = useCallback(
+    (sym: ChartSymbol) => {
+      setChartJumpSymbol(sym);
+      setActiveScreen("dashboard");
+    },
+    [setActiveScreen]
+  );
 
   return (
     <div
@@ -393,7 +432,7 @@ export const App: React.FC = () => {
             ? `${DESIGN_TOKENS.sidebar.expandedWidthPx}px`
             : `${DESIGN_TOKENS.sidebar.collapsedWidthPx}px`,
         }}
-        className="iea-no-drag fixed bottom-0 left-0 z-40 iea-sidebar-rail flex flex-col justify-between overflow-hidden"
+        className="iea-no-drag hidden md:flex fixed bottom-0 left-0 z-40 iea-sidebar-rail flex-col justify-between overflow-hidden"
       >
         {/* Top Brand Block + Navigation */}
         <div className="flex flex-col min-h-0 flex-1">
@@ -593,7 +632,7 @@ export const App: React.FC = () => {
       ====================================================================== */}
       <div
         style={{
-          paddingLeft: `${DESIGN_TOKENS.sidebar.collapsedWidthPx}px`,
+          paddingLeft: isMobileViewport ? "0px" : `${DESIGN_TOKENS.sidebar.collapsedWidthPx}px`,
           paddingTop: `${titlebarHeightPx}px`,
         }}
         className="iea-no-drag relative z-10 flex-1 min-w-0 flex flex-col h-screen overflow-hidden"
@@ -661,7 +700,7 @@ export const App: React.FC = () => {
         )}
 
         {/* Scrollable Screen Viewport */}
-        <main className="flex-1 min-h-0 overflow-y-auto p-3.5 md:p-4">
+        <main className={`flex-1 min-h-0 overflow-y-auto p-3.5 md:p-4 ${isMobileViewport ? "pb-20" : ""}`}>
           <div className="max-w-[1920px] mx-auto">
             {activeScreen === "dashboard" && (
               <DashboardScreen
@@ -671,6 +710,8 @@ export const App: React.FC = () => {
                 onActionMessage={handleActionMessage}
                 trades={normalized.recentTrades}
                 feedStatus={feedStatus}
+                initialSymbol={chartJumpSymbol}
+                readOnlyMobile={isMobileViewport}
               />
             )}
 
@@ -679,15 +720,31 @@ export const App: React.FC = () => {
                 status={effectiveStatus}
                 onRefresh={refreshStatus}
                 onActionMessage={handleActionMessage}
+                readOnly={isMobileViewport}
               />
             )}
 
+            {activeScreen === "signals" && (
+              <SignalsGridScreen onJumpToChart={handleJumpToChart} />
+            )}
+
+            {activeScreen === "alerts" && (
+              <AlertCentreScreen onActionMessage={handleActionMessage} />
+            )}
+
             {activeScreen === "history" && (
-              <TradeHistoryScreen trades={normalized.recentTrades} onReload={reloadTrades} />
+              <TradeHistoryScreen
+                trades={normalized.recentTrades}
+                onReload={reloadTrades}
+                onReplayTrade={(ticket) => setReplayTicket(ticket)}
+              />
             )}
 
             {activeScreen === "analytics" && (
-              <AnalyticsScreen trades={normalized.recentTrades} />
+              <AnalyticsScreen
+                trades={normalized.recentTrades}
+                snapshots={balanceSnapshots}
+              />
             )}
 
             {activeScreen === "mt5" && (
@@ -728,6 +785,40 @@ export const App: React.FC = () => {
           </div>
         </main>
       </div>
+
+      {/* Responsive Read-Only Mobile Companion Bottom Navigation (< 768px) */}
+      <nav
+        aria-label="Mobile Companion Navigation"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#0A152B]/95 backdrop-blur-xl border-t border-[rgba(186,214,255,0.16)] grid grid-cols-4 px-2"
+      >
+        {(
+          [
+            { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+            { id: "positions", label: "Positions", icon: Layers },
+            { id: "signals", label: "Signals", icon: Zap },
+            { id: "alerts", label: "Alerts", icon: Bell },
+          ] as const
+        ).map((tab) => {
+          const Icon = tab.icon;
+          const active = activeScreen === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveScreen(tab.id)}
+              className={`flex flex-col items-center justify-center space-y-1 text-[11px] font-medium transition ${
+                active ? "text-[#B0F648]" : "text-[#8496B8]"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Trade Replay Modal */}
+      <TradeReplayModal ticket={replayTicket} onClose={() => setReplayTicket(null)} />
 
       {/* Existing Modal Dialogs */}
       <PairingModal

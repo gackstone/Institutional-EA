@@ -10,6 +10,7 @@ import {
 } from "lightweight-charts";
 import {
   Activity,
+  Camera,
   Clock,
   Eye,
   Layers,
@@ -50,6 +51,7 @@ interface LiveTradingChartProps {
   feedStatus: DataFeedStatus;
   onSelectSymbol: (sym: ChartSymbol) => void;
   onSelectTimeframe: (tf: ChartTimeframe) => void;
+  onCaptureScreenshot?: (ticket: number, symbol: string, stage: string, dataUrl: string) => void;
 }
 
 interface ProjectedZoneBox {
@@ -147,6 +149,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
   feedStatus,
   onSelectSymbol,
   onSelectTimeframe,
+  onCaptureScreenshot,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -742,6 +745,34 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     setIsFullscreen((prev) => !prev);
   };
 
+  // Auto-save chart PNG screenshot via lightweight-charts takeScreenshot() when a real trade opens
+  const capturedTicketsRef = useRef<Set<string>>(new Set());
+  const triggerChartScreenshot = useCallback(
+    (ticket: number, symbol: string, stage: string) => {
+      if (!chartRef.current || !onCaptureScreenshot) return;
+      try {
+        const canvas = chartRef.current.takeScreenshot();
+        const dataUrl = canvas.toDataURL("image/png");
+        onCaptureScreenshot(ticket, symbol, stage, dataUrl);
+      } catch {
+        // ignore screenshot errors
+      }
+    },
+    [onCaptureScreenshot]
+  );
+
+  useEffect(() => {
+    if (!primaryTrade || bundle.candles.length === 0 || !onCaptureScreenshot) return;
+    const key = `${primaryTrade.ticket}:OPEN`;
+    if (!capturedTicketsRef.current.has(key)) {
+      capturedTicketsRef.current.add(key);
+      const t = setTimeout(() => {
+        triggerChartScreenshot(primaryTrade.ticket, bundle.brokerSymbol, "OPEN");
+      }, 400);
+      return () => clearTimeout(t);
+    }
+  }, [primaryTrade, bundle.candles.length, bundle.brokerSymbol, onCaptureScreenshot, triggerChartScreenshot]);
+
   const labelToneClasses: Partial<Record<ResolvedPriceLabelItem["tone"], string>> = useMemo(
     () => ({
       liquidity: "bg-[#14274A]/92 border-[#C2F076]/55 text-[#C2F076]",
@@ -839,21 +870,44 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             })}
           </div>
 
-          {/* Live Bid/Ask + Spread Pill */}
+          {/* Live Bid/Ask + Spread + Data Provenance Pill */}
           <div
             className="hidden xl:flex items-center space-x-1.5 px-2.5 py-1 iea-pill-control font-mono text-xs"
-            title={`Broker symbol ${bundle.brokerSymbol} · Spread ${bundle.spreadPoints} points`}
+            title={`Source: ${bundle.source} · Broker ${bundle.brokerSymbol} · ${bundle.freshnessReason}`}
           >
             <span
               className={`w-4 h-4 rounded-full text-[9px] font-bold inline-flex items-center justify-center ${activeSymbolChip.chipBg}`}
             >
               {activeSymbolChip.shortCode}
             </span>
-            <span className="text-[#B0F648] font-bold">{bundle.bid.toFixed(bundle.digits)}</span>
+            <span className="text-[#B0F648] font-bold">
+              {bundle.bid !== null ? bundle.bid.toFixed(bundle.digits) : "—"}
+            </span>
             <span className="text-[#8496B8]">/</span>
-            <span className="text-[#FF5A6E] font-bold">{bundle.ask.toFixed(bundle.digits)}</span>
+            <span className="text-[#FF5A6E] font-bold">
+              {bundle.ask !== null ? bundle.ask.toFixed(bundle.digits) : "—"}
+            </span>
             <span className="text-[10px] text-[#C2F076] bg-[#B0F648]/12 px-1.5 py-0.2 rounded-full">
-              Spr {bundle.spreadPoints}
+              Spr {bundle.spreadPoints !== null ? bundle.spreadPoints : "—"}
+            </span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                bundle.marketClosed
+                  ? "bg-[#FBBF24]/20 text-[#FBBF24]"
+                  : bundle.stale
+                  ? "bg-[#FF5A6E]/20 text-[#FF7A8A]"
+                  : bundle.source === "MT5"
+                  ? "bg-[#5EEAD4]/15 text-[#5EEAD4]"
+                  : "bg-white/10 text-[#8496B8]"
+              }`}
+            >
+              {bundle.marketClosed
+                ? "CLOSED"
+                : bundle.stale
+                ? "STALE"
+                : bundle.source === "MT5"
+                ? `MT5${bundle.tickTimeUtc ? ` · ${bundle.tickTimeUtc.slice(11, 19)}` : ""}`
+                : "WAITING"}
             </span>
           </div>
         </div>
@@ -934,6 +988,17 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             <Eye className="w-3 h-3" />
             <span>{UI_COPY.chart.layers.tradeLabels.label}</span>
           </button>
+
+          {primaryTrade && onCaptureScreenshot && (
+            <button
+              type="button"
+              onClick={() => triggerChartScreenshot(primaryTrade.ticket, bundle.brokerSymbol, "MANUAL")}
+              title={`Save PNG chart screenshot for trade #${primaryTrade.ticket}`}
+              className="p-1.5 rounded-full border bg-[#0E1E3B]/80 hover:bg-[#19305C] border-[rgba(186,214,255,0.18)] text-[#5EEAD4] transition"
+            >
+              <Camera className="w-3.5 h-3.5" />
+            </button>
+          )}
 
           <button
             type="button"
@@ -1031,6 +1096,17 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
         className="relative flex-1 min-h-0 w-full"
         style={{ backgroundColor: DESIGN_TOKENS.colors.chart.background }}
       >
+        {bundle.candles.length === 0 && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#0B1528]/80 text-center px-4">
+            <div className="text-sm font-semibold text-[#F4F7FF]">
+              {bundle.marketClosed ? "Market Closed" : "Waiting for MT5 Candles"}
+            </div>
+            <div className="text-xs font-mono text-[#8496B8] mt-1">
+              {bundle.brokerSymbol} ({bundle.timeframe}) · {bundle.freshnessReason}
+            </div>
+          </div>
+        )}
+
         {/* BACKDROP OVERLAY LAYER (z-5): Behind candlesticks so candles stay 100% crisp */}
         <div
           className="absolute inset-0 z-[5] pointer-events-none overflow-hidden select-none"

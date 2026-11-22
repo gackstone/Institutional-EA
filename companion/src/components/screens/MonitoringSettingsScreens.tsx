@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { BarChart3, BookOpen, CheckCircle2, Database, FileText, Lock, Settings as SettingsIcon, Trash2 } from "lucide-react";
 import { controlClient } from "../../services/ipc";
 import {
   AuditLogRecord,
+  BalanceSnapshotRecord,
   ControlLogEntry,
   ControlStatusPayload,
   TradeHistoryRecord,
@@ -96,42 +97,225 @@ export const LogsScreen: React.FC<{
   );
 };
 
-export const AnalyticsScreen: React.FC<{ trades: TradeHistoryRecord[] }> = ({ trades }) => {
-  const closed = trades.filter((t) => t.status.includes("CLOSED") || t.profit !== 0);
-  const wins = closed.filter((t) => t.profit > 0);
-  const losses = closed.filter((t) => t.profit < 0);
-  const netPnl = closed.reduce((acc, t) => acc + t.profit, 0);
+const MiniLineChart: React.FC<{
+  title: string;
+  values: number[];
+  stroke: string;
+  formatValue: (v: number) => string;
+  emptyText: string;
+}> = ({ title, values, stroke, formatValue, emptyText }) => {
+  if (values.length < 2) {
+    return (
+      <div className="iea-glass-tile p-4 flex flex-col justify-between min-h-[168px]">
+        <div className="text-xs font-semibold text-[#B6C5E0]">{title}</div>
+        <div className="text-xs text-[#8496B8] text-center py-8">{emptyText}</div>
+      </div>
+    );
+  }
+  const minV = Math.min(...values);
+  const maxV = Math.max(...values);
+  const span = Math.max(1e-6, maxV - minV);
+  const pts = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * 280;
+      const y = 78 - ((v - minV) / span) * 66;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const latest = values[values.length - 1];
+
+  return (
+    <div className="iea-glass-tile p-4 flex flex-col justify-between min-h-[168px]">
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-semibold text-[#B6C5E0]">{title}</span>
+        <span className="font-mono font-bold text-[#F4F7FF]">{formatValue(latest)}</span>
+      </div>
+      <svg viewBox="0 0 280 86" className="w-full h-24 mt-2 overflow-visible">
+        <polyline
+          fill="none"
+          stroke={stroke}
+          strokeWidth="2"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          points={pts}
+        />
+      </svg>
+      <div className="flex justify-between text-[10px] font-mono text-[#8496B8]">
+        <span>Min {formatValue(minV)}</span>
+        <span>Max {formatValue(maxV)}</span>
+      </div>
+    </div>
+  );
+};
+
+export const AnalyticsScreen: React.FC<{
+  trades: TradeHistoryRecord[];
+  snapshots?: BalanceSnapshotRecord[];
+}> = ({ trades, snapshots = [] }) => {
+  const [symbolFilter, setSymbolFilter] = useState<string>("ALL");
+  const [rangeDays, setRangeDays] = useState<number>(0); // 0 = All
+
+  const filteredTrades = useMemo(() => {
+    const cutoffMs = rangeDays > 0 ? Date.now() - rangeDays * 86400 * 1000 : 0;
+    return trades
+      .filter((t) => {
+        const closedOk = t.status.includes("CLOSED") || t.closed_at !== null;
+        const symOk = symbolFilter === "ALL" || t.symbol.toUpperCase().includes(symbolFilter);
+        const dateMs = t.closed_at ? new Date(t.closed_at).getTime() : new Date(t.opened_at).getTime();
+        const rangeOk = cutoffMs === 0 || dateMs >= cutoffMs;
+        return closedOk && symOk && rangeOk;
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.closed_at || a.opened_at).getTime() -
+          new Date(b.closed_at || b.opened_at).getTime()
+      );
+  }, [trades, symbolFilter, rangeDays]);
+
+  const wins = filteredTrades.filter((t) => t.profit > 0);
+  const losses = filteredTrades.filter((t) => t.profit < 0);
+  const netPnl = filteredTrades.reduce((acc, t) => acc + t.profit, 0);
   const grossWin = wins.reduce((acc, t) => acc + t.profit, 0);
   const grossLoss = Math.abs(losses.reduce((acc, t) => acc + t.profit, 0));
-  const winRate = closed.length > 0 ? (wins.length / closed.length) * 100 : 0;
-  const profitFactor = grossLoss > 0 ? grossWin / grossLoss : grossWin > 0 ? 99.9 : 0;
+  const winRate = filteredTrades.length > 0 ? (wins.length / filteredTrades.length) * 100 : null;
+  const profitFactor =
+    filteredTrades.length === 0 ? null : grossLoss > 0 ? grossWin / grossLoss : grossWin > 0 ? 99.9 : 0;
+
+  const { cumPnlSeries, cumRSeries, drawdownSeries } = useMemo(() => {
+    let runPnl = 0;
+    let runR = 0;
+    let peakPnl = 0;
+    const pnlArr: number[] = [];
+    const rArr: number[] = [];
+    const ddArr: number[] = [];
+    for (const t of filteredTrades) {
+      runPnl += t.profit;
+      const riskDist = Math.abs(t.open_price - t.sl);
+      const rEst =
+        riskDist > 0 && t.close_price > 0
+          ? ((t.direction === "BUY" ? t.close_price - t.open_price : t.open_price - t.close_price) / riskDist)
+          : t.profit >= 0
+          ? 1
+          : -1;
+      runR += rEst;
+      peakPnl = Math.max(peakPnl, runPnl);
+      pnlArr.push(Number(runPnl.toFixed(2)));
+      rArr.push(Number(runR.toFixed(2)));
+      ddArr.push(Number((runPnl - peakPnl).toFixed(2)));
+    }
+    return { cumPnlSeries: pnlArr, cumRSeries: rArr, drawdownSeries: ddArr };
+  }, [filteredTrades]);
+
+  const equitySeries = useMemo(() => {
+    const cutoffMs = rangeDays > 0 ? Date.now() - rangeDays * 86400 * 1000 : 0;
+    return snapshots
+      .filter((s) => cutoffMs === 0 || new Date(s.created_at).getTime() >= cutoffMs)
+      .map((s) => s.equity);
+  }, [snapshots, rangeDays]);
 
   return (
     <div className="space-y-4">
       <div className="iea-glass-card p-5 space-y-4">
-        <h2 className="text-lg font-light text-[#F4F7FF] flex items-center space-x-2">
-          <BarChart3 className="w-5 h-5 text-[#B0F648]" />
-          <span>Performance</span>
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-light text-[#F4F7FF] flex items-center space-x-2">
+              <BarChart3 className="w-5 h-5 text-[#B0F648]" />
+              <span>Performance Analytics</span>
+            </h2>
+            <p className="text-[11px] font-mono text-[#8496B8] mt-0.5">
+              Source: Real Closed Trades ({filteredTrades.length}) &amp; Real MT5 Balance Snapshots ({equitySeries.length})
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <select
+              value={symbolFilter}
+              onChange={(e) => setSymbolFilter(e.target.value)}
+              aria-label="Filter analytics by symbol"
+              className="iea-pill-control px-3 py-1.5 text-[#F4F7FF] focus:outline-none"
+            >
+              <option value="ALL" className="bg-[#0A152B]">All Symbols</option>
+              <option value="XAU" className="bg-[#0A152B]">XAUUSD</option>
+              <option value="JPY" className="bg-[#0A152B]">USDJPY</option>
+              <option value="BTC" className="bg-[#0A152B]">BTCUSD</option>
+            </select>
+
+            <div className="inline-flex bg-[#091426]/80 border border-[rgba(186,214,255,0.16)] rounded-full p-0.5">
+              {[
+                { label: "7D", days: 7 },
+                { label: "30D", days: 30 },
+                { label: "90D", days: 90 },
+                { label: "All", days: 0 },
+              ].map((opt) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => setRangeDays(opt.days)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-bold ${
+                    rangeDays === opt.days ? "bg-[#B0F648] text-[#081321]" : "text-[#B6C5E0] hover:text-white"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 text-xs">
           <div className="iea-glass-tile p-4">
             <div className="text-[#B6C5E0]">Closed Trades</div>
-            <div className="text-2xl font-light font-mono text-[#F4F7FF] mt-1.5">{closed.length}</div>
+            <div className="text-2xl font-light font-mono text-[#F4F7FF] mt-1.5">{filteredTrades.length}</div>
           </div>
           <div className="iea-glass-tile p-4">
             <div className="text-[#B6C5E0]">Win Rate</div>
-            <div className="text-2xl font-light font-mono text-[#5EEAD4] mt-1.5">{winRate.toFixed(1)}%</div>
+            <div className="text-2xl font-light font-mono text-[#5EEAD4] mt-1.5">
+              {winRate !== null ? `${winRate.toFixed(1)}%` : "—"}
+            </div>
           </div>
           <div className="iea-glass-card-lime p-4">
             <div className="text-[#C2F076]">Net P&amp;L</div>
             <div className={`text-2xl font-light font-mono mt-1.5 ${netPnl >= 0 ? "text-[#B0F648]" : "text-[#FF5A6E]"}`}>
-              {netPnl >= 0 ? "+" : ""}${netPnl.toFixed(2)}
+              {filteredTrades.length > 0 ? `${netPnl >= 0 ? "+" : ""}$${netPnl.toFixed(2)}` : "—"}
             </div>
           </div>
           <div className="iea-glass-tile p-4">
             <div className="text-[#B6C5E0]">Profit Factor</div>
-            <div className="text-2xl font-light font-mono text-[#F4F7FF] mt-1.5">{profitFactor.toFixed(2)}</div>
+            <div className="text-2xl font-light font-mono text-[#F4F7FF] mt-1.5">
+              {profitFactor !== null ? profitFactor.toFixed(2) : "—"}
+            </div>
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <MiniLineChart
+            title="Equity Curve (Real MT5 Snapshots)"
+            values={equitySeries}
+            stroke="#B0F648"
+            formatValue={(v) => `$${v.toFixed(2)}`}
+            emptyText="Waiting for at least 2 real MT5 balance snapshots."
+          />
+          <MiniLineChart
+            title="Cumulative P&L Timeline"
+            values={cumPnlSeries}
+            stroke="#5EEAD4"
+            formatValue={(v) => `${v >= 0 ? "+" : ""}$${v.toFixed(2)}`}
+            emptyText="No closed trades yet."
+          />
+          <MiniLineChart
+            title="Cumulative R-Multiple"
+            values={cumRSeries}
+            stroke="#C077FA"
+            formatValue={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}R`}
+            emptyText="No closed trades yet."
+          />
+          <MiniLineChart
+            title="Realized Drawdown ($)"
+            values={drawdownSeries}
+            stroke="#FF5A6E"
+            formatValue={(v) => `$${v.toFixed(2)}`}
+            emptyText="No closed trades yet."
+          />
         </div>
       </div>
     </div>
