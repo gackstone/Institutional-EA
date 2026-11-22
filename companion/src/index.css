@@ -1,150 +1,287 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root, [data-theme="light"] {
-  /* Institutional EA Light Palette */
-  --institutional-ea-bg: #F1F5F4;
-  --institutional-ea-card: #FFFFFF;
-  --institutional-ea-surface: #FFFFFF;
-  --institutional-ea-surface-secondary: #F5F7F7;
-  --institutional-ea-surface-tertiary: #DFE7E5;
-  --institutional-ea-surface-hover: #F5F7F7;
-  --institutional-ea-border: #DFE7E5;
-  --institutional-ea-border-subtle: #EBF1F0;
-  --institutional-ea-border-strong: #CBD6D4;
-  --institutional-ea-text: #102A2A;
-  --institutional-ea-text-secondary: #526579;
-  --institutional-ea-text-muted: #6C7E8F;
-  --institutional-ea-primary: #0057B8;
-  --institutional-ea-primary-hover: #004694;
-  --institutional-ea-primary-active: #003875;
-  --institutional-ea-primary-soft: #E8F1FF;
-  --institutional-ea-profit: #10B981;
-  --institutional-ea-profit-soft: rgba(16, 185, 129, 0.12);
-  --institutional-ea-loss: #EF4444;
-  --institutional-ea-loss-soft: rgba(239, 68, 68, 0.12);
-  --institutional-ea-error: #EF4444;
-  --institutional-ea-error-soft: rgba(239, 68, 68, 0.12);
-  --institutional-ea-warning: #F59E0B;
-  --institutional-ea-warning-soft: rgba(245, 158, 11, 0.12);
-  --institutional-ea-info: #0057B8;
-  --institutional-ea-info-soft: #E8F1FF;
+:root,
+.dark,
+[data-theme="dark"],
+[data-theme="light"] {
+  /* =========================================================================
+     Institutional EA Companion — Sampled Glassmorphism Design Tokens
+     Single Source of Truth (see companion/docs/DESIGN_SPEC.md)
+  ========================================================================= */
+  --iea-bg-canvas: #091426;
+  --iea-bg-navy-top: #0A152B;
+  --iea-bg-navy-deep: #071020;
+  --iea-bg-royal-glow: #2F497C;
+  --iea-bg-horizon-glow: #7196CB;
+  --iea-bg-teal-depth: #112B42;
 
-  --scrollbar-track: #F1F5F4;
-  --scrollbar-thumb: #DFE7E5;
-  --scrollbar-thumb-hover: #CBD6D4;
-  --overlay-bg: rgba(16, 42, 42, 0.45);
-}
+  /* Translucent Glass Surfaces */
+  --iea-glass-card: linear-gradient(165deg, rgba(32, 54, 101, 0.44) 0%, rgba(14, 28, 54, 0.66) 100%);
+  --iea-glass-elevated: linear-gradient(165deg, rgba(47, 73, 124, 0.52) 0%, rgba(15, 31, 62, 0.82) 100%);
+  --iea-glass-lime-sheen: linear-gradient(160deg, rgba(176, 246, 72, 0.17) 0%, rgba(17, 43, 66, 0.58) 54%, rgba(14, 28, 54, 0.72) 100%);
+  --iea-glass-violet-sheen: linear-gradient(160deg, rgba(192, 119, 250, 0.16) 0%, rgba(28, 44, 84, 0.56) 55%, rgba(14, 28, 54, 0.72) 100%);
+  --iea-glass-tile: rgba(20, 40, 70, 0.48);
+  --iea-table-header: rgba(32, 54, 101, 0.34);
+  --iea-table-row-hover: rgba(34, 61, 106, 0.48);
+  --iea-table-row-stripe: rgba(22, 41, 78, 0.25);
 
-.dark, [data-theme="dark"] {
-  /* Institutional EA Dark Palette */
-  --institutional-ea-bg: #080A0B;
-  --institutional-ea-card: #101112;
-  --institutional-ea-surface: #101112;
-  --institutional-ea-surface-secondary: #15191C;
-  --institutional-ea-surface-tertiary: #1D2327;
-  --institutional-ea-surface-hover: #181D21;
-  --institutional-ea-border: #202629;
-  --institutional-ea-border-subtle: #15191C;
-  --institutional-ea-border-strong: #2D353A;
-  --institutional-ea-text: #F5F7FA;
-  --institutional-ea-text-secondary: #A6B2BD;
-  --institutional-ea-text-muted: #768491;
-  --institutional-ea-primary: #3284FF;
-  --institutional-ea-primary-hover: #4F96FF;
-  --institutional-ea-primary-active: #2672E0;
-  --institutional-ea-primary-soft: #172B45;
-  --institutional-ea-profit: #34D399;
-  --institutional-ea-profit-soft: rgba(52, 211, 153, 0.15);
-  --institutional-ea-loss: #F87171;
-  --institutional-ea-loss-soft: rgba(248, 113, 113, 0.15);
-  --institutional-ea-error: #F87171;
-  --institutional-ea-error-soft: rgba(248, 113, 113, 0.15);
+  /* Borders & Dividers */
+  --iea-border-glass: rgba(186, 214, 255, 0.15);
+  --iea-border-glass-hover: rgba(186, 214, 255, 0.28);
+  --iea-border-glass-strong: rgba(194, 240, 118, 0.40);
+  --iea-border-divider: rgba(148, 179, 226, 0.11);
+
+  /* Accents & Semantic Tones */
+  --iea-accent-lime: #B0F648;
+  --iea-accent-lime-soft: #C2F076;
+  --iea-accent-lime-bright: #99EF44;
+  --iea-accent-lime-glow: rgba(176, 246, 72, 0.18);
+  --iea-accent-violet: #C077FA;
+  --iea-accent-cyan: #5EEAD4;
+  --iea-danger: #FF5A6E;
+  --iea-warning: #FBBF24;
+
+  /* Typography Hierarchy */
+  --iea-text-primary: #F4F7FF;
+  --iea-text-secondary: #B6C5E0;
+  --iea-text-muted: #8496B8;
+
+  /* Legacy Variable Mapping (for backward compatibility across all modals/components) */
+  --institutional-ea-bg: #091426;
+  --institutional-ea-card: rgba(18, 35, 68, 0.62);
+  --institutional-ea-surface: rgba(18, 35, 68, 0.62);
+  --institutional-ea-surface-secondary: rgba(24, 44, 82, 0.56);
+  --institutional-ea-surface-tertiary: rgba(34, 61, 106, 0.52);
+  --institutional-ea-surface-hover: rgba(34, 61, 106, 0.65);
+  --institutional-ea-border: rgba(186, 214, 255, 0.15);
+  --institutional-ea-border-subtle: rgba(148, 179, 226, 0.10);
+  --institutional-ea-border-strong: rgba(194, 240, 118, 0.38);
+  --institutional-ea-text: #F4F7FF;
+  --institutional-ea-text-secondary: #B6C5E0;
+  --institutional-ea-text-muted: #8496B8;
+  --institutional-ea-primary: #B0F648;
+  --institutional-ea-primary-hover: #C2F076;
+  --institutional-ea-primary-active: #99EF44;
+  --institutional-ea-primary-soft: rgba(176, 246, 72, 0.16);
+  --institutional-ea-profit: #B0F648;
+  --institutional-ea-profit-soft: rgba(176, 246, 72, 0.16);
+  --institutional-ea-loss: #FF5A6E;
+  --institutional-ea-loss-soft: rgba(255, 90, 110, 0.16);
+  --institutional-ea-error: #FF5A6E;
+  --institutional-ea-error-soft: rgba(255, 90, 110, 0.16);
   --institutional-ea-warning: #FBBF24;
-  --institutional-ea-warning-soft: rgba(251, 191, 36, 0.15);
-  --institutional-ea-info: #3284FF;
-  --institutional-ea-info-soft: #172B45;
+  --institutional-ea-warning-soft: rgba(251, 191, 36, 0.16);
+  --institutional-ea-info: #5EEAD4;
+  --institutional-ea-info-soft: rgba(94, 234, 212, 0.16);
 
-  --scrollbar-track: #080A0B;
-  --scrollbar-thumb: #202629;
-  --scrollbar-thumb-hover: #2D353A;
-  --overlay-bg: rgba(0, 0, 0, 0.75);
+  --scrollbar-track: rgba(9, 20, 38, 0.55);
+  --scrollbar-thumb: rgba(113, 150, 203, 0.25);
+  --scrollbar-thumb-hover: rgba(176, 246, 72, 0.45);
+  --overlay-bg: rgba(5, 12, 26, 0.76);
 }
 
 @layer base {
+  html,
   body {
-    background-color: var(--institutional-ea-bg);
-    color: var(--institutional-ea-text);
-    font-family: "Inter", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--iea-bg-canvas);
+    color: var(--iea-text-primary);
+    font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     letter-spacing: -0.015em;
   }
 
-  code, pre, .font-mono, .tabular-nums {
+  code,
+  pre,
+  .font-mono,
+  .tabular-nums {
+    font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-variant-numeric: tabular-nums;
   }
 
   :focus-visible {
-    outline: 2px solid var(--institutional-ea-primary);
+    outline: 2px solid var(--iea-accent-lime);
     outline-offset: 2px;
   }
 }
 
-/* Institutional EA Component Styling */
-.institutional-ea-glass {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid var(--institutional-ea-border);
+/* ============================================================================
+   Atmospheric Deep Navy-to-Royal-Blue Viewport Backdrop
+============================================================================ */
+.iea-bg-atmosphere {
+  background-color: #091426;
+  background-image:
+    radial-gradient(circle at 10% 42%, rgba(113, 150, 203, 0.24) 0%, rgba(47, 73, 124, 0.28) 32%, transparent 66%),
+    radial-gradient(circle at 78% 16%, rgba(176, 246, 72, 0.11) 0%, rgba(17, 43, 66, 0.36) 36%, transparent 70%),
+    radial-gradient(circle at 52% 88%, rgba(59, 96, 141, 0.22) 0%, transparent 62%),
+    linear-gradient(155deg, #0A152B 0%, #091426 48%, #0C1C36 100%);
+  background-attachment: fixed;
 }
 
-.dark .institutional-ea-glass {
-  background: rgba(16, 17, 18, 0.88);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid var(--institutional-ea-border);
+/* ============================================================================
+   Glassmorphism Surfaces & Cards
+============================================================================ */
+.iea-glass-card {
+  background: var(--iea-glass-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--iea-border-glass);
+  border-radius: 18px;
+  box-shadow:
+    0 18px 42px -14px rgba(4, 10, 24, 0.68),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+  transition:
+    border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.institutional-ea-card {
-  background-color: var(--institutional-ea-card);
-  border: 1px solid var(--institutional-ea-border);
-  border-radius: 0.875rem;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+.iea-glass-card:hover {
+  border-color: var(--iea-border-glass-hover);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .institutional-ea-card:hover {
-    border-color: var(--institutional-ea-border-strong);
+.iea-glass-card-lime {
+  background: var(--iea-glass-lime-sheen);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(194, 240, 118, 0.26);
+  border-radius: 18px;
+  box-shadow:
+    0 18px 42px -14px rgba(4, 10, 24, 0.68),
+    inset 0 1px 0 0 rgba(194, 240, 118, 0.22);
+}
+
+.iea-glass-card-violet {
+  background: var(--iea-glass-violet-sheen);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(192, 119, 250, 0.24);
+  border-radius: 18px;
+  box-shadow:
+    0 18px 42px -14px rgba(4, 10, 24, 0.68),
+    inset 0 1px 0 0 rgba(201, 172, 218, 0.20);
+}
+
+/* Performance-tuned chart shell (omits expensive backdrop-filter behind 60fps canvas) */
+.iea-chart-glass-shell {
+  background: linear-gradient(165deg, rgba(16, 31, 61, 0.92) 0%, rgba(8, 18, 35, 0.96) 100%);
+  border: 1px solid var(--iea-border-glass);
+  border-radius: 18px;
+  box-shadow:
+    0 20px 46px -14px rgba(4, 10, 24, 0.75),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.11);
+}
+
+.iea-glass-tile {
+  background: var(--iea-glass-tile);
+  border: 1px solid rgba(186, 214, 255, 0.11);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+}
+
+.iea-pill-control {
+  background: rgba(22, 40, 76, 0.68);
+  border: 1px solid rgba(186, 214, 255, 0.16);
+  border-radius: 9999px;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+  transition: all 160ms ease;
+}
+
+.iea-pill-control:hover {
+  border-color: rgba(194, 240, 118, 0.36);
+  background: rgba(29, 52, 96, 0.78);
+}
+
+/* Supabase-style Overlay Sidebar Glass */
+.iea-sidebar-rail {
+  background: linear-gradient(180deg, rgba(10, 21, 43, 0.88) 0%, rgba(8, 17, 35, 0.94) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(186, 214, 255, 0.14);
+  transition:
+    width 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 200ms ease;
+  will-change: width;
+}
+
+.iea-sidebar-rail[data-expanded="true"] {
+  background: linear-gradient(180deg, rgba(11, 24, 49, 0.96) 0%, rgba(8, 18, 37, 0.98) 100%);
+  border-right-color: rgba(194, 240, 118, 0.28);
+  box-shadow:
+    20px 0 56px -10px rgba(3, 8, 20, 0.85),
+    inset -1px 0 0 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Reference-Style Segmented Tab with Neon Lime Underline */
+.iea-tab-button {
+  position: relative;
+  padding-bottom: 0.5rem;
+  color: var(--iea-text-muted);
+  font-weight: 500;
+  transition: color 160ms ease;
+}
+
+.iea-tab-button:hover {
+  color: var(--iea-text-primary);
+}
+
+.iea-tab-button[data-active="true"] {
+  color: var(--iea-text-primary);
+  font-weight: 600;
+}
+
+.iea-tab-button[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.5px;
+  border-radius: 9999px;
+  background: var(--iea-accent-lime);
+  box-shadow: 0 0 12px rgba(176, 246, 72, 0.75);
+}
+
+/* Reference-Style Glass Data Table */
+.iea-glass-table thead tr {
+  background: var(--iea-table-header);
+  border-bottom: 1px solid var(--iea-border-divider);
+}
+
+.iea-glass-table th {
+  color: var(--iea-text-muted);
+  font-weight: 500;
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+.iea-glass-table tbody tr {
+  border-bottom: 1px solid var(--iea-border-divider);
+  transition: background-color 150ms ease;
+}
+
+.iea-glass-table tbody tr:nth-child(even) {
+  background: var(--iea-table-row-stripe);
+}
+
+.iea-glass-table tbody tr:hover {
+  background: var(--iea-table-row-hover);
+}
+
+/* Reduced Motion Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
-}
-
-/* Institutional EA Animations */
-@keyframes institutional-ea-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes institutional-ea-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-institutional-ea-fade {
-  animation: institutional-ea-fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.animate-institutional-ea-slide {
-  animation: institutional-ea-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Custom Scrollbar */
@@ -159,7 +296,7 @@
 
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
-  border-radius: 3px;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
