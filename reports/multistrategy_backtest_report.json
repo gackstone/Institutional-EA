@@ -1,0 +1,81 @@
+{
+  "timestamp": "2026-11-13T15:07:55.352131+00:00",
+  "net_profit": -4547.36,
+  "gross_profit": 44643.25,
+  "gross_loss": 49190.61,
+  "win_rate": 47.41,
+  "profit_factor": 0.91,
+  "max_equity_drawdown": 106.36,
+  "max_balance_drawdown": 106.36,
+  "avg_win": 697.55,
+  "avg_loss": 692.83,
+  "expectancy": -33.68,
+  "avg_holding_minutes": 3.9,
+  "total_trades": 135,
+  "max_consecutive_wins": 8,
+  "max_consecutive_losses": 8,
+  "total_costs": 2156.4,
+  "performance_by_symbol": {
+    "EURUSD": {
+      "trades": 18,
+      "wins": 2,
+      "losses": 16,
+      "net_pnl": -206.49999999999176,
+      "gross_profit": 8.000000000003796,
+      "gross_loss": 214.49999999999557
+    },
+    "GBPUSD": {
+      "trades": 14,
+      "wins": 4,
+      "losses": 10,
+      "net_pnl": -105.50000000001006,
+      "gross_profit": 17.00000000000304,
+      "gross_loss": 122.50000000001307
+    },
+    "USDJPY": {
+      "trades": 41,
+      "wins": 18,
+      "losses": 23,
+      "net_pnl": -1763.7100000000137,
+      "gross_profit": 870.1400000001121,
+      "gross_loss": 2633.850000000125
+    },
+    "XAUUSD": {
+      "trades": 62,
+      "wins": 40,
+      "losses": 22,
+      "net_pnl": -2471.6519999987927,
+      "gross_profit": 43748.108000000255,
+      "gross_loss": 46219.75999999903
+    }
+  },
+  "performance_by_strategy": {
+    "EMA_TREND": {
+      "trades": 93,
+      "net_pnl": -898.363999999026,
+      "wins": 48
+    },
+    "MACD_MOMENTUM": {
+      "trades": 15,
+      "net_pnl": -9896.44999999953,
+      "wins": 5
+    },
+    "DIRECTIONAL_EFFICIENCY": {
+      "trades": 26,
+      "net_pnl": 6391.091999999753,
+      "wins": 11
+    },
+    "PRICE_ACTION": {
+      "trades": 1,
+      "net_pnl": -143.64000000000323,
+      "wins": 0
+    }
+  },
+  "performance_by_timeframe": {
+    "M1": {
+      "trades": 135,
+      "win_rate": 47.41,
+      "net_pnl": -4547.36
+    }
+  }
+}

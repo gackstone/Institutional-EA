@@ -1,0 +1,147 @@
+{
+  "trading_mode": "CONTINUOUS_SCALPING",
+  "execution_timeframes": [
+    "M1",
+    "M5"
+  ],
+  "context_timeframes": [
+    "M15",
+    "H1",
+    "H4"
+  ],
+  "news_filter_enabled": false,
+  "continuous_scanning": true,
+  "adaptive_entry_filters": true,
+  "auto_rescan_after_closure": true,
+  "multi_symbol_execution": true,
+  "scalp_require_htf_agreement": true,
+  "continuous_scalp_require_htf_agreement": true,
+  "scalping_min_confluence_score": 55.0,
+  "scalping_min_rr": 1.5,
+  "min_rr": 2.0,
+  "micro_account_min_lot_allowed": false,
+  "acknowledged_high_risk_microaccount": false,
+  "adaptive_scalping_min_lot_ceiling_pct": 2.0,
+  "ict_smc": {
+    "swing_lookback_bars": 5,
+    "fvg_min_pips": 1.5,
+    "fvg_min_atr": 0.3,
+    "require_mss_close_confirmation": true,
+    "require_close_break": true,
+    "bos_body_close_required": true,
+    "choch_requires_confirmation": true,
+    "sweep_requires_close_back_inside": true,
+    "ob_requires_displacement": true,
+    "ob_displacement_atr_mult": 1.2,
+    "ob_requires_bos": true,
+    "pd_equilibrium": 0.5,
+    "tp_requires_liquidity_pool": true,
+    "require_lower_high": true,
+    "choch_timeout_bars": 20,
+    "allow_choch_only_entries": false,
+    "failed_choch_action": "RESET_AND_LOG_TRAP",
+    "ote_fibonacci_levels": {
+      "entry_zone_min": 0.62,
+      "entry_zone_max": 0.79,
+      "optimal_entry": 0.705,
+      "invalidation": 1.0
+    },
+    "allow_countertrend_setups": false,
+    "countertrend_risk_multiplier": 0.5,
+    "scalp_require_htf_agreement": true,
+    "enable_sweep_mss_fvg": true,
+    "enable_sweep_bpr": true,
+    "enable_smt_mss_ifvg": true,
+    "enable_smt_mss_breaker": true,
+    "enable_unicorn": true
+  },
+  "smc_rulebook": {
+    "require_both_hh_hl_for_trend": true,
+    "ranging_structure_no_trade": true,
+    "htf_timeframes": [
+      "H4",
+      "D1"
+    ],
+    "bos_body_close_required": true,
+    "reject_breakout_candle_chase": true,
+    "choch_requires_confirmation": true,
+    "allow_choch_only_entries": false,
+    "sweep_requires_close_back_inside": true,
+    "tp_requires_liquidity_pool": true,
+    "ob_requires_displacement": true,
+    "ob_displacement_atr_mult": 1.2,
+    "ob_requires_bos": true,
+    "fvg_min_atr": 0.3,
+    "fvg_requires_impulse": true,
+    "ob_fvg_confluence_bonus_pts": 10.0,
+    "pd_equilibrium": 0.5,
+    "min_rr": 2.0,
+    "require_poi_touch_on_pullback": true,
+    "default_risk_pct": 1.0,
+    "max_risk_pct": 2.0,
+    "require_stop_loss": true,
+    "forbid_sl_widening": true,
+    "gate_mode": "ENFORCE",
+    "g1_structure_enabled": true,
+    "g2_zone_enabled": true,
+    "g3_sweep_enabled": true,
+    "g4_poi_quality_enabled": true,
+    "g5_ltf_confirm_enabled": true,
+    "g6_htf_alignment_enabled": true,
+    "g7_stops_targets_enabled": true,
+    "g8_risk_enabled": true
+  },
+  "confluence_scoring": {
+    "min_approval_score": 75.0,
+    "scalping_min_approval_score": 55.0,
+    "weights": {
+      "weekly_bias": 15.0,
+      "daily_bias": 15.0,
+      "h4_structure": 15.0,
+      "h1_alignment": 10.0,
+      "liquidity_sweep": 15.0,
+      "mss_bos_confirmation": 15.0,
+      "fvg_order_block_ote": 10.0,
+      "killzone_session": 5.0
+    }
+  },
+  "symbol_overrides": {
+    "BTCUSD.m": {
+      "W1": 30,
+      "D1": 150,
+      "H4": 250,
+      "H1": 400,
+      "M15": 500
+    }
+  },
+  "on_short_history": "REDUCE",
+  "reduced_history_risk_factor": 0.5,
+  "max_startup_rounds": 6,
+  "alert_cooldown_minutes": 15,
+  "feature_flags": {
+    "regime_detection": true,
+    "shadow_mode": false,
+    "meta_labeling": true,
+    "volatility_targeting": true,
+    "kelly_sizing": true,
+    "decay_guard": true,
+    "tca_logging": true
+  },
+  "multistrategy_scalping": {
+    "enabled": true,
+    "decision_threshold": 55.0,
+    "min_directional_advantage": 8.0,
+    "weights": {
+      "htf_trend": 0.20,
+      "ema_trend": 0.15,
+      "rsi_momentum": 0.10,
+      "macd_momentum": 0.10,
+      "price_action": 0.15,
+      "atr_volatility": 0.10,
+      "directional_efficiency": 0.10,
+      "short_term_momentum": 0.10,
+      "bollinger_bands": 0.05
+    },
+    "regime_adaptation_enabled": true
+  }
+}

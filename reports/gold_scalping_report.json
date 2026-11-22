@@ -1,0 +1,68 @@
+{
+  "generated_at_utc": "2026-11-14T10:10:29.522524+00:00",
+  "instrument": "GOLD",
+  "resolved_symbol": "XAUUSD.m",
+  "schedule": "MONDAY-FRIDAY",
+  "backtest_metrics": {
+    "symbol": "GOLD",
+    "number_of_trades": 143,
+    "winning_trades": 113,
+    "losing_trades": 30,
+    "net_profit_after_costs_usd": 182.85,
+    "profit_factor": 2.55,
+    "win_rate_pct": 79.02,
+    "average_win_usd": 2.66,
+    "average_loss_usd": -3.93,
+    "expectancy_usd": 1.279,
+    "maximum_drawdown_pct": 1.6,
+    "maximum_consecutive_losses": 3,
+    "average_holding_time_seconds": 39.2,
+    "maximum_holding_time_seconds": 114.0,
+    "spread_cost_usd": 36.05,
+    "commission_cost_usd": 39.62,
+    "slippage_cost_usd": 4.54,
+    "exposure_pct": 40.5,
+    "basket_completion_rate_pct": 100.0,
+    "reversal_performance": {
+      "reversals_executed": 14,
+      "reversal_win_rate_pct": 100.0,
+      "reversal_net_pnl_usd": 32.62
+    },
+    "rejected_orders": 4,
+    "requotes_handled": 4,
+    "winning_days": 6,
+    "losing_days": 0,
+    "chronological_splits": {
+      "training": {
+        "trades": 76,
+        "net_profit_usd": 87.77,
+        "win_rate_pct": 78.95,
+        "profit_factor": 2.36
+      },
+      "validation": {
+        "trades": 29,
+        "net_profit_usd": 44.56,
+        "win_rate_pct": 79.31,
+        "profit_factor": 2.83
+      },
+      "out_of_sample": {
+        "trades": 38,
+        "net_profit_usd": 50.52,
+        "win_rate_pct": 78.95,
+        "profit_factor": 2.74
+      }
+    },
+    "win_rate_realism_audit": {
+      "passed": true,
+      "status": "REALISTIC_DISTRIBUTION_CONFIRMED",
+      "win_rate_pct": 79.02
+    }
+  },
+  "demo_session_verification": {
+    "passed": true,
+    "initial_basket_positions": 4,
+    "baskets_opened": 3,
+    "baskets_closed": 3,
+    "realized_pnl_usd": 1992.0
+  }
+}

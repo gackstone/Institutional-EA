@@ -1,0 +1,39 @@
+{
+  "productName": "MT5-001 Companion",
+  "appId": "live.arcadefx.mt5oo1",
+  "version": "1.2.0",
+  "platform": "windows",
+  "architecture": "x64",
+  "filename": "MT5-001-Companion-Setup.exe",
+  "fileSizeBytes": 156942722,
+  "sha256": "6957cbddf60820a365057595adb200a30d462898a77cff890805619b0b4ebcba",
+  "buildDate": "2026-11-11T08:48:47Z",
+  "releaseChannel": "production",
+  "minWindowsVersion": "10.0.17763 (Windows 10 / Windows 11 64-bit)",
+  "sidecars": [
+    {
+      "name": "mt5_bridge_server",
+      "executable": "bin/mt5_bridge_server.exe",
+      "ports": [5555, 5556],
+      "purpose": "Dual-port MQL5 Expert Advisor TCP bridge & local IPC socket switchboard"
+    },
+    {
+      "name": "mt5_trading_engine",
+      "executable": "bin/mt5_trading_engine.exe",
+      "purpose": "Autonomous quantitative scalping and swing trading engine"
+    },
+    {
+      "name": "mt5_bot_agent",
+      "executable": "bin/mt5_bot_agent.exe",
+      "purpose": "ArcadeFX.live cloud telemetry sync, pairing claim handler & remote commands"
+    }
+  ],
+  "bundledAssets": [
+    "mql5/Experts/PythonBridgeEA.mq5",
+    "config/settings.json",
+    "config/strategy_config.json",
+    "config/risk_config.json",
+    "config/telegram_config.json"
+  ],
+  "signingStatus": "Unsigned (Ready for Authenticode signing pipeline)"
+}

@@ -1,0 +1,32 @@
+{
+  "ati": {
+    "enabled": true,
+    "mode": "OBSERVATION",
+    "auto_training": true,
+    "auto_experimentation": true,
+    "auto_promotion": false,
+    "autonomous_code_changes": false,
+    "shadow_testing": true,
+    "trade_auditing": true,
+    "pattern_discovery": true,
+    "market_regime_detection": true,
+    "execution_analysis": true,
+    "counterfactual_analysis": true,
+    "model_monitoring": true,
+    "rollback_enabled": true,
+    "approved_symbols": [
+      "XAUUSD",
+      "BTCUSD"
+    ],
+    "safety": {
+      "allow_live_trading_activation": false,
+      "allow_risk_limit_changes": false,
+      "allow_symbol_universe_changes": false,
+      "allow_execution_permission_changes": false,
+      "require_candidate_validation": true,
+      "require_approval_for_promotion": true
+    },
+    "min_audit_samples": 5,
+    "min_backtest_trades": 20
+  }
+}

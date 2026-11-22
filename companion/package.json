@@ -1,0 +1,98 @@
+{
+  "name": "mt5-oo1-companion",
+  "version": "1.2.0",
+  "description": "MT5-OO1 Arcade FX Companion Desktop Application",
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "electron": "electron electron/main.cjs",
+    "electron:dev": "concurrently \"vite\" \"wait-on tcp:5173 && electron electron/main.cjs\"",
+    "sidecars": "python packaging/build_sidecars.py",
+    "dist:win": "npm run build && electron-builder --win nsis:x64",
+    "package:win": "python packaging/build_sidecars.py && npm run build && electron-builder --win nsis:x64",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "dependencies": {
+    "lucide-react": "^1.16.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/cli": "^2.2.0",
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.2",
+    "electron": "^34.2.0",
+    "electron-builder": "^25.1.8",
+    "postcss": "^8.5.1",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.7.3",
+    "vite": "^6.1.0",
+    "wait-on": "^8.0.2"
+  },
+  "build": {
+    "appId": "live.arcadefx.mt5oo1",
+    "productName": "MT5-OO1 Companion",
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/bin",
+        "to": "bin",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../mql5",
+        "to": "mql5",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../config",
+        "to": "config",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MT5-OO1 Companion",
+      "artifactName": "MT5-OO1-Companion-Setup.${ext}",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

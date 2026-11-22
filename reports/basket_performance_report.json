@@ -1,0 +1,17 @@
+{
+  "generated_at_utc": "2026-11-14T10:10:29.522524+00:00",
+  "gold_basket_metrics": {
+    "number_of_trades": 143,
+    "basket_completion_rate_pct": 100.0,
+    "net_profit_after_costs_usd": 182.85,
+    "profit_factor": 2.55,
+    "expectancy_usd": 1.279
+  },
+  "btcusd_basket_metrics": {
+    "number_of_trades": 117,
+    "basket_completion_rate_pct": 100.0,
+    "net_profit_after_costs_usd": 164.17,
+    "profit_factor": 3.02,
+    "expectancy_usd": 1.403
+  }
+}

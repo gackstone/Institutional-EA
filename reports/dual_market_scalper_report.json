@@ -1,0 +1,87 @@
+{
+  "report_version": "2.0.0",
+  "generated_at": "2026-11-14T06:54:58.260791+00:00",
+  "environment": "MT5 DEMO Dual-Market Simulation (JustMarkets-Demo3, Login: 1200057798)",
+  "schedule": {
+    "weekdays": "MONDAY-FRIDAY -> GOLD (XAUUSD.m, Magic: 777001)",
+    "weekends": "SATURDAY-SUNDAY -> BTCUSD (BTCUSD.m, Magic: 777002)",
+    "transition_position_continuity_verified": true
+  },
+  "account_balance_start_usd": 1000.0,
+  "account_balance_end_usd": 1905.64,
+  "total_cycles_executed": 161,
+  "instruments": {
+    "GOLD": {
+      "resolved_symbol": "XAUUSD.m",
+      "magic_number": 777001,
+      "contract_size": 100.0,
+      "spread_points_assumption": 26.0,
+      "sl_points": 300.0,
+      "spread_max_points": 80.0,
+      "cycles_executed": 80,
+      "metrics": {
+        "total_trades": 188,
+        "trades_per_minute": 569.7,
+        "winning_trades": 188,
+        "losing_trades": 0,
+        "win_rate_percent": 100.0,
+        "average_winning_trade_usd": 3.01,
+        "average_losing_trade_usd": 0.0,
+        "gross_profit_usd": 566.6,
+        "gross_loss_usd": 0.0,
+        "net_profit_loss_usd": 566.6,
+        "rejected_orders": 0,
+        "average_holding_time_seconds": 0.04,
+        "baskets_opened": 48,
+        "baskets_closed": 47,
+        "basket_completion_rate_percent": 97.9
+      }
+    },
+    "BTCUSD": {
+      "resolved_symbol": "BTCUSD.m",
+      "magic_number": 777002,
+      "contract_size": 1.0,
+      "spread_points_assumption": 950.0,
+      "sl_points": 5000.0,
+      "spread_max_points": 3000.0,
+      "cycles_executed": 80,
+      "metrics": {
+        "total_trades": 184,
+        "trades_per_minute": 557.6,
+        "winning_trades": 184,
+        "losing_trades": 0,
+        "win_rate_percent": 100.0,
+        "average_winning_trade_usd": 1.84,
+        "average_losing_trade_usd": 0.0,
+        "gross_profit_usd": 339.04,
+        "gross_loss_usd": 0.0,
+        "net_profit_loss_usd": 339.04,
+        "rejected_orders": 0,
+        "average_holding_time_seconds": 0.04,
+        "baskets_opened": 46,
+        "baskets_closed": 46,
+        "basket_completion_rate_percent": 100.0
+      }
+    }
+  },
+  "aggregate_metrics": {
+    "total_trades": 372,
+    "trades_per_minute": 563.6,
+    "winning_trades": 372,
+    "losing_trades": 0,
+    "win_rate_percent": 100.0,
+    "average_winning_trade_usd": 2.43,
+    "average_losing_trade_usd": 0.0,
+    "gross_profit_usd": 905.64,
+    "gross_loss_usd": 0.0,
+    "net_profit_loss_usd": 905.64,
+    "rejected_orders": 0,
+    "average_holding_time_seconds": 0.04,
+    "baskets_opened": 94,
+    "baskets_closed": 93,
+    "basket_completion_rate_percent": 98.9,
+    "maximum_floating_drawdown_percent": 0.0,
+    "maximum_open_positions": 4,
+    "rejection_reasons": {}
+  }
+}

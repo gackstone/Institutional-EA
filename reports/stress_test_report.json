@@ -1,0 +1,89 @@
+{
+  "total_scenarios": 16,
+  "passed_scenarios": 16,
+  "failed_scenarios": 0,
+  "all_passed": true,
+  "scenarios": [
+    {
+      "scenario": "1_sudden_spread_widening",
+      "passed": true,
+      "detail": "Wide spread (250 pts > 80 pts) blocked new GOLD entry cleanly."
+    },
+    {
+      "scenario": "2_fast_price_reversals",
+      "passed": true,
+      "detail": "Flipped BUY -> SELL with zero simultaneous opposing positions."
+    },
+    {
+      "scenario": "3_multiple_losing_entries",
+      "passed": true,
+      "detail": "3 consecutive losses activated cooldown (Loss-streak cooldown active (3 consecutive losses, 300s remaining)) and lot size did not escalate (0.2 -> 0.19)."
+    },
+    {
+      "scenario": "4_consecutive_order_rejection",
+      "passed": true,
+      "detail": "Failed basket cleaned up state and re-primed without ghost positions."
+    },
+    {
+      "scenario": "5_network_disconnection",
+      "passed": true,
+      "detail": "Disconnected state blocked new entries and emitted alert."
+    },
+    {
+      "scenario": "6_mt5_terminal_restart",
+      "passed": true,
+      "detail": "Reconciled 2 existing scalper positions after terminal restart."
+    },
+    {
+      "scenario": "7_python_engine_restart",
+      "passed": true,
+      "detail": "Adopted existing basket on Python restart without opening duplicate orders."
+    },
+    {
+      "scenario": "8_duplicate_execution_messages",
+      "passed": true,
+      "detail": "Duplicate tick/order guard blocked 1 duplicate evaluation(s)."
+    },
+    {
+      "scenario": "9_partial_basket_closure",
+      "passed": true,
+      "detail": "Closed individual profitable position #901 while keeping remaining position #902 managed."
+    },
+    {
+      "scenario": "10_insufficient_margin",
+      "passed": true,
+      "detail": "Blocked order when required margin exceeded free margin (Insufficient free margin: Required $10.00 > Free $5.00)."
+    },
+    {
+      "scenario": "11_invalid_volume",
+      "passed": true,
+      "detail": "Normalized invalid volume to min_lot=0.01 and rejected under-budget trade (MIN_LOT_EXCEEDS_PERMITTED_RISK: Min lot 0.01 risks $3.37 > remaining risk budget $0.01)."
+    },
+    {
+      "scenario": "12_symbol_unavailable",
+      "passed": true,
+      "detail": "Blocked entry gracefully when symbol spec is unavailable (Symbol specification for GOLD is unavailable.)."
+    },
+    {
+      "scenario": "13_broker_trading_session_changes",
+      "passed": true,
+      "detail": "Blocked entry when broker session switched trade_mode to closed (0)."
+    },
+    {
+      "scenario": "14_weekend_btcusd_closure",
+      "passed": true,
+      "detail": "When BTCUSD is closed on weekend, engine waits and never substitutes GOLD."
+    },
+    {
+      "scenario": "15_friday_to_saturday_transition",
+      "passed": true,
+      "detail": "Friday GOLD basket managed to completion on Saturday while new Saturday basket opened on BTCUSD."
+    },
+    {
+      "scenario": "16_sunday_to_monday_transition",
+      "passed": true,
+      "detail": "Weekend BTCUSD basket managed to completion on Monday while new Monday basket opened on GOLD."
+    }
+  ],
+  "generated_at_utc": "2026-11-14T10:10:28.824500+00:00"
+}

@@ -1,0 +1,40 @@
+{
+  "generated_at_utc": "2026-11-14T10:10:29.453355+00:00",
+  "benchmark_cycles": 500,
+  "total_wall_time_ms": 594.59,
+  "avg_cycle_wall_time_ms": 1.1892,
+  "blocking_sleeps_in_hot_path": 0,
+  "indicator_cache_enabled": true,
+  "symbol_specs_cached": true,
+  "telemetry_summary": {
+    "total_orders_evaluated": 1000,
+    "filled_orders": 1000,
+    "rejected_orders": 0,
+    "rejection_rate_pct": 0.0,
+    "signal_calculation_latency_ms": {
+      "avg": 0.077,
+      "max": 1.123,
+      "samples": 500
+    },
+    "order_submission_latency_ms": {
+      "avg": 0.011,
+      "max": 0.73
+    },
+    "broker_acknowledgement_latency_ms": {
+      "avg": 0.011,
+      "max": 0.73
+    },
+    "fill_latency_ms": {
+      "avg": 0.011,
+      "max": 0.73
+    },
+    "slippage": {
+      "avg_points": 0.0,
+      "max_points": 0.0,
+      "total_slippage_usd": 0.0
+    },
+    "missed_opportunities_total": 0,
+    "missed_opportunities_by_reason": {},
+    "duplicate_orders_prevented": 0
+  }
+}

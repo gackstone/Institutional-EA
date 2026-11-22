@@ -1,0 +1,116 @@
+{
+  "generated_at_utc": "2026-11-14T10:10:29.521366+00:00",
+  "execution_mode": "DEMO",
+  "demo_mode_enforced": true,
+  "live_trading_requires_manual_approval": true,
+  "mt5_demo_terminal_verification": {
+    "connected": true,
+    "server": "JustMarkets-Demo3",
+    "login": 1200057798,
+    "trade_mode": 0,
+    "is_demo_account": true,
+    "balance": 4618.59,
+    "equity": 4447.63,
+    "terminal_connected": true,
+    "resolved_gold": {
+      "symbol": "XAUUSD.m",
+      "contract_size": 100.0,
+      "point": 0.01,
+      "spread": 26
+    },
+    "resolved_btcusd": {
+      "symbol": "BTCUSD.m",
+      "contract_size": 1.0,
+      "point": 0.01,
+      "spread": 858
+    }
+  },
+  "phase17_demo_scenarios": {
+    "weekday_gold_demo_session": {
+      "passed": true,
+      "initial_basket_positions": 4,
+      "baskets_opened": 3,
+      "baskets_closed": 3,
+      "realized_pnl_usd": 1992.0
+    },
+    "weekend_btcusd_demo_session": {
+      "passed": true,
+      "initial_basket_positions": 4,
+      "baskets_opened": 2,
+      "baskets_closed": 1,
+      "realized_pnl_usd": 272.0
+    },
+    "direction_reversal_verification": {
+      "passed": true,
+      "reversals_executed": 1,
+      "reversal_records": [
+        {
+          "symbol_key": "GOLD",
+          "previous_direction": "BUY",
+          "new_direction": "SELL",
+          "reversal_reason": "CONFIRMED_REVERSAL: BUY->SELL | GOLD MOMENTUM_CONTINUATION (SELL) | Score=0.81 | R/Cost=4.68 | Regime=NORMAL_LIQUID",
+          "closed_positions": [
+            600001,
+            600002,
+            600003,
+            600004
+          ],
+          "realized_pnl_usd": -16.0,
+          "remaining_exposure_lots": 0.8,
+          "new_order_details": [
+            {
+              "ticket": 600005,
+              "volume": 0.2,
+              "price": 2650.1
+            },
+            {
+              "ticket": 600006,
+              "volume": 0.2,
+              "price": 2650.1
+            },
+            {
+              "ticket": 600007,
+              "volume": 0.2,
+              "price": 2650.1
+            },
+            {
+              "ticket": 600008,
+              "volume": 0.2,
+              "price": 2650.1
+            }
+          ],
+          "timestamp": 1794651029.517367
+        }
+      ]
+    },
+    "restart_recovery_verification": {
+      "passed": true,
+      "recovered_positions": 1
+    }
+  },
+  "engine_summary": {
+    "total_cycles": 5,
+    "total_baskets_opened": 5,
+    "total_baskets_closed": 4,
+    "total_orders_submitted": 20,
+    "total_orders_filled": 20,
+    "total_orders_rejected": 0,
+    "reversals_executed": 1,
+    "duplicate_orders_prevented": 0,
+    "net_profit_usd": 2264.0,
+    "symbols": {
+      "GOLD": {
+        "baskets_opened": 3,
+        "baskets_closed": 3,
+        "orders_filled": 12,
+        "net_profit_usd": 1992.0
+      },
+      "BTCUSD": {
+        "baskets_opened": 2,
+        "baskets_closed": 1,
+        "orders_filled": 8,
+        "net_profit_usd": 272.0
+      }
+    }
+  }
+}

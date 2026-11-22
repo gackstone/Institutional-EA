@@ -1,0 +1,71 @@
+name: Quantitative CI Suite
+
+on:
+  push:
+    branches: [ main, "feature/*", "audit-*" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-audit:
+    name: Unit Tests, Secret Scan & Quant Validation
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Secret and Credential Scanner
+        shell: pwsh
+        run: |
+          Write-Host "Running automated secret and credentials audit on tracked files..."
+          $forbidden = @(
+            "AIzaSy[0-9A-Za-z_-]{20,}",
+            "bot[0-9]{8,10}:[a-zA-Z0-9_-]{35}",
+            "password\s*=\s*['\"][^'\"]+['\"]"
+          )
+          $violations = 0
+          $trackedFiles = git ls-files | Where-Object { $_ -ne ".github/workflows/ci.yml" }
+          foreach ($relPath in $trackedFiles) {
+            if (Test-Path $relPath) {
+              $content = Get-Content $relPath -Raw -ErrorAction SilentlyContinue
+              if ($content) {
+                foreach ($pattern in $forbidden) {
+                  if ($content -match $pattern) {
+                    Write-Error "CRITICAL: Secret pattern matched in ${relPath}: $pattern"
+                    $violations++
+                  }
+                }
+              }
+            }
+          }
+          if ($violations -gt 0) {
+            Write-Error "CI FAILED: $violations secrets detected in repository!"
+            exit 1
+          }
+          Write-Host "Secret scan passed cleanly. Zero leaked credentials."
+
+      - name: Execute SMC Rulebook & Quality Gate Verification
+        shell: pwsh
+        run: |
+          python -m unittest tests/test_smc_rulebook_golden.py tests/test_setup_quality_gate_and_risk.py -v
+
+      - name: Execute Full Quantitative Unit Test Suite
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Verify Architecture and Baseline
+        shell: pwsh
+        run: |
+          python scripts/verify_deep.py

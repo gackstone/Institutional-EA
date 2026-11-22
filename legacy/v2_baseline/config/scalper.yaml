@@ -1,0 +1,160 @@
+# ==============================================================================
+# DUAL-MARKET SCALPING ENGINE — CENTRALIZED CONFIGURATION
+# Dedicated high-frequency scalping: Weekdays (GOLD) + Weekends (BTCUSD)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. General & Safety Settings
+# ------------------------------------------------------------------------------
+general:
+  engine_name: "DualMarketScalperEngine"
+  version: "2.0.0"
+  DEMO_MODE: true                 # Default: DEMO ONLY. Hard-blocks real-money execution unless false
+  allow_real_trading: false       # Explicit secondary flag required for live account trading
+  require_live_confirmation: true # Strict runtime safety prompt if live account detected
+  LEGACY_FILTERS_ENABLED: false   # false = bypass legacy gates; true = restore original restrictive behavior
+  EXECUTION_INTERVAL_MS: 250      # Loop interval in milliseconds (200-500ms recommended)
+  tick_timeout_seconds: 5.0
+  candle_context_timeframe: "M1"
+
+# ------------------------------------------------------------------------------
+# 2. Market Scheduler (Trading Calendar & Routing)
+# ------------------------------------------------------------------------------
+scheduler:
+  enabled: true
+  timezone: "UTC"
+  weekday_symbol: "GOLD"
+  weekend_symbol: "BTCUSD"
+  weekday_days:
+    - "MONDAY"
+    - "TUESDAY"
+    - "WEDNESDAY"
+    - "THURSDAY"
+    - "FRIDAY"
+  weekend_days:
+    - "SATURDAY"
+    - "SUNDAY"
+  manage_existing_positions: true # Continue managing open positions across schedule transitions
+  require_symbol_trading_availability: true # Query MT5 broker symbol trade_mode before entry
+
+# ------------------------------------------------------------------------------
+# 3. Independent Symbol Profiles
+# ------------------------------------------------------------------------------
+symbols:
+
+  # --- GOLD (XAUUSD) WEEKDAY PROFILE ---
+  GOLD:
+    enabled: true
+    canonical: "XAUUSD"
+    magic_number: 777001
+    comment_prefix: "GS_GOLD"
+    aliases:
+      - "XAUUSD"
+      - "XAUUSDm"
+      - "XAUUSD.m"
+      - "XAUUSD.a"
+      - "XAUUSD.pro"
+      - "XAUUSD.raw"
+      - "XAUUSD.std"
+      - "GOLD"
+      - "GOLD.m"
+      - "GOLDm"
+      - "XAU/USD"
+    basket_size: 4
+    max_basket_size: 10
+    order_spacing_ms: 150
+    burst_timeout_seconds: 3.0
+    lot_step_balance: 50.0
+    min_lot: 0.01
+    max_lot: 0.50
+    micro_account_min_lot: 0.01
+    tp_usd_per_min_lot: 0.50
+    basket_tp_usd: 2.00
+    min_basket_tp_usd: 1.00
+    max_hold_seconds: 180
+    breakeven_urgency_seconds: 120
+    sl_points: 300.0
+    spread_max_points: 80.0
+    fallback_lookback_ticks: 20
+    fallback_m1_candles: 5
+    fallback_momentum_period: 10
+
+  # --- BITCOIN (BTCUSD) WEEKEND PROFILE ---
+  BTCUSD:
+    enabled: true
+    canonical: "BTCUSD"
+    magic_number: 777002
+    comment_prefix: "BS_BTC"
+    aliases:
+      - "BTCUSD"
+      - "BTCUSDm"
+      - "BTCUSD.m"
+      - "BTCUSD.a"
+      - "BTCUSD#"
+      - "BTCUSD."
+      - "BTCUSDpro"
+      - "BTC/USD"
+    basket_size: 4
+    max_basket_size: 10
+    order_spacing_ms: 150
+    burst_timeout_seconds: 3.0
+    lot_step_balance: 50.0
+    min_lot: 0.01
+    max_lot: 0.50
+    micro_account_min_lot: 0.01
+    tp_usd_per_min_lot: 0.50
+    basket_tp_usd: 2.00
+    min_basket_tp_usd: 1.00
+    max_hold_seconds: 180
+    breakeven_urgency_seconds: 120
+    sl_points: 5000.0             # 5000 points = $50.00 price move on BTC (calibrated to BTC volatility)
+    spread_max_points: 3000.0     # 3000 points = $30.00 spread ceiling on BTC (~0.04% of BTC price)
+    fallback_lookback_ticks: 30
+    fallback_m1_candles: 5
+    fallback_momentum_period: 10
+
+# ------------------------------------------------------------------------------
+# 4. Global Account Risk Controls (Covers All Instruments)
+# ------------------------------------------------------------------------------
+risk:
+  max_open_positions: 12          # Hard account-wide ceiling across both instruments
+  max_total_lots: 1.00            # Hard aggregate volume ceiling
+  min_margin_level_pct: 300.0     # Minimum margin level % required before submitting any order
+  max_margin_usage_pct: 50.0      # Maximum % of free margin permitted for new order allocation
+  max_dd_pct: 30.0                # Hard stop: Maximum floating drawdown % relative to balance
+  pause_minutes: 60               # Duration in minutes to suspend trading upon drawdown breach
+  max_daily_loss_enabled: false
+  max_daily_loss_usd: 50.0
+  daily_profit_target_enabled: false
+  daily_profit_target_usd: 100.0
+  accounting_includes_floating: true
+
+# ------------------------------------------------------------------------------
+# 5. Emergency Kill Switch
+# ------------------------------------------------------------------------------
+kill_switch:
+  enabled: true
+  flag_file_path: "STOP.flag"     # Presence of this file triggers instantaneous liquidation & halt
+  cli_command_enabled: true
+  telegram_command_enabled: true
+  on_trigger_action: "CLOSE_ALL_AND_HALT"
+
+# ------------------------------------------------------------------------------
+# 6. Execution & Order Routing
+# ------------------------------------------------------------------------------
+execution:
+  order_type: "MARKET"
+  preferred_filling_mode: "AUTO"  # AUTO queries symbol_info().filling_mode
+  slippage_points: 25
+  max_retries: 3
+  retry_delay_ms: 100
+  rate_limit_per_second: 5
+
+# ------------------------------------------------------------------------------
+# 7. Logging & Diagnostics
+# ------------------------------------------------------------------------------
+logging:
+  log_level: "INFO"
+  log_file: "logs/dual_market_scalper.log"
+  log_basket_events: true
+  log_tick_frequency_sec: 10

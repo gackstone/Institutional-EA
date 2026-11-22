@@ -1,0 +1,69 @@
+{
+  "generated_at_utc": "2026-11-14T10:10:29.522524+00:00",
+  "instrument": "BTCUSD",
+  "resolved_symbol": "BTCUSD.m",
+  "schedule": "SATURDAY-SUNDAY",
+  "fast_mode_enabled": true,
+  "backtest_metrics": {
+    "symbol": "BTCUSD",
+    "number_of_trades": 117,
+    "winning_trades": 91,
+    "losing_trades": 26,
+    "net_profit_after_costs_usd": 164.17,
+    "profit_factor": 3.02,
+    "win_rate_pct": 77.78,
+    "average_win_usd": 2.7,
+    "average_loss_usd": -3.13,
+    "expectancy_usd": 1.403,
+    "maximum_drawdown_pct": 0.65,
+    "maximum_consecutive_losses": 2,
+    "average_holding_time_seconds": 57.3,
+    "maximum_holding_time_seconds": 161.0,
+    "spread_cost_usd": 12.76,
+    "commission_cost_usd": 0.0,
+    "slippage_cost_usd": 0.22,
+    "exposure_pct": 51.67,
+    "basket_completion_rate_pct": 100.0,
+    "reversal_performance": {
+      "reversals_executed": 14,
+      "reversal_win_rate_pct": 100.0,
+      "reversal_net_pnl_usd": 39.18
+    },
+    "rejected_orders": 1,
+    "requotes_handled": 3,
+    "winning_days": 6,
+    "losing_days": 0,
+    "chronological_splits": {
+      "training": {
+        "trades": 62,
+        "net_profit_usd": 87.73,
+        "win_rate_pct": 75.81,
+        "profit_factor": 2.82
+      },
+      "validation": {
+        "trades": 23,
+        "net_profit_usd": 30.13,
+        "win_rate_pct": 86.96,
+        "profit_factor": 4.85
+      },
+      "out_of_sample": {
+        "trades": 32,
+        "net_profit_usd": 46.31,
+        "win_rate_pct": 75.0,
+        "profit_factor": 2.84
+      }
+    },
+    "win_rate_realism_audit": {
+      "passed": true,
+      "status": "REALISTIC_DISTRIBUTION_CONFIRMED",
+      "win_rate_pct": 77.78
+    }
+  },
+  "demo_session_verification": {
+    "passed": true,
+    "initial_basket_positions": 4,
+    "baskets_opened": 2,
+    "baskets_closed": 1,
+    "realized_pnl_usd": 272.0
+  }
+}

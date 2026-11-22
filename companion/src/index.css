@@ -1,0 +1,167 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root, [data-theme="light"] {
+  /* Yardly Automotive Light Palette */
+  --arcade-bg: #F1F5F4;
+  --arcade-card: #FFFFFF;
+  --arcade-surface: #FFFFFF;
+  --arcade-surface-secondary: #F5F7F7;
+  --arcade-surface-tertiary: #DFE7E5;
+  --arcade-surface-hover: #F5F7F7;
+  --arcade-border: #DFE7E5;
+  --arcade-border-subtle: #EBF1F0;
+  --arcade-border-strong: #CBD6D4;
+  --arcade-text: #102A2A;
+  --arcade-text-secondary: #526579;
+  --arcade-text-muted: #6C7E8F;
+  --arcade-primary: #0057B8;
+  --arcade-primary-hover: #004694;
+  --arcade-primary-active: #003875;
+  --arcade-primary-soft: #E8F1FF;
+  --arcade-profit: #10B981;
+  --arcade-profit-soft: rgba(16, 185, 129, 0.12);
+  --arcade-loss: #EF4444;
+  --arcade-loss-soft: rgba(239, 68, 68, 0.12);
+  --arcade-error: #EF4444;
+  --arcade-error-soft: rgba(239, 68, 68, 0.12);
+  --arcade-warning: #F59E0B;
+  --arcade-warning-soft: rgba(245, 158, 11, 0.12);
+  --arcade-info: #0057B8;
+  --arcade-info-soft: #E8F1FF;
+
+  --scrollbar-track: #F1F5F4;
+  --scrollbar-thumb: #DFE7E5;
+  --scrollbar-thumb-hover: #CBD6D4;
+  --overlay-bg: rgba(16, 42, 42, 0.45);
+}
+
+.dark, [data-theme="dark"] {
+  /* Yardly Automotive Dark Palette */
+  --arcade-bg: #080A0B;
+  --arcade-card: #101112;
+  --arcade-surface: #101112;
+  --arcade-surface-secondary: #15191C;
+  --arcade-surface-tertiary: #1D2327;
+  --arcade-surface-hover: #181D21;
+  --arcade-border: #202629;
+  --arcade-border-subtle: #15191C;
+  --arcade-border-strong: #2D353A;
+  --arcade-text: #F5F7FA;
+  --arcade-text-secondary: #A6B2BD;
+  --arcade-text-muted: #768491;
+  --arcade-primary: #3284FF;
+  --arcade-primary-hover: #4F96FF;
+  --arcade-primary-active: #2672E0;
+  --arcade-primary-soft: #172B45;
+  --arcade-profit: #34D399;
+  --arcade-profit-soft: rgba(52, 211, 153, 0.15);
+  --arcade-loss: #F87171;
+  --arcade-loss-soft: rgba(248, 113, 113, 0.15);
+  --arcade-error: #F87171;
+  --arcade-error-soft: rgba(248, 113, 113, 0.15);
+  --arcade-warning: #FBBF24;
+  --arcade-warning-soft: rgba(251, 191, 36, 0.15);
+  --arcade-info: #3284FF;
+  --arcade-info-soft: #172B45;
+
+  --scrollbar-track: #080A0B;
+  --scrollbar-thumb: #202629;
+  --scrollbar-thumb-hover: #2D353A;
+  --overlay-bg: rgba(0, 0, 0, 0.75);
+}
+
+@layer base {
+  body {
+    background-color: var(--arcade-bg);
+    color: var(--arcade-text);
+    font-family: "Inter", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.015em;
+  }
+
+  code, pre, .font-mono, .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--arcade-primary);
+    outline-offset: 2px;
+  }
+}
+
+/* Yardly Component Styling */
+.yardly-glass {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--arcade-border);
+}
+
+.dark .yardly-glass {
+  background: rgba(16, 17, 18, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--arcade-border);
+}
+
+.yardly-card {
+  background-color: var(--arcade-card);
+  border: 1px solid var(--arcade-border);
+  border-radius: 0.875rem;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .yardly-card:hover {
+    border-color: var(--arcade-border-strong);
+  }
+}
+
+/* Yardly Animations */
+@keyframes yardly-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes yardly-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-yardly-fade {
+  animation: yardly-fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-yardly-slide {
+  animation: yardly-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}

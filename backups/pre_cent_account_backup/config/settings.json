@@ -1,0 +1,76 @@
+{
+  "execution_mode": "DEMO",
+  "LIVE_TRADING_ENABLED": false,
+  "LEGACY_FILTERS_ENABLED": false,
+  "TRADING_MODE": "CONTINUOUS_SCALPING",
+  "EXECUTION_TIMEFRAMES": [
+    "M1",
+    "M5"
+  ],
+  "CONTEXT_TIMEFRAMES": [
+    "M15",
+    "H1"
+  ],
+  "NEWS_FILTER_ENABLED": false,
+  "CONTINUOUS_SCANNING": true,
+  "ADAPTIVE_ENTRY_FILTERS": false,
+  "DYNAMIC_TAKE_PROFIT": true,
+  "BREAK_EVEN_ENABLED": true,
+  "BE_MOVE_MODE": "structure_only",
+  "TRAILING_STOP_ENABLED": true,
+  "PARTIAL_PROFIT_ENABLED": true,
+  "AUTO_RESCAN_AFTER_CLOSURE": true,
+  "MULTI_SYMBOL_EXECUTION": true,
+  "RISK_PROFILE": "ADAPTIVE_SCALPING",
+  "MAX_DAILY_LOSS_ENABLED": false,
+  "MAX_DRAWDOWN_PROTECTION_ENABLED": true,
+  "symbols": [
+    "XAUUSD",
+    "BTCUSD",
+    "USDJPY"
+  ],
+  "strict_three_symbol_universe": true,
+  "weekday_gold_mode_enabled": true,
+  "inverse_coordination_enabled": true,
+  "weekend_btc_mode_enabled": true,
+  "weekday_btc_fallback_enabled": false,
+  "primary_signal_timeframe": "M15",
+  "htf_timeframes": [
+    "W1",
+    "D1",
+    "H4",
+    "H1"
+  ],
+  "bridge_host": "127.0.0.1",
+  "bridge_port": 5555,
+  "bridge_sub_port": 5556,
+  "magic_number": 100101,
+  "symbol_magic_offsets": {
+    "XAUUSD": 1,
+    "USDJPY": 2,
+    "BTCUSD": 3,
+    "XAUUSD.m": 1,
+    "USDJPY.m": 2,
+    "BTCUSD.m": 3
+  },
+  "dry_run": false,
+  "log_level": "INFO",
+  "telegram_enabled": true,
+  "upgrade": {
+    "enabled": true,
+    "broker_adapter_enabled": true,
+    "feature_pipeline_enabled": true,
+    "modular_strategy_enabled": true,
+    "scbf_enabled": true,
+    "chart_visualization_enabled": false,
+    "ab_harness_enabled": false,
+    "meta_labeling_enabled": true,
+    "bridge_extensions_enabled": false,
+    "validation_gates_enabled": true
+  },
+  "arcadefx": {
+    "api_url": "https://arcadefx.live/api/v1",
+    "heartbeat_interval_seconds": 20,
+    "command_poll_interval_seconds": 3
+  }
+}

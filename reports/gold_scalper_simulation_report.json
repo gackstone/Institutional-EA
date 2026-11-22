@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-11-14T05:36:44.556172+00:00",
+  "environment": "MT5 DEMO Simulation (JustMarkets-Demo3, Login: 1200057798)",
+  "instrument": "XAUUSD.m",
+  "account_balance_start_usd": 1000.0,
+  "account_balance_end_usd": 1109.6,
+  "spread_points_assumption": 30.0,
+  "commission_per_lot_usd": 0.0,
+  "cycles_executed": 120,
+  "session_duration_minutes": 0.5,
+  "metrics": {
+    "total_trades": 32,
+    "trades_per_minute": 64.0,
+    "winning_trades": 32,
+    "losing_trades": 0,
+    "win_rate_percent": 100.0,
+    "average_winning_trade_usd": 3.42,
+    "average_losing_trade_usd": 0.0,
+    "gross_profit_usd": 109.6,
+    "gross_loss_usd": 0.0,
+    "net_profit_loss_usd": 109.6,
+    "maximum_floating_drawdown_percent": 0.0,
+    "maximum_open_positions": 4,
+    "rejected_orders": 0,
+    "rejection_reasons": {},
+    "average_holding_time_seconds": 0.5,
+    "baskets_opened": 9,
+    "baskets_closed": 8,
+    "basket_completion_rate_percent": 88.9
+  }
+}

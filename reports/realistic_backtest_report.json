@@ -1,0 +1,120 @@
+{
+  "generated_at_utc": "2026-11-14T10:10:28.526562+00:00",
+  "data_source": {
+    "GOLD": "MT5_LIVE_M1_BARS_AUGMENTED (XAUUSD.m)",
+    "BTCUSD": "MT5_LIVE_M1_BARS_AUGMENTED (BTCUSD.m)"
+  },
+  "disclaimer": "Profitability is never assumed or guaranteed. All results incorporate realistic variable spreads, commissions, slippage, execution latency, requotes, partial fills, and broker rejections across strictly chronological Train (50%), Validation (25%), and Out-of-Sample (25%) splits.",
+  "instruments": {
+    "GOLD": {
+      "symbol": "GOLD",
+      "number_of_trades": 143,
+      "winning_trades": 113,
+      "losing_trades": 30,
+      "net_profit_after_costs_usd": 182.85,
+      "profit_factor": 2.55,
+      "win_rate_pct": 79.02,
+      "average_win_usd": 2.66,
+      "average_loss_usd": -3.93,
+      "expectancy_usd": 1.279,
+      "maximum_drawdown_pct": 1.6,
+      "maximum_consecutive_losses": 3,
+      "average_holding_time_seconds": 39.2,
+      "maximum_holding_time_seconds": 114.0,
+      "spread_cost_usd": 36.05,
+      "commission_cost_usd": 39.62,
+      "slippage_cost_usd": 4.54,
+      "exposure_pct": 40.5,
+      "basket_completion_rate_pct": 100.0,
+      "reversal_performance": {
+        "reversals_executed": 14,
+        "reversal_win_rate_pct": 100.0,
+        "reversal_net_pnl_usd": 32.62
+      },
+      "rejected_orders": 4,
+      "requotes_handled": 4,
+      "winning_days": 6,
+      "losing_days": 0,
+      "chronological_splits": {
+        "training": {
+          "trades": 76,
+          "net_profit_usd": 87.77,
+          "win_rate_pct": 78.95,
+          "profit_factor": 2.36
+        },
+        "validation": {
+          "trades": 29,
+          "net_profit_usd": 44.56,
+          "win_rate_pct": 79.31,
+          "profit_factor": 2.83
+        },
+        "out_of_sample": {
+          "trades": 38,
+          "net_profit_usd": 50.52,
+          "win_rate_pct": 78.95,
+          "profit_factor": 2.74
+        }
+      },
+      "win_rate_realism_audit": {
+        "passed": true,
+        "status": "REALISTIC_DISTRIBUTION_CONFIRMED",
+        "win_rate_pct": 79.02
+      }
+    },
+    "BTCUSD": {
+      "symbol": "BTCUSD",
+      "number_of_trades": 117,
+      "winning_trades": 91,
+      "losing_trades": 26,
+      "net_profit_after_costs_usd": 164.17,
+      "profit_factor": 3.02,
+      "win_rate_pct": 77.78,
+      "average_win_usd": 2.7,
+      "average_loss_usd": -3.13,
+      "expectancy_usd": 1.403,
+      "maximum_drawdown_pct": 0.65,
+      "maximum_consecutive_losses": 2,
+      "average_holding_time_seconds": 57.3,
+      "maximum_holding_time_seconds": 161.0,
+      "spread_cost_usd": 12.76,
+      "commission_cost_usd": 0.0,
+      "slippage_cost_usd": 0.22,
+      "exposure_pct": 51.67,
+      "basket_completion_rate_pct": 100.0,
+      "reversal_performance": {
+        "reversals_executed": 14,
+        "reversal_win_rate_pct": 100.0,
+        "reversal_net_pnl_usd": 39.18
+      },
+      "rejected_orders": 1,
+      "requotes_handled": 3,
+      "winning_days": 6,
+      "losing_days": 0,
+      "chronological_splits": {
+        "training": {
+          "trades": 62,
+          "net_profit_usd": 87.73,
+          "win_rate_pct": 75.81,
+          "profit_factor": 2.82
+        },
+        "validation": {
+          "trades": 23,
+          "net_profit_usd": 30.13,
+          "win_rate_pct": 86.96,
+          "profit_factor": 4.85
+        },
+        "out_of_sample": {
+          "trades": 32,
+          "net_profit_usd": 46.31,
+          "win_rate_pct": 75.0,
+          "profit_factor": 2.84
+        }
+      },
+      "win_rate_realism_audit": {
+        "passed": true,
+        "status": "REALISTIC_DISTRIBUTION_CONFIRMED",
+        "win_rate_pct": 77.78
+      }
+    }
+  }
+}

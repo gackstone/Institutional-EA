@@ -1,0 +1,2241 @@
+{
+  "generated_at": "2026-11-08T15:48:31.861107+00:00",
+  "dataset": {
+    "period": "2024-01-01 to 2026-06-30 (2.5 years)",
+    "in_sample_period": "2024-01-01 to 2024-12-31",
+    "out_of_sample_period": "2025-01-01 to 2026-06-30",
+    "symbols": [
+      "EURUSD",
+      "GBPUSD",
+      "USDJPY",
+      "XAUUSD"
+    ],
+    "total_candidate_events": 1748,
+    "in_sample_events": 685,
+    "out_of_sample_events": 1063
+  },
+  "full_sample_metrics": {
+    "00_Baseline_All_Gates_OFF": {
+      "trades": 1748,
+      "win_rate_pct": 21.28,
+      "avg_rr": 2.15,
+      "expectancy_r": -0.435,
+      "profit_factor": 0.51,
+      "net_r": -760.78,
+      "max_drawdown_pct": 99.96,
+      "longest_losing_streak": 30,
+      "sessions": {
+        "LONDON": {
+          "trades": 614,
+          "win_rate_pct": 21.2,
+          "expectancy_r": -0.437,
+          "profit_factor": 0.5
+        },
+        "OVERLAP": {
+          "trades": 502,
+          "win_rate_pct": 20.5,
+          "expectancy_r": -0.462,
+          "profit_factor": 0.48
+        },
+        "NEW_YORK": {
+          "trades": 397,
+          "win_rate_pct": 23.2,
+          "expectancy_r": -0.374,
+          "profit_factor": 0.56
+        },
+        "ASIA": {
+          "trades": 235,
+          "win_rate_pct": 20.0,
+          "expectancy_r": -0.475,
+          "profit_factor": 0.47
+        }
+      }
+    },
+    "01_SingleGate_G1_Structure_Only": {
+      "trades": 1171,
+      "win_rate_pct": 29.29,
+      "avg_rr": 2.16,
+      "expectancy_r": -0.179,
+      "profit_factor": 0.77,
+      "net_r": -209.8,
+      "max_drawdown_pct": 89.8,
+      "longest_losing_streak": 20,
+      "sessions": {
+        "LONDON": {
+          "trades": 421,
+          "win_rate_pct": 29.5,
+          "expectancy_r": -0.168,
+          "profit_factor": 0.79
+        },
+        "OVERLAP": {
+          "trades": 322,
+          "win_rate_pct": 28.3,
+          "expectancy_r": -0.215,
+          "profit_factor": 0.73
+        },
+        "NEW_YORK": {
+          "trades": 271,
+          "win_rate_pct": 31.7,
+          "expectancy_r": -0.105,
+          "profit_factor": 0.86
+        },
+        "ASIA": {
+          "trades": 157,
+          "win_rate_pct": 26.8,
+          "expectancy_r": -0.265,
+          "profit_factor": 0.68
+        }
+      }
+    },
+    "02_SingleGate_G2_PD_Zone_Only": {
+      "trades": 955,
+      "win_rate_pct": 18.53,
+      "avg_rr": 2.17,
+      "expectancy_r": -0.522,
+      "profit_factor": 0.43,
+      "net_r": -498.28,
+      "max_drawdown_pct": 99.37,
+      "longest_losing_streak": 30,
+      "sessions": {
+        "LONDON": {
+          "trades": 328,
+          "win_rate_pct": 18.6,
+          "expectancy_r": -0.525,
+          "profit_factor": 0.42
+        },
+        "OVERLAP": {
+          "trades": 281,
+          "win_rate_pct": 16.7,
+          "expectancy_r": -0.573,
+          "profit_factor": 0.39
+        },
+        "NEW_YORK": {
+          "trades": 217,
+          "win_rate_pct": 20.7,
+          "expectancy_r": -0.452,
+          "profit_factor": 0.49
+        },
+        "ASIA": {
+          "trades": 129,
+          "win_rate_pct": 18.6,
+          "expectancy_r": -0.519,
+          "profit_factor": 0.43
+        }
+      }
+    },
+    "03_SingleGate_G3_Sweep_Only": {
+      "trades": 1321,
+      "win_rate_pct": 25.28,
+      "avg_rr": 2.15,
+      "expectancy_r": -0.308,
+      "profit_factor": 0.63,
+      "net_r": -407.39,
+      "max_drawdown_pct": 98.55,
+      "longest_losing_streak": 25,
+      "sessions": {
+        "LONDON": {
+          "trades": 459,
+          "win_rate_pct": 25.1,
+          "expectancy_r": -0.313,
+          "profit_factor": 0.63
+        },
+        "OVERLAP": {
+          "trades": 379,
+          "win_rate_pct": 24.0,
+          "expectancy_r": -0.353,
+          "profit_factor": 0.58
+        },
+        "NEW_YORK": {
+          "trades": 307,
+          "win_rate_pct": 27.4,
+          "expectancy_r": -0.241,
+          "profit_factor": 0.7
+        },
+        "ASIA": {
+          "trades": 176,
+          "win_rate_pct": 25.0,
+          "expectancy_r": -0.316,
+          "profit_factor": 0.62
+        }
+      }
+    },
+    "04_SingleGate_G4_POI_Quality_Only": {
+      "trades": 1325,
+      "win_rate_pct": 23.85,
+      "avg_rr": 2.15,
+      "expectancy_r": -0.355,
+      "profit_factor": 0.58,
+      "net_r": -469.82,
+      "max_drawdown_pct": 99.23,
+      "longest_losing_streak": 21,
+      "sessions": {
+        "LONDON": {
+          "trades": 456,
+          "win_rate_pct": 23.9,
+          "expectancy_r": -0.354,
+          "profit_factor": 0.58
+        },
+        "OVERLAP": {
+          "trades": 387,
+          "win_rate_pct": 22.7,
+          "expectancy_r": -0.389,
+          "profit_factor": 0.55
+        },
+        "NEW_YORK": {
+          "trades": 303,
+          "win_rate_pct": 26.4,
+          "expectancy_r": -0.276,
+          "profit_factor": 0.67
+        },
+        "ASIA": {
+          "trades": 179,
+          "win_rate_pct": 21.8,
+          "expectancy_r": -0.414,
+          "profit_factor": 0.53
+        }
+      }
+    },
+    "05_SingleGate_G5_LTF_Confirm_Only": {
+      "trades": 1337,
+      "win_rate_pct": 22.66,
+      "avg_rr": 2.15,
+      "expectancy_r": -0.395,
+      "profit_factor": 0.54,
+      "net_r": -528.31,
+      "max_drawdown_pct": 99.57,
+      "longest_losing_streak": 27,
+      "sessions": {
+        "LONDON": {
+          "trades": 455,
+          "win_rate_pct": 22.9,
+          "expectancy_r": -0.382,
+          "profit_factor": 0.56
+        },
+        "OVERLAP": {
+          "trades": 389,
+          "win_rate_pct": 20.8,
+          "expectancy_r": -0.459,
+          "profit_factor": 0.48
+        },
+        "NEW_YORK": {
+          "trades": 312,
+          "win_rate_pct": 25.0,
+          "expectancy_r": -0.321,
+          "profit_factor": 0.62
+        },
+        "ASIA": {
+          "trades": 181,
+          "win_rate_pct": 22.1,
+          "expectancy_r": -0.418,
+          "profit_factor": 0.52
+        }
+      }
+    },
+    "06_SingleGate_G6_HTF_Align_Only": {
+      "trades": 1141,
+      "win_rate_pct": 29.01,
+      "avg_rr": 2.16,
+      "expectancy_r": -0.187,
+      "profit_factor": 0.77,
+      "net_r": -213.06,
+      "max_drawdown_pct": 89.98,
+      "longest_losing_streak": 15,
+      "sessions": {
+        "LONDON": {
+          "trades": 393,
+          "win_rate_pct": 28.0,
+          "expectancy_r": -0.214,
+          "profit_factor": 0.74
+        },
+        "OVERLAP": {
+          "trades": 315,
+          "win_rate_pct": 29.8,
+          "expectancy_r": -0.164,
+          "profit_factor": 0.79
+        },
+        "NEW_YORK": {
+          "trades": 266,
+          "win_rate_pct": 31.6,
+          "expectancy_r": -0.108,
+          "profit_factor": 0.86
+        },
+        "ASIA": {
+          "trades": 167,
+          "win_rate_pct": 25.7,
+          "expectancy_r": -0.292,
+          "profit_factor": 0.65
+        }
+      }
+    },
+    "07_SingleGate_G7_Stops_RR_Only": {
+      "trades": 905,
+      "win_rate_pct": 26.41,
+      "avg_rr": 2.37,
+      "expectancy_r": -0.232,
+      "profit_factor": 0.72,
+      "net_r": -210.02,
+      "max_drawdown_pct": 89.06,
+      "longest_losing_streak": 24,
+      "sessions": {
+        "LONDON": {
+          "trades": 320,
+          "win_rate_pct": 26.9,
+          "expectancy_r": -0.209,
+          "profit_factor": 0.74
+        },
+        "OVERLAP": {
+          "trades": 258,
+          "win_rate_pct": 25.2,
+          "expectancy_r": -0.275,
+          "profit_factor": 0.67
+        },
+        "NEW_YORK": {
+          "trades": 200,
+          "win_rate_pct": 28.0,
+          "expectancy_r": -0.187,
+          "profit_factor": 0.77
+        },
+        "ASIA": {
+          "trades": 127,
+          "win_rate_pct": 25.2,
+          "expectancy_r": -0.274,
+          "profit_factor": 0.67
+        }
+      }
+    },
+    "08_All_Gates_ON_G1_to_G8": {
+      "trades": 108,
+      "win_rate_pct": 50.93,
+      "avg_rr": 2.38,
+      "expectancy_r": 0.581,
+      "profit_factor": 2.06,
+      "net_r": 62.74,
+      "max_drawdown_pct": 6.53,
+      "longest_losing_streak": 6,
+      "sessions": {
+        "LONDON": {
+          "trades": 30,
+          "win_rate_pct": 53.3,
+          "expectancy_r": 0.683,
+          "profit_factor": 2.31
+        },
+        "OVERLAP": {
+          "trades": 28,
+          "win_rate_pct": 46.4,
+          "expectancy_r": 0.453,
+          "profit_factor": 1.76
+        },
+        "NEW_YORK": {
+          "trades": 31,
+          "win_rate_pct": 51.6,
+          "expectancy_r": 0.542,
+          "profit_factor": 2.0
+        },
+        "ASIA": {
+          "trades": 19,
+          "win_rate_pct": 52.6,
+          "expectancy_r": 0.672,
+          "profit_factor": 2.27
+        }
+      }
+    },
+    "09_Ablate_G1_No_Structure_Gate": {
+      "trades": 131,
+      "win_rate_pct": 46.56,
+      "avg_rr": 2.37,
+      "expectancy_r": 0.434,
+      "profit_factor": 1.73,
+      "net_r": 56.88,
+      "max_drawdown_pct": 7.35,
+      "longest_losing_streak": 6,
+      "sessions": {
+        "LONDON": {
+          "trades": 38,
+          "win_rate_pct": 47.4,
+          "expectancy_r": 0.469,
+          "profit_factor": 1.8
+        },
+        "OVERLAP": {
+          "trades": 37,
+          "win_rate_pct": 40.5,
+          "expectancy_r": 0.256,
+          "profit_factor": 1.38
+        },
+        "NEW_YORK": {
+          "trades": 33,
+          "win_rate_pct": 51.5,
+          "expectancy_r": 0.54,
+          "profit_factor": 2.0
+        },
+        "ASIA": {
+          "trades": 23,
+          "win_rate_pct": 47.8,
+          "expectancy_r": 0.512,
+          "profit_factor": 1.88
+        }
+      }
+    },
+    "10_Ablate_G2_No_PD_Zone_Gate": {
+      "trades": 206,
+      "win_rate_pct": 53.4,
+      "avg_rr": 2.36,
+      "expectancy_r": 0.661,
+      "profit_factor": 2.27,
+      "net_r": 136.22,
+      "max_drawdown_pct": 6.13,
+      "longest_losing_streak": 4,
+      "sessions": {
+        "LONDON": {
+          "trades": 70,
+          "win_rate_pct": 54.3,
+          "expectancy_r": 0.727,
+          "profit_factor": 2.42
+        },
+        "OVERLAP": {
+          "trades": 56,
+          "win_rate_pct": 51.8,
+          "expectancy_r": 0.581,
+          "profit_factor": 2.08
+        },
+        "NEW_YORK": {
+          "trades": 53,
+          "win_rate_pct": 50.9,
+          "expectancy_r": 0.568,
+          "profit_factor": 2.03
+        },
+        "ASIA": {
+          "trades": 27,
+          "win_rate_pct": 59.3,
+          "expectancy_r": 0.842,
+          "profit_factor": 2.84
+        }
+      }
+    },
+    "11_Ablate_G3_No_Sweep_Gate": {
+      "trades": 139,
+      "win_rate_pct": 46.76,
+      "avg_rr": 2.37,
+      "expectancy_r": 0.436,
+      "profit_factor": 1.73,
+      "net_r": 60.62,
+      "max_drawdown_pct": 6.54,
+      "longest_losing_streak": 6,
+      "sessions": {
+        "LONDON": {
+          "trades": 40,
+          "win_rate_pct": 47.5,
+          "expectancy_r": 0.475,
+          "profit_factor": 1.81
+        },
+        "OVERLAP": {
+          "trades": 39,
+          "win_rate_pct": 46.2,
+          "expectancy_r": 0.434,
+          "profit_factor": 1.72
+        },
+        "NEW_YORK": {
+          "trades": 34,
+          "win_rate_pct": 52.9,
+          "expectancy_r": 0.58,
+          "profit_factor": 2.1
+        },
+        "ASIA": {
+          "trades": 26,
+          "win_rate_pct": 38.5,
+          "expectancy_r": 0.19,
+          "profit_factor": 1.28
+        }
+      }
+    },
+    "12_Ablate_G4_No_POI_Quality_Gate": {
+      "trades": 138,
+      "win_rate_pct": 44.2,
+      "avg_rr": 2.39,
+      "expectancy_r": 0.356,
+      "profit_factor": 1.57,
+      "net_r": 49.06,
+      "max_drawdown_pct": 8.61,
+      "longest_losing_streak": 8,
+      "sessions": {
+        "LONDON": {
+          "trades": 43,
+          "win_rate_pct": 37.2,
+          "expectancy_r": 0.138,
+          "profit_factor": 1.2
+        },
+        "OVERLAP": {
+          "trades": 38,
+          "win_rate_pct": 42.1,
+          "expectancy_r": 0.305,
+          "profit_factor": 1.47
+        },
+        "NEW_YORK": {
+          "trades": 36,
+          "win_rate_pct": 50.0,
+          "expectancy_r": 0.499,
+          "profit_factor": 1.89
+        },
+        "ASIA": {
+          "trades": 21,
+          "win_rate_pct": 52.4,
+          "expectancy_r": 0.647,
+          "profit_factor": 2.21
+        }
+      }
+    },
+    "13_Ablate_G5_No_LTF_Confirm_Gate": {
+      "trades": 142,
+      "win_rate_pct": 47.89,
+      "avg_rr": 2.37,
+      "expectancy_r": 0.475,
+      "profit_factor": 1.81,
+      "net_r": 67.48,
+      "max_drawdown_pct": 6.85,
+      "longest_losing_streak": 5,
+      "sessions": {
+        "LONDON": {
+          "trades": 40,
+          "win_rate_pct": 50.0,
+          "expectancy_r": 0.547,
+          "profit_factor": 1.98
+        },
+        "OVERLAP": {
+          "trades": 39,
+          "win_rate_pct": 41.0,
+          "expectancy_r": 0.28,
+          "profit_factor": 1.42
+        },
+        "NEW_YORK": {
+          "trades": 36,
+          "win_rate_pct": 52.8,
+          "expectancy_r": 0.591,
+          "profit_factor": 2.12
+        },
+        "ASIA": {
+          "trades": 27,
+          "win_rate_pct": 48.1,
+          "expectancy_r": 0.495,
+          "profit_factor": 1.85
+        }
+      }
+    },
+    "14_Ablate_G6_No_HTF_Align_Gate": {
+      "trades": 144,
+      "win_rate_pct": 45.83,
+      "avg_rr": 2.37,
+      "expectancy_r": 0.416,
+      "profit_factor": 1.69,
+      "net_r": 59.88,
+      "max_drawdown_pct": 7.9,
+      "longest_losing_streak": 7,
+      "sessions": {
+        "LONDON": {
+          "trades": 44,
+          "win_rate_pct": 52.3,
+          "expectancy_r": 0.65,
+          "profit_factor": 2.22
+        },
+        "OVERLAP": {
+          "trades": 41,
+          "win_rate_pct": 36.6,
+          "expectancy_r": 0.134,
+          "profit_factor": 1.19
+        },
+        "NEW_YORK": {
+          "trades": 36,
+          "win_rate_pct": 50.0,
+          "expectancy_r": 0.486,
+          "profit_factor": 1.87
+        },
+        "ASIA": {
+          "trades": 23,
+          "win_rate_pct": 43.5,
+          "expectancy_r": 0.361,
+          "profit_factor": 1.57
+        }
+      }
+    },
+    "15_Ablate_G7_No_Stops_RR_Gate": {
+      "trades": 205,
+      "win_rate_pct": 40.49,
+      "avg_rr": 2.15,
+      "expectancy_r": 0.175,
+      "profit_factor": 1.26,
+      "net_r": 35.87,
+      "max_drawdown_pct": 14.19,
+      "longest_losing_streak": 8,
+      "sessions": {
+        "LONDON": {
+          "trades": 64,
+          "win_rate_pct": 40.6,
+          "expectancy_r": 0.166,
+          "profit_factor": 1.25
+        },
+        "OVERLAP": {
+          "trades": 49,
+          "win_rate_pct": 36.7,
+          "expectancy_r": 0.08,
+          "profit_factor": 1.11
+        },
+        "NEW_YORK": {
+          "trades": 65,
+          "win_rate_pct": 40.0,
+          "expectancy_r": 0.144,
+          "profit_factor": 1.21
+        },
+        "ASIA": {
+          "trades": 27,
+          "win_rate_pct": 48.1,
+          "expectancy_r": 0.443,
+          "profit_factor": 1.76
+        }
+      }
+    },
+    "16_Recommended_Enforce_G1_G3_to_G8_Shadow_G2": {
+      "trades": 206,
+      "win_rate_pct": 53.4,
+      "avg_rr": 2.36,
+      "expectancy_r": 0.661,
+      "profit_factor": 2.27,
+      "net_r": 136.22,
+      "max_drawdown_pct": 6.13,
+      "longest_losing_streak": 4,
+      "sessions": {
+        "LONDON": {
+          "trades": 70,
+          "win_rate_pct": 54.3,
+          "expectancy_r": 0.727,
+          "profit_factor": 2.42
+        },
+        "OVERLAP": {
+          "trades": 56,
+          "win_rate_pct": 51.8,
+          "expectancy_r": 0.581,
+          "profit_factor": 2.08
+        },
+        "NEW_YORK": {
+          "trades": 53,
+          "win_rate_pct": 50.9,
+          "expectancy_r": 0.568,
+          "profit_factor": 2.03
+        },
+        "ASIA": {
+          "trades": 27,
+          "win_rate_pct": 59.3,
+          "expectancy_r": 0.842,
+          "profit_factor": 2.84
+        }
+      }
+    }
+  },
+  "in_sample_metrics": {
+    "00_Baseline_All_Gates_OFF": {
+      "trades": 685,
+      "win_rate_pct": 20.44,
+      "avg_rr": 2.14,
+      "expectancy_r": -0.468,
+      "profit_factor": 0.47,
+      "net_r": -320.41,
+      "max_drawdown_pct": 96.28,
+      "longest_losing_streak": 30,
+      "sessions": {
+        "LONDON": {
+          "trades": 244,
+          "win_rate_pct": 20.1,
+          "expectancy_r": -0.478,
+          "profit_factor": 0.47
+        },
+        "OVERLAP": {
+          "trades": 184,
+          "win_rate_pct": 19.0,
+          "expectancy_r": -0.512,
+          "profit_factor": 0.44
+        },
+        "NEW_YORK": {
+          "trades": 177,
+          "win_rate_pct": 24.3,
+          "expectancy_r": -0.351,
+          "profit_factor": 0.59
+        },
+        "ASIA": {
+          "trades": 80,
+          "win_rate_pct": 16.2,
+          "expectancy_r": -0.595,
+          "profit_factor": 0.37
+        }
+      }
+    },
+    "01_SingleGate_G1_Structure_Only": {
+      "trades": 452,
+      "win_rate_pct": 28.1,
+      "avg_rr": 2.13,
+      "expectancy_r": -0.23,
+      "profit_factor": 0.71,
+      "net_r": -104.05,
+      "max_drawdown_pct": 67.84,
+      "longest_losing_streak": 20,
+      "sessions": {
+        "LONDON": {
+          "trades": 166,
+          "win_rate_pct": 28.3,
+          "expectancy_r": -0.214,
+          "profit_factor": 0.73
+        },
+        "OVERLAP": {
+          "trades": 111,
+          "win_rate_pct": 26.1,
+          "expectancy_r": -0.298,
+          "profit_factor": 0.64
+        },
+        "NEW_YORK": {
+          "trades": 121,
+          "win_rate_pct": 32.2,
+          "expectancy_r": -0.116,
+          "profit_factor": 0.85
+        },
+        "ASIA": {
+          "trades": 54,
+          "win_rate_pct": 22.2,
+          "expectancy_r": -0.398,
+          "profit_factor": 0.54
+        }
+      }
+    },
+    "02_SingleGate_G2_PD_Zone_Only": {
+      "trades": 379,
+      "win_rate_pct": 16.36,
+      "avg_rr": 2.16,
+      "expectancy_r": -0.59,
+      "profit_factor": 0.37,
+      "net_r": -223.69,
+      "max_drawdown_pct": 89.68,
+      "longest_losing_streak": 30,
+      "sessions": {
+        "LONDON": {
+          "trades": 127,
+          "win_rate_pct": 15.0,
+          "expectancy_r": -0.64,
+          "profit_factor": 0.33
+        },
+        "OVERLAP": {
+          "trades": 105,
+          "win_rate_pct": 12.4,
+          "expectancy_r": -0.707,
+          "profit_factor": 0.28
+        },
+        "NEW_YORK": {
+          "trades": 102,
+          "win_rate_pct": 21.6,
+          "expectancy_r": -0.434,
+          "profit_factor": 0.51
+        },
+        "ASIA": {
+          "trades": 45,
+          "win_rate_pct": 17.8,
+          "expectancy_r": -0.533,
+          "profit_factor": 0.42
+        }
+      }
+    },
+    "03_SingleGate_G3_Sweep_Only": {
+      "trades": 517,
+      "win_rate_pct": 25.15,
+      "avg_rr": 2.14,
+      "expectancy_r": -0.322,
+      "profit_factor": 0.62,
+      "net_r": -166.34,
+      "max_drawdown_pct": 82.64,
+      "longest_losing_streak": 25,
+      "sessions": {
+        "LONDON": {
+          "trades": 179,
+          "win_rate_pct": 25.1,
+          "expectancy_r": -0.318,
+          "profit_factor": 0.62
+        },
+        "OVERLAP": {
+          "trades": 143,
+          "win_rate_pct": 21.7,
+          "expectancy_r": -0.433,
+          "profit_factor": 0.51
+        },
+        "NEW_YORK": {
+          "trades": 136,
+          "win_rate_pct": 30.1,
+          "expectancy_r": -0.173,
+          "profit_factor": 0.78
+        },
+        "ASIA": {
+          "trades": 59,
+          "win_rate_pct": 22.0,
+          "expectancy_r": -0.408,
+          "profit_factor": 0.53
+        }
+      }
+    },
+    "04_SingleGate_G4_POI_Quality_Only": {
+      "trades": 513,
+      "win_rate_pct": 22.61,
+      "avg_rr": 2.14,
+      "expectancy_r": -0.398,
+      "profit_factor": 0.54,
+      "net_r": -204.34,
+      "max_drawdown_pct": 87.99,
+      "longest_losing_streak": 21,
+      "sessions": {
+        "LONDON": {
+          "trades": 174,
+          "win_rate_pct": 23.0,
+          "expectancy_r": -0.387,
+          "profit_factor": 0.55
+        },
+        "OVERLAP": {
+          "trades": 141,
+          "win_rate_pct": 19.9,
+          "expectancy_r": -0.483,
+          "profit_factor": 0.46
+        },
+        "NEW_YORK": {
+          "trades": 134,
+          "win_rate_pct": 27.6,
+          "expectancy_r": -0.253,
+          "profit_factor": 0.69
+        },
+        "ASIA": {
+          "trades": 64,
+          "win_rate_pct": 17.2,
+          "expectancy_r": -0.546,
+          "profit_factor": 0.41
+        }
+      }
+    },
+    "05_SingleGate_G5_LTF_Confirm_Only": {
+      "trades": 541,
+      "win_rate_pct": 21.44,
+      "avg_rr": 2.14,
+      "expectancy_r": -0.441,
+      "profit_factor": 0.5,
+      "net_r": -238.38,
+      "max_drawdown_pct": 91.55,
+      "longest_losing_streak": 27,
+      "sessions": {
+        "LONDON": {
+          "trades": 183,
+          "win_rate_pct": 20.8,
+          "expectancy_r": -0.456,
+          "profit_factor": 0.49
+        },
+        "OVERLAP": {
+          "trades": 149,
+          "win_rate_pct": 18.1,
+          "expectancy_r": -0.546,
+          "profit_factor": 0.4
+        },
+        "NEW_YORK": {
+          "trades": 146,
+          "win_rate_pct": 26.7,
+          "expectancy_r": -0.282,
+          "profit_factor": 0.66
+        },
+        "ASIA": {
+          "trades": 63,
+          "win_rate_pct": 19.0,
+          "expectancy_r": -0.513,
+          "profit_factor": 0.43
+        }
+      }
+    },
+    "06_SingleGate_G6_HTF_Align_Only": {
+      "trades": 452,
+      "win_rate_pct": 27.88,
+      "avg_rr": 2.14,
+      "expectancy_r": -0.232,
+      "profit_factor": 0.71,
+      "net_r": -104.96,
+      "max_drawdown_pct": 68.05,
+      "longest_losing_streak": 15,
+      "sessions": {
+        "LONDON": {
+          "trades": 156,
+          "win_rate_pct": 25.6,
+          "expectancy_r": -0.297,
+          "profit_factor": 0.64
+        },
+        "OVERLAP": {
+          "trades": 115,
+          "win_rate_pct": 27.8,
+          "expectancy_r": -0.235,
+          "profit_factor": 0.71
+        },
+        "NEW_YORK": {
+          "trades": 120,
+          "win_rate_pct": 34.2,
+          "expectancy_r": -0.045,
+          "profit_factor": 0.94
+        },
+        "ASIA": {
+          "trades": 61,
+          "win_rate_pct": 21.3,
+          "expectancy_r": -0.431,
+          "profit_factor": 0.51
+        }
+      }
+    },
+    "07_SingleGate_G7_Stops_RR_Only": {
+      "trades": 339,
+      "win_rate_pct": 26.25,
+      "avg_rr": 2.37,
+      "expectancy_r": -0.238,
+      "profit_factor": 0.71,
+      "net_r": -80.59,
+      "max_drawdown_pct": 58.19,
+      "longest_losing_streak": 20,
+      "sessions": {
+        "LONDON": {
+          "trades": 122,
+          "win_rate_pct": 27.0,
+          "expectancy_r": -0.204,
+          "profit_factor": 0.75
+        },
+        "OVERLAP": {
+          "trades": 92,
+          "win_rate_pct": 21.7,
+          "expectancy_r": -0.396,
+          "profit_factor": 0.55
+        },
+        "NEW_YORK": {
+          "trades": 86,
+          "win_rate_pct": 31.4,
+          "expectancy_r": -0.075,
+          "profit_factor": 0.9
+        },
+        "ASIA": {
+          "trades": 39,
+          "win_rate_pct": 23.1,
+          "expectancy_r": -0.33,
+          "profit_factor": 0.62
+        }
+      }
+    },
+    "08_All_Gates_ON_G1_to_G8": {
+      "trades": 43,
+      "win_rate_pct": 51.16,
+      "avg_rr": 2.32,
+      "expectancy_r": 0.56,
+      "profit_factor": 2.02,
+      "net_r": 24.07,
+      "max_drawdown_pct": 3.98,
+      "longest_losing_streak": 3,
+      "sessions": {
+        "LONDON": {
+          "trades": 8,
+          "win_rate_pct": 50.0,
+          "expectancy_r": 0.581,
+          "profit_factor": 2.04
+        },
+        "OVERLAP": {
+          "trades": 7,
+          "win_rate_pct": 0.0,
+          "expectancy_r": -1.121,
+          "profit_factor": 0.0
+        },
+        "NEW_YORK": {
+          "trades": 18,
+          "win_rate_pct": 61.1,
+          "expectancy_r": 0.807,
+          "profit_factor": 2.85
+        },
+        "ASIA": {
+          "trades": 10,
+          "win_rate_pct": 70.0,
+          "expectancy_r": 1.275,
+          "profit_factor": 4.79
+        }
+      }
+    },
+    "09_Ablate_G1_No_Structure_Gate": {
+      "trades": 51,
+      "win_rate_pct": 47.06,
+      "avg_rr": 2.33,
+      "expectancy_r": 0.434,
+      "profit_factor": 1.73,
+      "net_r": 22.16,
+      "max_drawdown_pct": 6.13,
+      "longest_losing_streak": 4,
+      "sessions": {
+        "LONDON": {
+          "trades": 9,
+          "win_rate_pct": 44.4,
+          "expectancy_r": 0.392,
+          "profit_factor": 1.63
+        },
+        "OVERLAP": {
+          "trades": 11,
+          "win_rate_pct": 9.1,
+          "expectancy_r": -0.776,
+          "profit_factor": 0.24
+        },
+        "NEW_YORK": {
+          "trades": 20,
+          "win_rate_pct": 60.0,
+          "expectancy_r": 0.777,
+          "profit_factor": 2.74
+        },
+        "ASIA": {
+          "trades": 11,
+          "win_rate_pct": 63.6,
+          "expectancy_r": 1.057,
+          "profit_factor": 3.59
+        }
+      }
+    },
+    "10_Ablate_G2_No_PD_Zone_Gate": {
+      "trades": 83,
+      "win_rate_pct": 55.42,
+      "avg_rr": 2.31,
+      "expectancy_r": 0.711,
+      "profit_factor": 2.42,
+      "net_r": 59.01,
+      "max_drawdown_pct": 6.13,
+      "longest_losing_streak": 4,
+      "sessions": {
+        "LONDON": {
+          "trades": 27,
+          "win_rate_pct": 59.3,
+          "expectancy_r": 0.902,
+          "profit_factor": 2.98
+        },
+        "OVERLAP": {
+          "trades": 16,
+          "win_rate_pct": 37.5,
+          "expectancy_r": 0.05,
+          "profit_factor": 1.07
+        },
+        "NEW_YORK": {
+          "trades": 27,
+          "win_rate_pct": 59.3,
+          "expectancy_r": 0.793,
+          "profit_factor": 2.74
+        },
+        "ASIA": {
+          "trades": 13,
+          "win_rate_pct": 61.5,
+          "expectancy_r": 0.957,
+          "profit_factor": 3.22
+        }
+      }
+    },
+    "11_Ablate_G3_No_Sweep_Gate": {
+      "trades": 56,
+      "win_rate_pct": 44.64,
+      "avg_rr": 2.33,
+      "expectancy_r": 0.353,
+      "profit_factor": 1.57,
+      "net_r": 19.76,
+      "max_drawdown_pct": 6.53,
+      "longest_losing_streak": 6,
+      "sessions": {
+        "LONDON": {
+          "trades": 11,
+          "win_rate_pct": 45.5,
+          "expectancy_r": 0.412,
+          "profit_factor": 1.67
+        },
+        "OVERLAP": {
+          "trades": 14,
+          "win_rate_pct": 14.3,
+          "expectancy_r": -0.621,
+          "profit_factor": 0.35
+        },
+        "NEW_YORK": {
+          "trades": 18,
+          "win_rate_pct": 61.1,
+          "expectancy_r": 0.807,
+          "profit_factor": 2.85
+        },
+        "ASIA": {
+          "trades": 13,
+          "win_rate_pct": 53.8,
+          "expectancy_r": 0.723,
+          "profit_factor": 2.4
+        }
+      }
+    },
+    "12_Ablate_G4_No_POI_Quality_Gate": {
+      "trades": 58,
+      "win_rate_pct": 44.83,
+      "avg_rr": 2.38,
+      "expectancy_r": 0.364,
+      "profit_factor": 1.59,
+      "net_r": 21.09,
+      "max_drawdown_pct": 6.53,
+      "longest_losing_streak": 6,
+      "sessions": {
+        "LONDON": {
+          "trades": 14,
+          "win_rate_pct": 28.6,
+          "expectancy_r": -0.148,
+          "profit_factor": 0.82
+        },
+        "OVERLAP": {
+          "trades": 12,
+          "win_rate_pct": 16.7,
+          "expectancy_r": -0.532,
+          "profit_factor": 0.43
+        },
+        "NEW_YORK": {
+          "trades": 22,
+          "win_rate_pct": 59.1,
+          "expectancy_r": 0.764,
+          "profit_factor": 2.67
+        },
+        "ASIA": {
+          "trades": 10,
+          "win_rate_pct": 70.0,
+          "expectancy_r": 1.275,
+          "profit_factor": 4.79
+        }
+      }
+    },
+    "13_Ablate_G5_No_LTF_Confirm_Gate": {
+      "trades": 50,
+      "win_rate_pct": 46.0,
+      "avg_rr": 2.31,
+      "expectancy_r": 0.386,
+      "profit_factor": 1.64,
+      "net_r": 19.29,
+      "max_drawdown_pct": 6.12,
+      "longest_losing_streak": 4,
+      "sessions": {
+        "LONDON": {
+          "trades": 10,
+          "win_rate_pct": 50.0,
+          "expectancy_r": 0.546,
+          "profit_factor": 1.98
+        },
+        "OVERLAP": {
+          "trades": 11,
+          "win_rate_pct": 0.0,
+          "expectancy_r": -1.12,
+          "profit_factor": 0.0
+        },
+        "NEW_YORK": {
+          "trades": 18,
+          "win_rate_pct": 61.1,
+          "expectancy_r": 0.807,
+          "profit_factor": 2.85
+        },
+        "ASIA": {
+          "trades": 11,
+          "win_rate_pct": 63.6,
+          "expectancy_r": 1.057,
+          "profit_factor": 3.59
+        }
+      }
+    },
+    "14_Ablate_G6_No_HTF_Align_Gate": {
+      "trades": 53,
+      "win_rate_pct": 47.17,
+      "avg_rr": 2.32,
+      "expectancy_r": 0.424,
+      "profit_factor": 1.72,
+      "net_r": 22.47,
+      "max_drawdown_pct": 5.8,
+      "longest_losing_streak": 5,
+      "sessions": {
+        "LONDON": {
+          "trades": 13,
+          "win_rate_pct": 53.8,
+          "expectancy_r": 0.665,
+          "profit_factor": 2.29
+        },
+        "OVERLAP": {
+          "trades": 10,
+          "win_rate_pct": 0.0,
+          "expectancy_r": -1.121,
+          "profit_factor": 0.0
+        },
+        "NEW_YORK": {
+          "trades": 19,
+          "win_rate_pct": 57.9,
+          "expectancy_r": 0.705,
+          "profit_factor": 2.5
+        },
+        "ASIA": {
+          "trades": 11,
+          "win_rate_pct": 63.6,
+          "expectancy_r": 1.057,
+          "profit_factor": 3.59
+        }
+      }
+    },
+    "15_Ablate_G7_No_Stops_RR_Gate": {
+      "trades": 88,
+      "win_rate_pct": 32.95,
+      "avg_rr": 2.08,
+      "expectancy_r": -0.074,
+      "profit_factor": 0.9,
+      "net_r": -6.51,
+      "max_drawdown_pct": 13.18,
+      "longest_losing_streak": 7,
+      "sessions": {
+        "LONDON": {
+          "trades": 22,
+          "win_rate_pct": 22.7,
+          "expectancy_r": -0.391,
+          "profit_factor": 0.55
+        },
+        "OVERLAP": {
+          "trades": 16,
+          "win_rate_pct": 12.5,
+          "expectancy_r": -0.749,
+          "profit_factor": 0.24
+        },
+        "NEW_YORK": {
+          "trades": 36,
+          "win_rate_pct": 41.7,
+          "expectancy_r": 0.161,
+          "profit_factor": 1.25
+        },
+        "ASIA": {
+          "trades": 14,
+          "win_rate_pct": 50.0,
+          "expectancy_r": 0.591,
+          "profit_factor": 2.05
+        }
+      }
+    },
+    "16_Recommended_Enforce_G1_G3_to_G8_Shadow_G2": {
+      "trades": 83,
+      "win_rate_pct": 55.42,
+      "avg_rr": 2.31,
+      "expectancy_r": 0.711,
+      "profit_factor": 2.42,
+      "net_r": 59.01,
+      "max_drawdown_pct": 6.13,
+      "longest_losing_streak": 4,
+      "sessions": {
+        "LONDON": {
+          "trades": 27,
+          "win_rate_pct": 59.3,
+          "expectancy_r": 0.902,
+          "profit_factor": 2.98
+        },
+        "OVERLAP": {
+          "trades": 16,
+          "win_rate_pct": 37.5,
+          "expectancy_r": 0.05,
+          "profit_factor": 1.07
+        },
+        "NEW_YORK": {
+          "trades": 27,
+          "win_rate_pct": 59.3,
+          "expectancy_r": 0.793,
+          "profit_factor": 2.74
+        },
+        "ASIA": {
+          "trades": 13,
+          "win_rate_pct": 61.5,
+          "expectancy_r": 0.957,
+          "profit_factor": 3.22
+        }
+      }
+    }
+  },
+  "out_of_sample_metrics": {
+    "00_Baseline_All_Gates_OFF": {
+      "trades": 1063,
+      "win_rate_pct": 21.83,
+      "avg_rr": 2.16,
+      "expectancy_r": -0.414,
+      "profit_factor": 0.53,
+      "net_r": -440.37,
+      "max_drawdown_pct": 99.0,
+      "longest_losing_streak": 23,
+      "sessions": {
+        "LONDON": {
+          "trades": 370,
+          "win_rate_pct": 21.9,
+          "expectancy_r": -0.41,
+          "profit_factor": 0.53
+        },
+        "OVERLAP": {
+          "trades": 318,
+          "win_rate_pct": 21.4,
+          "expectancy_r": -0.434,
+          "profit_factor": 0.51
+        },
+        "NEW_YORK": {
+          "trades": 220,
+          "win_rate_pct": 22.3,
+          "expectancy_r": -0.393,
+          "profit_factor": 0.55
+        },
+        "ASIA": {
+          "trades": 155,
+          "win_rate_pct": 21.9,
+          "expectancy_r": -0.414,
+          "profit_factor": 0.53
+        }
+      }
+    },
+    "01_SingleGate_G1_Structure_Only": {
+      "trades": 719,
+      "win_rate_pct": 30.04,
+      "avg_rr": 2.18,
+      "expectancy_r": -0.147,
+      "profit_factor": 0.81,
+      "net_r": -105.75,
+      "max_drawdown_pct": 71.1,
+      "longest_losing_streak": 14,
+      "sessions": {
+        "LONDON": {
+          "trades": 255,
+          "win_rate_pct": 30.2,
+          "expectancy_r": -0.138,
+          "profit_factor": 0.82
+        },
+        "OVERLAP": {
+          "trades": 211,
+          "win_rate_pct": 29.4,
+          "expectancy_r": -0.172,
+          "profit_factor": 0.78
+        },
+        "NEW_YORK": {
+          "trades": 150,
+          "win_rate_pct": 31.3,
+          "expectancy_r": -0.096,
+          "profit_factor": 0.88
+        },
+        "ASIA": {
+          "trades": 103,
+          "win_rate_pct": 29.1,
+          "expectancy_r": -0.195,
+          "profit_factor": 0.75
+        }
+      }
+    },
+    "02_SingleGate_G2_PD_Zone_Only": {
+      "trades": 576,
+      "win_rate_pct": 19.97,
+      "avg_rr": 2.18,
+      "expectancy_r": -0.477,
+      "profit_factor": 0.47,
+      "net_r": -274.59,
+      "max_drawdown_pct": 94.19,
+      "longest_losing_streak": 23,
+      "sessions": {
+        "LONDON": {
+          "trades": 201,
+          "win_rate_pct": 20.9,
+          "expectancy_r": -0.452,
+          "profit_factor": 0.49
+        },
+        "OVERLAP": {
+          "trades": 176,
+          "win_rate_pct": 19.3,
+          "expectancy_r": -0.494,
+          "profit_factor": 0.45
+        },
+        "NEW_YORK": {
+          "trades": 115,
+          "win_rate_pct": 20.0,
+          "expectancy_r": -0.469,
+          "profit_factor": 0.48
+        },
+        "ASIA": {
+          "trades": 84,
+          "win_rate_pct": 19.0,
+          "expectancy_r": -0.511,
+          "profit_factor": 0.44
+        }
+      }
+    },
+    "03_SingleGate_G3_Sweep_Only": {
+      "trades": 804,
+      "win_rate_pct": 25.37,
+      "avg_rr": 2.16,
+      "expectancy_r": -0.3,
+      "profit_factor": 0.64,
+      "net_r": -241.05,
+      "max_drawdown_pct": 92.39,
+      "longest_losing_streak": 19,
+      "sessions": {
+        "LONDON": {
+          "trades": 280,
+          "win_rate_pct": 25.0,
+          "expectancy_r": -0.31,
+          "profit_factor": 0.63
+        },
+        "OVERLAP": {
+          "trades": 236,
+          "win_rate_pct": 25.4,
+          "expectancy_r": -0.305,
+          "profit_factor": 0.63
+        },
+        "NEW_YORK": {
+          "trades": 171,
+          "win_rate_pct": 25.1,
+          "expectancy_r": -0.296,
+          "profit_factor": 0.65
+        },
+        "ASIA": {
+          "trades": 117,
+          "win_rate_pct": 26.5,
+          "expectancy_r": -0.27,
+          "profit_factor": 0.67
+        }
+      }
+    },
+    "04_SingleGate_G4_POI_Quality_Only": {
+      "trades": 812,
+      "win_rate_pct": 24.63,
+      "avg_rr": 2.15,
+      "expectancy_r": -0.327,
+      "profit_factor": 0.61,
+      "net_r": -265.48,
+      "max_drawdown_pct": 94.05,
+      "longest_losing_streak": 20,
+      "sessions": {
+        "LONDON": {
+          "trades": 282,
+          "win_rate_pct": 24.5,
+          "expectancy_r": -0.334,
+          "profit_factor": 0.6
+        },
+        "OVERLAP": {
+          "trades": 246,
+          "win_rate_pct": 24.4,
+          "expectancy_r": -0.335,
+          "profit_factor": 0.6
+        },
+        "NEW_YORK": {
+          "trades": 169,
+          "win_rate_pct": 25.4,
+          "expectancy_r": -0.293,
+          "profit_factor": 0.65
+        },
+        "ASIA": {
+          "trades": 115,
+          "win_rate_pct": 24.3,
+          "expectancy_r": -0.341,
+          "profit_factor": 0.6
+        }
+      }
+    },
+    "05_SingleGate_G5_LTF_Confirm_Only": {
+      "trades": 796,
+      "win_rate_pct": 23.49,
+      "avg_rr": 2.16,
+      "expectancy_r": -0.364,
+      "profit_factor": 0.57,
+      "net_r": -289.93,
+      "max_drawdown_pct": 95.3,
+      "longest_losing_streak": 19,
+      "sessions": {
+        "LONDON": {
+          "trades": 272,
+          "win_rate_pct": 24.3,
+          "expectancy_r": -0.331,
+          "profit_factor": 0.61
+        },
+        "OVERLAP": {
+          "trades": 240,
+          "win_rate_pct": 22.5,
+          "expectancy_r": -0.406,
+          "profit_factor": 0.53
+        },
+        "NEW_YORK": {
+          "trades": 166,
+          "win_rate_pct": 23.5,
+          "expectancy_r": -0.355,
+          "profit_factor": 0.59
+        },
+        "ASIA": {
+          "trades": 118,
+          "win_rate_pct": 23.7,
+          "expectancy_r": -0.368,
+          "profit_factor": 0.57
+        }
+      }
+    },
+    "06_SingleGate_G6_HTF_Align_Only": {
+      "trades": 689,
+      "win_rate_pct": 29.75,
+      "avg_rr": 2.17,
+      "expectancy_r": -0.157,
+      "profit_factor": 0.8,
+      "net_r": -108.1,
+      "max_drawdown_pct": 71.66,
+      "longest_losing_streak": 14,
+      "sessions": {
+        "LONDON": {
+          "trades": 237,
+          "win_rate_pct": 29.5,
+          "expectancy_r": -0.159,
+          "profit_factor": 0.8
+        },
+        "OVERLAP": {
+          "trades": 200,
+          "win_rate_pct": 31.0,
+          "expectancy_r": -0.123,
+          "profit_factor": 0.84
+        },
+        "NEW_YORK": {
+          "trades": 146,
+          "win_rate_pct": 29.5,
+          "expectancy_r": -0.159,
+          "profit_factor": 0.8
+        },
+        "ASIA": {
+          "trades": 106,
+          "win_rate_pct": 28.3,
+          "expectancy_r": -0.212,
+          "profit_factor": 0.74
+        }
+      }
+    },
+    "07_SingleGate_G7_Stops_RR_Only": {
+      "trades": 566,
+      "win_rate_pct": 26.5,
+      "avg_rr": 2.37,
+      "expectancy_r": -0.229,
+      "profit_factor": 0.72,
+      "net_r": -129.43,
+      "max_drawdown_pct": 77.04,
+      "longest_losing_streak": 24,
+      "sessions": {
+        "LONDON": {
+          "trades": 198,
+          "win_rate_pct": 26.8,
+          "expectancy_r": -0.212,
+          "profit_factor": 0.74
+        },
+        "OVERLAP": {
+          "trades": 166,
+          "win_rate_pct": 27.1,
+          "expectancy_r": -0.208,
+          "profit_factor": 0.75
+        },
+        "NEW_YORK": {
+          "trades": 114,
+          "win_rate_pct": 25.4,
+          "expectancy_r": -0.271,
+          "profit_factor": 0.68
+        },
+        "ASIA": {
+          "trades": 88,
+          "win_rate_pct": 26.1,
+          "expectancy_r": -0.25,
+          "profit_factor": 0.7
+        }
+      }
+    },
+    "08_All_Gates_ON_G1_to_G8": {
+      "trades": 65,
+      "win_rate_pct": 50.77,
+      "avg_rr": 2.42,
+      "expectancy_r": 0.595,
+      "profit_factor": 2.08,
+      "net_r": 38.67,
+      "max_drawdown_pct": 6.53,
+      "longest_losing_streak": 6,
+      "sessions": {
+        "LONDON": {
+          "trades": 22,
+          "win_rate_pct": 54.5,
+          "expectancy_r": 0.719,
+          "profit_factor": 2.41
+        },
+        "OVERLAP": {
+          "trades": 21,
+          "win_rate_pct": 61.9,
+          "expectancy_r": 0.978,
+          "profit_factor": 3.29
+        },
+        "NEW_YORK": {
+          "trades": 13,
+          "win_rate_pct": 38.5,
+          "expectancy_r": 0.175,
+          "profit_factor": 1.25
+        },
+        "ASIA": {
+          "trades": 9,
+          "win_rate_pct": 33.3,
+          "expectancy_r": 0.003,
+          "profit_factor": 1.0
+        }
+      }
+    },
+    "09_Ablate_G1_No_Structure_Gate": {
+      "trades": 80,
+      "win_rate_pct": 46.25,
+      "avg_rr": 2.39,
+      "expectancy_r": 0.434,
+      "profit_factor": 1.72,
+      "net_r": 34.72,
+      "max_drawdown_pct": 7.35,
+      "longest_losing_streak": 6,
+      "sessions": {
+        "LONDON": {
+          "trades": 29,
+          "win_rate_pct": 48.3,
+          "expectancy_r": 0.493,
+          "profit_factor": 1.85
+        },
+        "OVERLAP": {
+          "trades": 26,
+          "win_rate_pct": 53.8,
+          "expectancy_r": 0.692,
+          "profit_factor": 2.34
+        },
+        "NEW_YORK": {
+          "trades": 13,
+          "win_rate_pct": 38.5,
+          "expectancy_r": 0.175,
+          "profit_factor": 1.25
+        },
+        "ASIA": {
+          "trades": 12,
+          "win_rate_pct": 33.3,
+          "expectancy_r": 0.013,
+          "profit_factor": 1.02
+        }
+      }
+    },
+    "10_Ablate_G2_No_PD_Zone_Gate": {
+      "trades": 123,
+      "win_rate_pct": 52.03,
+      "avg_rr": 2.39,
+      "expectancy_r": 0.628,
+      "profit_factor": 2.17,
+      "net_r": 77.21,
+      "max_drawdown_pct": 4.55,
+      "longest_losing_streak": 4,
+      "sessions": {
+        "LONDON": {
+          "trades": 43,
+          "win_rate_pct": 51.2,
+          "expectancy_r": 0.617,
+          "profit_factor": 2.13
+        },
+        "OVERLAP": {
+          "trades": 40,
+          "win_rate_pct": 57.5,
+          "expectancy_r": 0.793,
+          "profit_factor": 2.67
+        },
+        "NEW_YORK": {
+          "trades": 26,
+          "win_rate_pct": 42.3,
+          "expectancy_r": 0.334,
+          "profit_factor": 1.52
+        },
+        "ASIA": {
+          "trades": 14,
+          "win_rate_pct": 57.1,
+          "expectancy_r": 0.734,
+          "profit_factor": 2.53
+        }
+      }
+    },
+    "11_Ablate_G3_No_Sweep_Gate": {
+      "trades": 83,
+      "win_rate_pct": 48.19,
+      "avg_rr": 2.39,
+      "expectancy_r": 0.492,
+      "profit_factor": 1.85,
+      "net_r": 40.85,
+      "max_drawdown_pct": 6.54,
+      "longest_losing_streak": 6,
+      "sessions": {
+        "LONDON": {
+          "trades": 29,
+          "win_rate_pct": 48.3,
+          "expectancy_r": 0.499,
+          "profit_factor": 1.86
+        },
+        "OVERLAP": {
+          "trades": 25,
+          "win_rate_pct": 64.0,
+          "expectancy_r": 1.025,
+          "profit_factor": 3.54
+        },
+        "NEW_YORK": {
+          "trades": 16,
+          "win_rate_pct": 43.8,
+          "expectancy_r": 0.326,
+          "profit_factor": 1.52
+        },
+        "ASIA": {
+          "trades": 13,
+          "win_rate_pct": 23.1,
+          "expectancy_r": -0.343,
+          "profit_factor": 0.6
+        }
+      }
+    },
+    "12_Ablate_G4_No_POI_Quality_Gate": {
+      "trades": 80,
+      "win_rate_pct": 43.75,
+      "avg_rr": 2.39,
+      "expectancy_r": 0.35,
+      "profit_factor": 1.56,
+      "net_r": 27.97,
+      "max_drawdown_pct": 8.61,
+      "longest_losing_streak": 8,
+      "sessions": {
+        "LONDON": {
+          "trades": 29,
+          "win_rate_pct": 41.4,
+          "expectancy_r": 0.275,
+          "profit_factor": 1.42
+        },
+        "OVERLAP": {
+          "trades": 26,
+          "win_rate_pct": 53.8,
+          "expectancy_r": 0.692,
+          "profit_factor": 2.34
+        },
+        "NEW_YORK": {
+          "trades": 14,
+          "win_rate_pct": 35.7,
+          "expectancy_r": 0.082,
+          "profit_factor": 1.11
+        },
+        "ASIA": {
+          "trades": 11,
+          "win_rate_pct": 36.4,
+          "expectancy_r": 0.077,
+          "profit_factor": 1.11
+        }
+      }
+    },
+    "13_Ablate_G5_No_LTF_Confirm_Gate": {
+      "trades": 92,
+      "win_rate_pct": 48.91,
+      "avg_rr": 2.41,
+      "expectancy_r": 0.524,
+      "profit_factor": 1.92,
+      "net_r": 48.19,
+      "max_drawdown_pct": 6.85,
+      "longest_losing_streak": 5,
+      "sessions": {
+        "LONDON": {
+          "trades": 30,
+          "win_rate_pct": 50.0,
+          "expectancy_r": 0.548,
+          "profit_factor": 1.98
+        },
+        "OVERLAP": {
+          "trades": 28,
+          "win_rate_pct": 57.1,
+          "expectancy_r": 0.83,
+          "profit_factor": 2.73
+        },
+        "NEW_YORK": {
+          "trades": 18,
+          "win_rate_pct": 44.4,
+          "expectancy_r": 0.376,
+          "profit_factor": 1.61
+        },
+        "ASIA": {
+          "trades": 16,
+          "win_rate_pct": 37.5,
+          "expectancy_r": 0.108,
+          "profit_factor": 1.15
+        }
+      }
+    },
+    "14_Ablate_G6_No_HTF_Align_Gate": {
+      "trades": 91,
+      "win_rate_pct": 45.05,
+      "avg_rr": 2.4,
+      "expectancy_r": 0.411,
+      "profit_factor": 1.67,
+      "net_r": 37.41,
+      "max_drawdown_pct": 7.9,
+      "longest_losing_streak": 7,
+      "sessions": {
+        "LONDON": {
+          "trades": 31,
+          "win_rate_pct": 51.6,
+          "expectancy_r": 0.643,
+          "profit_factor": 2.19
+        },
+        "OVERLAP": {
+          "trades": 31,
+          "win_rate_pct": 48.4,
+          "expectancy_r": 0.539,
+          "profit_factor": 1.93
+        },
+        "NEW_YORK": {
+          "trades": 17,
+          "win_rate_pct": 41.2,
+          "expectancy_r": 0.241,
+          "profit_factor": 1.37
+        },
+        "ASIA": {
+          "trades": 12,
+          "win_rate_pct": 25.0,
+          "expectancy_r": -0.277,
+          "profit_factor": 0.67
+        }
+      }
+    },
+    "15_Ablate_G7_No_Stops_RR_Gate": {
+      "trades": 117,
+      "win_rate_pct": 46.15,
+      "avg_rr": 2.21,
+      "expectancy_r": 0.362,
+      "profit_factor": 1.6,
+      "net_r": 42.38,
+      "max_drawdown_pct": 8.61,
+      "longest_losing_streak": 8,
+      "sessions": {
+        "LONDON": {
+          "trades": 42,
+          "win_rate_pct": 50.0,
+          "expectancy_r": 0.458,
+          "profit_factor": 1.82
+        },
+        "OVERLAP": {
+          "trades": 33,
+          "win_rate_pct": 48.5,
+          "expectancy_r": 0.482,
+          "profit_factor": 1.84
+        },
+        "NEW_YORK": {
+          "trades": 29,
+          "win_rate_pct": 37.9,
+          "expectancy_r": 0.123,
+          "profit_factor": 1.18
+        },
+        "ASIA": {
+          "trades": 13,
+          "win_rate_pct": 46.2,
+          "expectancy_r": 0.284,
+          "profit_factor": 1.47
+        }
+      }
+    },
+    "16_Recommended_Enforce_G1_G3_to_G8_Shadow_G2": {
+      "trades": 123,
+      "win_rate_pct": 52.03,
+      "avg_rr": 2.39,
+      "expectancy_r": 0.628,
+      "profit_factor": 2.17,
+      "net_r": 77.21,
+      "max_drawdown_pct": 4.55,
+      "longest_losing_streak": 4,
+      "sessions": {
+        "LONDON": {
+          "trades": 43,
+          "win_rate_pct": 51.2,
+          "expectancy_r": 0.617,
+          "profit_factor": 2.13
+        },
+        "OVERLAP": {
+          "trades": 40,
+          "win_rate_pct": 57.5,
+          "expectancy_r": 0.793,
+          "profit_factor": 2.67
+        },
+        "NEW_YORK": {
+          "trades": 26,
+          "win_rate_pct": 42.3,
+          "expectancy_r": 0.334,
+          "profit_factor": 1.52
+        },
+        "ASIA": {
+          "trades": 14,
+          "win_rate_pct": 57.1,
+          "expectancy_r": 0.734,
+          "profit_factor": 2.53
+        }
+      }
+    }
+  },
+  "parameter_sensitivity_oos": {
+    "fvg_min_atr": {
+      "-30% (0.21)": {
+        "trades": 133,
+        "win_rate_pct": 51.13,
+        "avg_rr": 2.39,
+        "expectancy_r": 0.599,
+        "profit_factor": 2.1,
+        "net_r": 79.73,
+        "max_drawdown_pct": 4.55,
+        "longest_losing_streak": 4,
+        "sessions": {
+          "LONDON": {
+            "trades": 48,
+            "win_rate_pct": 47.9,
+            "expectancy_r": 0.522,
+            "profit_factor": 1.89
+          },
+          "OVERLAP": {
+            "trades": 43,
+            "win_rate_pct": 55.8,
+            "expectancy_r": 0.731,
+            "profit_factor": 2.48
+          },
+          "NEW_YORK": {
+            "trades": 26,
+            "win_rate_pct": 42.3,
+            "expectancy_r": 0.334,
+            "profit_factor": 1.52
+          },
+          "ASIA": {
+            "trades": 16,
+            "win_rate_pct": 62.5,
+            "expectancy_r": 0.912,
+            "profit_factor": 3.17
+          }
+        }
+      },
+      "Base (0.3)": {
+        "trades": 123,
+        "win_rate_pct": 52.03,
+        "avg_rr": 2.39,
+        "expectancy_r": 0.628,
+        "profit_factor": 2.17,
+        "net_r": 77.21,
+        "max_drawdown_pct": 4.55,
+        "longest_losing_streak": 4,
+        "sessions": {
+          "LONDON": {
+            "trades": 43,
+            "win_rate_pct": 51.2,
+            "expectancy_r": 0.617,
+            "profit_factor": 2.13
+          },
+          "OVERLAP": {
+            "trades": 40,
+            "win_rate_pct": 57.5,
+            "expectancy_r": 0.793,
+            "profit_factor": 2.67
+          },
+          "NEW_YORK": {
+            "trades": 26,
+            "win_rate_pct": 42.3,
+            "expectancy_r": 0.334,
+            "profit_factor": 1.52
+          },
+          "ASIA": {
+            "trades": 14,
+            "win_rate_pct": 57.1,
+            "expectancy_r": 0.734,
+            "profit_factor": 2.53
+          }
+        }
+      },
+      "+30% (0.39)": {
+        "trades": 114,
+        "win_rate_pct": 49.12,
+        "avg_rr": 2.4,
+        "expectancy_r": 0.533,
+        "profit_factor": 1.94,
+        "net_r": 60.73,
+        "max_drawdown_pct": 5.93,
+        "longest_losing_streak": 5,
+        "sessions": {
+          "LONDON": {
+            "trades": 40,
+            "win_rate_pct": 47.5,
+            "expectancy_r": 0.5,
+            "profit_factor": 1.85
+          },
+          "OVERLAP": {
+            "trades": 36,
+            "win_rate_pct": 55.6,
+            "expectancy_r": 0.733,
+            "profit_factor": 2.47
+          },
+          "NEW_YORK": {
+            "trades": 25,
+            "win_rate_pct": 40.0,
+            "expectancy_r": 0.24,
+            "profit_factor": 1.36
+          },
+          "ASIA": {
+            "trades": 13,
+            "win_rate_pct": 53.8,
+            "expectancy_r": 0.642,
+            "profit_factor": 2.24
+          }
+        }
+      }
+    },
+    "ob_displacement_atr_mult": {
+      "-30% (0.84)": {
+        "trades": 132,
+        "win_rate_pct": 50.0,
+        "avg_rr": 2.39,
+        "expectancy_r": 0.56,
+        "profit_factor": 2.0,
+        "net_r": 73.86,
+        "max_drawdown_pct": 5.57,
+        "longest_losing_streak": 4,
+        "sessions": {
+          "LONDON": {
+            "trades": 46,
+            "win_rate_pct": 50.0,
+            "expectancy_r": 0.58,
+            "profit_factor": 2.04
+          },
+          "OVERLAP": {
+            "trades": 42,
+            "win_rate_pct": 54.8,
+            "expectancy_r": 0.702,
+            "profit_factor": 2.38
+          },
+          "NEW_YORK": {
+            "trades": 30,
+            "win_rate_pct": 40.0,
+            "expectancy_r": 0.248,
+            "profit_factor": 1.37
+          },
+          "ASIA": {
+            "trades": 14,
+            "win_rate_pct": 57.1,
+            "expectancy_r": 0.734,
+            "profit_factor": 2.53
+          }
+        }
+      },
+      "Base (1.2)": {
+        "trades": 123,
+        "win_rate_pct": 52.03,
+        "avg_rr": 2.39,
+        "expectancy_r": 0.628,
+        "profit_factor": 2.17,
+        "net_r": 77.21,
+        "max_drawdown_pct": 4.55,
+        "longest_losing_streak": 4,
+        "sessions": {
+          "LONDON": {
+            "trades": 43,
+            "win_rate_pct": 51.2,
+            "expectancy_r": 0.617,
+            "profit_factor": 2.13
+          },
+          "OVERLAP": {
+            "trades": 40,
+            "win_rate_pct": 57.5,
+            "expectancy_r": 0.793,
+            "profit_factor": 2.67
+          },
+          "NEW_YORK": {
+            "trades": 26,
+            "win_rate_pct": 42.3,
+            "expectancy_r": 0.334,
+            "profit_factor": 1.52
+          },
+          "ASIA": {
+            "trades": 14,
+            "win_rate_pct": 57.1,
+            "expectancy_r": 0.734,
+            "profit_factor": 2.53
+          }
+        }
+      },
+      "+30% (1.56)": {
+        "trades": 112,
+        "win_rate_pct": 53.57,
+        "avg_rr": 2.38,
+        "expectancy_r": 0.678,
+        "profit_factor": 2.3,
+        "net_r": 75.96,
+        "max_drawdown_pct": 4.55,
+        "longest_losing_streak": 4,
+        "sessions": {
+          "LONDON": {
+            "trades": 37,
+            "win_rate_pct": 54.1,
+            "expectancy_r": 0.721,
+            "profit_factor": 2.4
+          },
+          "OVERLAP": {
+            "trades": 37,
+            "win_rate_pct": 56.8,
+            "expectancy_r": 0.759,
+            "profit_factor": 2.57
+          },
+          "NEW_YORK": {
+            "trades": 24,
+            "win_rate_pct": 45.8,
+            "expectancy_r": 0.455,
+            "profit_factor": 1.75
+          },
+          "ASIA": {
+            "trades": 14,
+            "win_rate_pct": 57.1,
+            "expectancy_r": 0.734,
+            "profit_factor": 2.53
+          }
+        }
+      }
+    },
+    "min_rr": {
+      "-30% (1.4)": {
+        "trades": 186,
+        "win_rate_pct": 48.92,
+        "avg_rr": 2.15,
+        "expectancy_r": 0.425,
+        "profit_factor": 1.74,
+        "net_r": 78.97,
+        "max_drawdown_pct": 7.71,
+        "longest_losing_streak": 6,
+        "sessions": {
+          "LONDON": {
+            "trades": 64,
+            "win_rate_pct": 50.0,
+            "expectancy_r": 0.461,
+            "profit_factor": 1.82
+          },
+          "OVERLAP": {
+            "trades": 59,
+            "win_rate_pct": 52.5,
+            "expectancy_r": 0.532,
+            "profit_factor": 2.0
+          },
+          "NEW_YORK": {
+            "trades": 42,
+            "win_rate_pct": 40.5,
+            "expectancy_r": 0.178,
+            "profit_factor": 1.27
+          },
+          "ASIA": {
+            "trades": 21,
+            "win_rate_pct": 52.4,
+            "expectancy_r": 0.504,
+            "profit_factor": 1.94
+          }
+        }
+      },
+      "Base (2.0)": {
+        "trades": 123,
+        "win_rate_pct": 52.03,
+        "avg_rr": 2.39,
+        "expectancy_r": 0.628,
+        "profit_factor": 2.17,
+        "net_r": 77.21,
+        "max_drawdown_pct": 4.55,
+        "longest_losing_streak": 4,
+        "sessions": {
+          "LONDON": {
+            "trades": 43,
+            "win_rate_pct": 51.2,
+            "expectancy_r": 0.617,
+            "profit_factor": 2.13
+          },
+          "OVERLAP": {
+            "trades": 40,
+            "win_rate_pct": 57.5,
+            "expectancy_r": 0.793,
+            "profit_factor": 2.67
+          },
+          "NEW_YORK": {
+            "trades": 26,
+            "win_rate_pct": 42.3,
+            "expectancy_r": 0.334,
+            "profit_factor": 1.52
+          },
+          "ASIA": {
+            "trades": 14,
+            "win_rate_pct": 57.1,
+            "expectancy_r": 0.734,
+            "profit_factor": 2.53
+          }
+        }
+      },
+      "+30% (2.6)": {
+        "trades": 30,
+        "win_rate_pct": 46.67,
+        "avg_rr": 2.87,
+        "expectancy_r": 0.665,
+        "profit_factor": 2.11,
+        "net_r": 19.94,
+        "max_drawdown_pct": 5.47,
+        "longest_losing_streak": 5,
+        "sessions": {
+          "LONDON": {
+            "trades": 10,
+            "win_rate_pct": 60.0,
+            "expectancy_r": 1.189,
+            "profit_factor": 3.66
+          },
+          "OVERLAP": {
+            "trades": 9,
+            "win_rate_pct": 33.3,
+            "expectancy_r": 0.149,
+            "profit_factor": 1.2
+          },
+          "NEW_YORK": {
+            "trades": 9,
+            "win_rate_pct": 44.4,
+            "expectancy_r": 0.572,
+            "profit_factor": 1.92
+          },
+          "ASIA": {
+            "trades": 2,
+            "win_rate_pct": 50.0,
+            "expectancy_r": 0.78,
+            "profit_factor": 2.39
+          }
+        }
+      }
+    }
+  },
+  "monte_carlo_replay_gate": {
+    "EURUSD": {
+      "passed": true,
+      "prob_target": 0.4546,
+      "prob_stop": 0.0002,
+      "prob_neither": 0.5452,
+      "expected_r": 1.871,
+      "ci_95": [
+        1.858,
+        1.884
+      ],
+      "runtime_ms": 10.17
+    },
+    "GBPUSD": {
+      "passed": true,
+      "prob_target": 0.8514,
+      "prob_stop": 0.0,
+      "prob_neither": 0.1486,
+      "expected_r": 2.137,
+      "ci_95": [
+        2.131,
+        2.143
+      ],
+      "runtime_ms": 4.63
+    },
+    "USDJPY": {
+      "passed": true,
+      "prob_target": 0.6318,
+      "prob_stop": 0.0,
+      "prob_neither": 0.3682,
+      "expected_r": 1.998,
+      "ci_95": [
+        1.988,
+        2.008
+      ],
+      "runtime_ms": 9.16
+    },
+    "XAUUSD": {
+      "passed": true,
+      "prob_target": 0.6,
+      "prob_stop": 0.0,
+      "prob_neither": 0.4,
+      "expected_r": 1.978,
+      "ci_95": [
+        1.967,
+        1.988
+      ],
+      "runtime_ms": 6.78
+    }
+  }
+}

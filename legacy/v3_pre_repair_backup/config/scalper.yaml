@@ -1,0 +1,271 @@
+# ==============================================================================
+# CENTRALIZED DUAL-MARKET SCALPER CONFIGURATION (GOLD WEEKDAYS + BTCUSD WEEKENDS)
+# High-Speed Event-Driven Multi-Position Scalping Engine (v3.0.0)
+# ==============================================================================
+
+general:
+  engine_name: "DualMarketScalperEngine"
+  version: "3.0.0"
+  magic_number: 777001
+  comment_prefix: "DMS"
+  DEMO_MODE: true
+  allow_real_trading: false
+  require_live_confirmation: true
+  LEGACY_FILTERS_ENABLED: false
+  EXECUTION_INTERVAL_MS: 200
+  tick_timeout_seconds: 5.0
+  candle_context_timeframe: "M1"
+
+scheduler:
+  enabled: true
+  timezone: "UTC"
+  broker_utc_offset_hours: 0
+  dst_auto_adjust: true
+  weekday_symbol: "GOLD"
+  weekend_symbol: "BTCUSD"
+  weekday_days:
+    - "MONDAY"
+    - "TUESDAY"
+    - "WEDNESDAY"
+    - "THURSDAY"
+    - "FRIDAY"
+  weekend_days:
+    - "SATURDAY"
+    - "SUNDAY"
+  manage_existing_positions: true
+  require_symbol_trading_availability: true
+
+# Phase 15 explicit gold section (synchronized with symbols.GOLD)
+gold:
+  enabled: true
+  schedule: "weekdays"
+  execution_mode: "DEMO"
+  canonical: "XAUUSD"
+  magic_number: 777001
+  comment_prefix: "GS_GOLD"
+  aliases:
+    - "XAUUSD"
+    - "XAUUSD.m"
+    - "XAUUSDm"
+    - "XAUUSD.a"
+    - "XAUUSD.pro"
+    - "XAUUSD.raw"
+    - "GOLD"
+    - "GOLD.m"
+  entry_mode: "controlled_multi_entry"
+  risk_profile: "STANDARD"
+  max_positions: 4
+  max_basket_size: 10
+  max_basket_risk_pct: 0.25
+  max_spread: 80.0
+  max_slippage: 25.0
+  order_spacing_ms: 0
+  burst_timeout_seconds: 2.0
+  lot_step_balance: 50.0
+  min_lot: 0.01
+  max_lot: 0.50
+  micro_account_min_lot: 0.01
+  tp_usd_per_min_lot: 0.50
+  basket_tp_usd: 2.00
+  min_basket_tp_usd: 1.00
+  max_hold_seconds: 180
+  breakeven_urgency_seconds: 120
+  breakeven_trigger_r: 1.0
+  breakeven_buffer_points: 15.0
+  trailing_stop_enabled: true
+  trailing_start_r: 1.2
+  trailing_distance_points: 120.0
+  trailing_step_points: 25.0
+  profit_lock_trigger_usd: 1.50
+  profit_lock_floor_usd: 0.90
+  sl_points: 300.0
+  tp_points: 450.0
+  spread_max_points: 80.0
+  cooldown_seconds: 2.0
+  reversal_cooldown_seconds: 10.0
+  min_entry_quality_score: 0.55
+  commission_per_lot_usd: 7.0
+  fallback_lookback_ticks: 20
+  fallback_m1_candles: 5
+  fallback_momentum_period: 10
+
+# Phase 15 explicit btc section (synchronized with symbols.BTCUSD)
+btc:
+  enabled: true
+  schedule: "weekends"
+  execution_mode: "DEMO"
+  canonical: "BTCUSD"
+  magic_number: 777002
+  comment_prefix: "GS_BTC"
+  aliases:
+    - "BTCUSD"
+    - "BTCUSD.m"
+    - "BTCUSDm"
+    - "BTCUSD.a"
+    - "BTCUSD#"
+    - "BTCUSD."
+    - "BTCUSDpro"
+    - "BTCUSD.raw"
+    - "BITCOIN"
+  entry_mode: "controlled_multi_entry"
+  risk_profile: "STANDARD"
+  max_positions: 4
+  max_basket_size: 10
+  max_basket_risk_pct: 0.25
+  max_spread: 3000.0
+  max_slippage: 150.0
+  order_spacing_ms: 0
+  burst_timeout_seconds: 2.0
+  lot_step_balance: 50.0
+  min_lot: 0.01
+  max_lot: 0.50
+  micro_account_min_lot: 0.01
+  tp_usd_per_min_lot: 0.50
+  basket_tp_usd: 2.00
+  min_basket_tp_usd: 1.00
+  max_hold_seconds: 180
+  breakeven_urgency_seconds: 120
+  breakeven_trigger_r: 1.0
+  breakeven_buffer_points: 200.0
+  trailing_stop_enabled: true
+  trailing_start_r: 1.2
+  trailing_distance_points: 2000.0
+  trailing_step_points: 300.0
+  profit_lock_trigger_usd: 1.50
+  profit_lock_floor_usd: 0.90
+  sl_points: 5000.0
+  tp_points: 7500.0
+  spread_max_points: 3000.0
+  cooldown_seconds: 3.0
+  reversal_cooldown_seconds: 15.0
+  min_entry_quality_score: 0.58
+  commission_per_lot_usd: 0.0
+  fallback_lookback_ticks: 20
+  fallback_m1_candles: 5
+  fallback_momentum_period: 10
+
+symbols:
+  GOLD:
+    enabled: true
+    canonical: "XAUUSD"
+    magic_number: 777001
+    comment_prefix: "GS_GOLD"
+    aliases:
+      - "XAUUSD"
+      - "XAUUSD.m"
+      - "XAUUSDm"
+      - "XAUUSD.a"
+      - "XAUUSD.pro"
+      - "XAUUSD.raw"
+      - "GOLD"
+      - "GOLD.m"
+    basket_size: 4
+    max_basket_size: 10
+    order_spacing_ms: 0
+    burst_timeout_seconds: 2.0
+    lot_step_balance: 50.0
+    min_lot: 0.01
+    max_lot: 0.50
+    micro_account_min_lot: 0.01
+    tp_usd_per_min_lot: 0.50
+    basket_tp_usd: 2.00
+    min_basket_tp_usd: 1.00
+    max_hold_seconds: 180
+    breakeven_urgency_seconds: 120
+    sl_points: 300.0
+    spread_max_points: 80.0
+    fallback_lookback_ticks: 20
+    fallback_m1_candles: 5
+    fallback_momentum_period: 10
+
+  BTCUSD:
+    enabled: true
+    canonical: "BTCUSD"
+    magic_number: 777002
+    comment_prefix: "GS_BTC"
+    aliases:
+      - "BTCUSD"
+      - "BTCUSD.m"
+      - "BTCUSDm"
+      - "BTCUSD.a"
+      - "BTCUSD#"
+      - "BTCUSD."
+      - "BTCUSDpro"
+      - "BTCUSD.raw"
+      - "BITCOIN"
+    basket_size: 4
+    max_basket_size: 10
+    order_spacing_ms: 0
+    burst_timeout_seconds: 2.0
+    lot_step_balance: 50.0
+    min_lot: 0.01
+    max_lot: 0.50
+    micro_account_min_lot: 0.01
+    tp_usd_per_min_lot: 0.50
+    basket_tp_usd: 2.00
+    min_basket_tp_usd: 1.00
+    max_hold_seconds: 180
+    breakeven_urgency_seconds: 120
+    sl_points: 5000.0
+    spread_max_points: 3000.0
+    fallback_lookback_ticks: 20
+    fallback_m1_candles: 5
+    fallback_momentum_period: 10
+
+# Phase 15 explicit account_risk section
+account_risk:
+  daily_loss_enabled: true
+  max_daily_loss_pct: 5.0
+  max_daily_loss_usd: 50.0
+  max_drawdown_pct: 30.0
+  max_open_risk_pct: 2.0
+  max_margin_utilization_pct: 50.0
+  min_margin_level_pct: 300.0
+  max_open_positions: 12
+  max_total_lots: 1.00
+  max_consecutive_losses: 4
+  loss_streak_cooldown_seconds: 300
+  pause_minutes: 60
+  emergency_stop_enabled: true
+  broker_disconnect_timeout_sec: 15.0
+
+risk:
+  max_open_positions: 12
+  max_total_lots: 1.00
+  min_margin_level_pct: 300.0
+  max_margin_usage_pct: 50.0
+  max_dd_pct: 30.0
+  pause_minutes: 60
+  max_daily_loss_enabled: false
+  max_daily_loss_usd: 50.0
+  daily_profit_target_enabled: false
+  daily_profit_target_usd: 100.0
+  accounting_includes_floating: true
+
+kill_switch:
+  enabled: true
+  flag_file_path: "STOP.flag"
+  cli_command_enabled: true
+  telegram_command_enabled: true
+  on_trigger_action: "CLOSE_ALL_AND_HALT"
+
+# Phase 15 explicit execution section
+execution:
+  event_driven: true
+  duplicate_order_protection: true
+  broker_confirmation_required: true
+  tick_staleness_limit_ms: 5000
+  max_execution_latency_ms: 1500
+  reconnect_reconciliation: true
+  order_type: "MARKET"
+  preferred_filling_mode: "AUTO"
+  slippage_points: 25
+  max_retries: 2
+  retry_delay_ms: 20
+  rate_limit_per_second: 10
+
+logging:
+  log_level: "INFO"
+  log_file: "logs/dual_market_scalper.log"
+  log_basket_events: true
+  log_tick_frequency_sec: 10

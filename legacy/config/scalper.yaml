@@ -1,0 +1,208 @@
+# ==============================================================================
+# GOLD SCALPER ENGINE — CENTRALIZED CONFIGURATION
+# Dedicated high-frequency GOLD (XAUUSD) scalping system
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. General Settings
+# ------------------------------------------------------------------------------
+general:
+  engine_name: "GoldScalperEngine"
+  version: "1.0.0"
+  magic_number: 777001
+  comment_prefix: "GS_GOLD"
+
+# ------------------------------------------------------------------------------
+# 2. Trading Symbol and Aliases
+# ------------------------------------------------------------------------------
+symbol:
+  target_canonical: "XAUUSD"
+  aliases:
+    - "XAUUSD"
+    - "XAUUSDm"
+    - "XAUUSD.m"
+    - "XAUUSD.a"
+    - "XAUUSD.pro"
+    - "XAUUSD.raw"
+    - "XAUUSD.std"
+    - "GOLD"
+    - "GOLD.m"
+    - "GOLDm"
+    - "XAU/USD"
+  auto_detect_broker_symbol: true
+  fallback_symbol: "XAUUSD"
+
+# ------------------------------------------------------------------------------
+# 3. Execution-Loop Settings
+# ------------------------------------------------------------------------------
+execution_loop:
+  interval_ms: 250                # Loop cycle interval in milliseconds (200-500ms recommended)
+  tick_timeout_seconds: 5.0       # Maximum acceptable age for live market quote
+  candle_context_timeframe: "M1"  # Supplementary timeframe for trend and momentum context
+
+# ------------------------------------------------------------------------------
+# 4. Direction-Selection Settings
+# ------------------------------------------------------------------------------
+direction_selection:
+  use_strategy_scoring: true      # Incorporate SMC/structural analytical modules as bias providers
+  scoring_weight_smc: 0.35        # Weight given to market structure / SMC POI signals
+  scoring_weight_momentum: 0.40   # Weight given to short-term momentum indicators
+  scoring_weight_patterns: 0.25   # Weight given to candlestick pattern recognition
+  min_bias_threshold: 0.05        # Score difference required to prefer one direction over the other
+  fallback:
+    lookback_ticks: 20            # Number of recent market ticks to evaluate price velocity
+    m1_candle_lookback: 5         # Number of recent M1 candles to evaluate net directional drift
+    momentum_period: 10           # Momentum calculation period for direction fallback
+    default_on_flat: "BUY"        # Default fallback direction if market is dead flat
+
+# ------------------------------------------------------------------------------
+# 5. Legacy-Filter Compatibility
+# ------------------------------------------------------------------------------
+legacy_filters:
+  LEGACY_FILTERS_ENABLED: false   # false = bypass legacy gates; true = restore original restrictive behavior
+  bypass_session_filters: true
+  bypass_news_filters: true
+  bypass_htf_agreement: true
+  bypass_candle_close_confirmation: true
+  bypass_quality_gate: true
+  bypass_anti_chase: true
+  bypass_strict_rr_gate: true
+  bypass_cooldown_periods: true
+  bypass_single_position_limit: true
+
+# ------------------------------------------------------------------------------
+# 6. Basket Configuration
+# ------------------------------------------------------------------------------
+basket:
+  basket_size: 4                  # Number of positions opened per basket (default: 4)
+  max_basket_size: 10             # Hard ceiling on basket position count
+  order_spacing_ms: 150           # Delay between consecutive order submissions in a basket (ms)
+  burst_timeout_seconds: 3.0      # Maximum allowed time window to complete a basket burst
+
+# ------------------------------------------------------------------------------
+# 7. Dynamic Lot Sizing
+# ------------------------------------------------------------------------------
+lot_sizing:
+  formula: "floor(balance / LOT_STEP_BALANCE) * 0.01"
+  lot_step_balance: 50.0          # Balance step in USD for each 0.01 increment (e.g. $5 -> 0.01, $50 -> 0.01, $150 -> 0.03, etc.)
+  micro_account_min_lot: 0.01     # Minimum lot permitted for micro/low-balance accounts ($5 floor)
+  min_lot_override: 0.01          # Absolute minimum lot size
+  max_lot_override: 0.50          # Absolute maximum lot size per individual position
+  clamp_to_broker_step: true      # Strictly align volume to broker lot step
+
+# ------------------------------------------------------------------------------
+# 8. Individual Position Take Profit
+# ------------------------------------------------------------------------------
+individual_tp:
+  enabled: true
+  tp_usd_per_min_lot: 0.50        # Target net profit in USD per 0.01 lot (range: $0.40 - $0.70)
+  account_for_costs: true         # Deduct commission and swap from individual profit calculation
+
+# ------------------------------------------------------------------------------
+# 9. Basket Aggregate Take Profit
+# ------------------------------------------------------------------------------
+basket_tp:
+  enabled: true
+  basket_tp_usd: 2.00             # Aggregate net profit in USD to trigger full basket market close
+  min_basket_tp_usd: 1.00         # Minimum floor for aggregate basket take profit
+  account_for_costs: true         # Include floating P/L, commission, and swap
+
+# ------------------------------------------------------------------------------
+# 10. Maximum Holding Time
+# ------------------------------------------------------------------------------
+holding_time:
+  max_hold_seconds: 180           # Maximum basket duration before initiating time-stop exit
+  breakeven_urgency_seconds: 120  # Duration after which basket actively seeks breakeven exit
+  allow_controlled_loss_exit: true # Prefer small controlled exit rather than indefinite open risk
+
+# ------------------------------------------------------------------------------
+# 11. Protective Stop-Loss
+# ------------------------------------------------------------------------------
+protective_sl:
+  sl_points: 300.0                # Mandatory protective stop loss distance in points (e.g. 300 points = $3.00 on Gold)
+  enforce_immediate_placement: true # Stop loss must be placed with order or immediately via modify
+  post_modify_retry_count: 3      # Retry attempts for SL modifications if broker requires two-step placement
+  fail_closed_on_unprotected: true # Instantly close position if protective SL cannot be attached
+
+# ------------------------------------------------------------------------------
+# 12. Maximum Positions
+# ------------------------------------------------------------------------------
+position_limits:
+  max_open_positions: 12          # Hard ceiling on total simultaneous open positions on the account
+
+# ------------------------------------------------------------------------------
+# 13. Maximum Total Volume
+# ------------------------------------------------------------------------------
+volume_limits:
+  max_total_lots: 1.00            # Hard ceiling on aggregate open volume across all active positions
+
+# ------------------------------------------------------------------------------
+# 14. Margin Protection
+# ------------------------------------------------------------------------------
+margin_protection:
+  min_margin_level_pct: 300.0     # Minimum margin level % required before submitting any new order
+  max_margin_usage_pct: 50.0      # Maximum % of free margin permitted for new order allocation
+  check_projected_margin: true    # Calculate projected margin demand before dispatching each order
+
+# ------------------------------------------------------------------------------
+# 15. Equity Drawdown Protection
+# ------------------------------------------------------------------------------
+equity_protection:
+  max_dd_pct: 30.0                # Hard stop: Maximum floating drawdown % relative to balance
+  action_on_breach: "CLOSE_ALL_AND_PAUSE" # Close all positions, cancel orders, pause engine
+  pause_minutes: 60               # Duration in minutes to suspend trading upon drawdown breach
+
+# ------------------------------------------------------------------------------
+# 16. Daily Profit and Loss Limits
+# ------------------------------------------------------------------------------
+daily_limits:
+  max_daily_loss_enabled: false   # Optional hard daily loss ceiling (disabled by default)
+  max_daily_loss_usd: 50.0
+  daily_profit_target_enabled: false # Optional daily profit ceiling (disabled by default)
+  daily_profit_target_usd: 100.0
+  accounting_includes_floating: true # Include unrealized P/L in daily risk accounting
+
+# ------------------------------------------------------------------------------
+# 17. Spread Protection
+# ------------------------------------------------------------------------------
+spread_protection:
+  spread_max_points: 80.0         # Skip new entries when current spread exceeds 80 points
+  action: "SKIP_ENTRY"            # Preserve existing positions, pause new basket submission
+
+# ------------------------------------------------------------------------------
+# 18. Retry and Execution Settings
+# ------------------------------------------------------------------------------
+execution:
+  order_type: "MARKET"
+  preferred_filling_mode: "AUTO"  # AUTO queries symbol_info().filling_mode (IOC, FOK, or RETURN)
+  slippage_points: 25             # Allowed slippage/deviation points
+  max_retries: 3                  # Retry attempts on transient network or requote failures
+  retry_delay_ms: 100             # Delay between retries
+  rate_limit_per_second: 5        # Execution rate limiter to prevent flooding the broker
+
+# ------------------------------------------------------------------------------
+# 19. Emergency Kill Switch
+# ------------------------------------------------------------------------------
+kill_switch:
+  enabled: true
+  flag_file_path: "STOP.flag"     # Presence of this file triggers instantaneous shutdown & close all
+  cli_command_enabled: true
+  telegram_command_enabled: true
+  on_trigger_action: "CLOSE_ALL_AND_HALT"
+
+# ------------------------------------------------------------------------------
+# 20. Demo / Live Protection
+# ------------------------------------------------------------------------------
+safety_mode:
+  DEMO_MODE: true                 # Default: DEMO ONLY. Hard-blocks real-money execution unless false
+  allow_real_trading: false       # Explicit secondary flag required for live account trading
+  require_live_confirmation: true # Strict runtime safety confirmation prompt if live account detected
+
+# ------------------------------------------------------------------------------
+# 21. Logging and Diagnostics
+# ------------------------------------------------------------------------------
+logging:
+  log_level: "INFO"
+  log_file: "logs/gold_scalper.log"
+  log_basket_events: true
+  log_tick_frequency_sec: 10

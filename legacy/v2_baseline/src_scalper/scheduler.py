@@ -1,0 +1,140 @@
+"""
+Market Scheduler and Trading Calendar for Dual-Market Scalping.
+Routes trading execution based on trading calendar:
+- MONDAY – FRIDAY: GOLD (XAUUSD) active for new entries
+- SATURDAY – SUNDAY: BITCOIN (BTCUSD) active for new entries
+- ALL DAYS: Continuous monitoring and lifecycle management of existing positions
+Verifies broker-level trading availability before allowing new entries.
+"""
+
+from __future__ import annotations
+import logging
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+try:
+    import zoneinfo
+except ImportError:
+    from backports import zoneinfo  # type: ignore
+
+from src.scalper.config import SchedulerConfig
+from src.scalper.symbol_resolver import ResolvedSymbolSpec
+
+logger = logging.getLogger("MarketScheduler")
+
+
+@dataclass
+class MarketScheduleDecision:
+    scheduled_symbol: str               # "GOLD" or "BTCUSD"
+    day_name: str                       # "MONDAY", ..., "SUNDAY"
+    timestamp: datetime
+    is_broker_tradable: bool = False
+    is_entry_permitted: bool = False
+    reason: str = ""
+    is_transition_bar: bool = False
+
+
+class MarketScheduler:
+    """
+    Calendar-aware routing scheduler managing market transitions and broker verification.
+    """
+
+    def __init__(self, config: Optional[SchedulerConfig] = None):
+        self.config = config or SchedulerConfig()
+        self.last_active_symbol: Optional[str] = None
+
+    def get_current_time(self, dt_override: Optional[datetime] = None) -> datetime:
+        """Returns localized datetime according to configured timezone."""
+        if dt_override is not None:
+            if dt_override.tzinfo is None:
+                return dt_override.replace(tzinfo=timezone.utc)
+            return dt_override
+
+        tz_str = self.config.timezone.upper()
+        if tz_str in ("UTC", "Z", ""):
+            return datetime.now(timezone.utc)
+        try:
+            tz = zoneinfo.ZoneInfo(self.config.timezone)
+            return datetime.now(tz)
+        except Exception:
+            return datetime.now(timezone.utc)
+
+    def get_scheduled_symbol_key(self, current_dt: Optional[datetime] = None) -> str:
+        """
+        Determines scheduled symbol key based on calendar day:
+        - Monday through Friday -> "GOLD"
+        - Saturday through Sunday -> "BTCUSD"
+        """
+        dt = self.get_current_time(current_dt)
+        day_name = dt.strftime("%A").upper()
+
+        weekend_days = [d.upper() for d in self.config.weekend_days]
+        if day_name in weekend_days:
+            return self.config.weekend_symbol.upper()
+
+        weekday_days = [d.upper() for d in self.config.weekday_days]
+        if day_name in weekday_days:
+            return self.config.weekday_symbol.upper()
+
+        # Fallback to weekday symbol if unlisted
+        return self.config.weekday_symbol.upper()
+
+    def evaluate_market_status(
+        self,
+        symbol_spec: Optional[ResolvedSymbolSpec],
+        current_dt: Optional[datetime] = None,
+    ) -> MarketScheduleDecision:
+        """
+        Evaluates calendar schedule AND broker trading status:
+        1. Checks day of week.
+        2. Validates broker trading permissions on the scheduled symbol.
+        3. Confirms valid live quotes (bid > 0, ask > 0).
+        """
+        dt = self.get_current_time(current_dt)
+        day_name = dt.strftime("%A").upper()
+        scheduled_key = self.get_scheduled_symbol_key(dt)
+
+        is_transition = False
+        if self.last_active_symbol is not None and self.last_active_symbol != scheduled_key:
+            is_transition = True
+            logger.info(
+                f"[SCHEDULER] Market transition detected: '{self.last_active_symbol}' -> '{scheduled_key}' "
+                f"at {dt.isoformat()} ({day_name})."
+            )
+        self.last_active_symbol = scheduled_key
+
+        if not self.config.enabled:
+            return MarketScheduleDecision(
+                scheduled_symbol=scheduled_key,
+                day_name=day_name,
+                timestamp=dt,
+                is_broker_tradable=True,
+                is_entry_permitted=True,
+                reason="Scheduler disabled: routing unrestricted.",
+                is_transition_bar=is_transition,
+            )
+
+        # Broker availability checks
+        is_broker_tradable = False
+        reason = ""
+        if symbol_spec is None:
+            reason = f"Symbol specification for {scheduled_key} is unavailable."
+        elif not symbol_spec.is_tradable or symbol_spec.trade_mode != 4:
+            reason = f"Broker trade_mode ({symbol_spec.trade_mode}) indicates {symbol_spec.symbol} is closed or disabled for trading."
+        elif symbol_spec.bid <= 0 or symbol_spec.ask <= 0:
+            reason = f"No live price quotes streaming for {symbol_spec.symbol} (bid: {symbol_spec.bid}, ask: {symbol_spec.ask})."
+        else:
+            is_broker_tradable = True
+            reason = f"Active schedule confirmed: {day_name} -> {scheduled_key} ({symbol_spec.symbol}) tradable."
+
+        is_entry_permitted = is_broker_tradable if self.config.require_symbol_trading_availability else True
+
+        return MarketScheduleDecision(
+            scheduled_symbol=scheduled_key,
+            day_name=day_name,
+            timestamp=dt,
+            is_broker_tradable=is_broker_tradable,
+            is_entry_permitted=is_entry_permitted,
+            reason=reason,
+            is_transition_bar=is_transition,
+        )

@@ -1,0 +1,157 @@
+{
+  "timestamp": "2026-11-16T19:55:29.112426Z",
+  "terminal_initialized": true,
+  "account_info": {
+    "login": 2002270203,
+    "server": "JustMarkets-Demo",
+    "company": "Just Global Markets Ltd.",
+    "currency": "USD",
+    "balance": 1904.52,
+    "equity": 1912.8,
+    "margin_free": 1902.39,
+    "leverage": 3000,
+    "trade_allowed_account": true,
+    "trade_allowed_terminal": true,
+    "trade_mode": "DEMO"
+  },
+  "account_detection": {
+    "account_type": "DEMO_STANDARD",
+    "confidence": "HIGH",
+    "denomination_factor": 1.0,
+    "normalized_balance": 1904.52,
+    "normalized_equity": 1912.8,
+    "evidence": [
+      "Account classified as STANDARD based on verified conventional currency 'USD'."
+    ]
+  },
+  "discovered_symbols": {
+    "XAUUSD": {
+      "canonical_symbol": "XAUUSD",
+      "actual_broker_symbol": "XAUUSD.m",
+      "broker_symbol": "XAUUSD.m",
+      "broker_server": "JustMarkets-Demo",
+      "account_type": "DEMO_STANDARD",
+      "suffix": ".m",
+      "contract_size": 100.0,
+      "digits": 2,
+      "point_size": 0.01,
+      "tick_size": 0.01,
+      "tick_value": 1.0,
+      "minimum_volume": 0.01,
+      "maximum_volume": 100.0,
+      "volume_step": 0.01,
+      "trade_mode": 4,
+      "filling_mode": 1,
+      "stop_level": 0,
+      "freeze_level": 0,
+      "discovery_timestamp": "2026-11-16T19:55:29.139602+00:00",
+      "validation_status": "VALIDATED",
+      "candidates": [
+        "XAUUSD.m"
+      ],
+      "reason": ""
+    },
+    "BTCUSD": {
+      "canonical_symbol": "BTCUSD",
+      "actual_broker_symbol": "BTCUSD.m",
+      "broker_symbol": "BTCUSD.m",
+      "broker_server": "JustMarkets-Demo",
+      "account_type": "DEMO_STANDARD",
+      "suffix": ".m",
+      "contract_size": 1.0,
+      "digits": 2,
+      "point_size": 0.01,
+      "tick_size": 0.01,
+      "tick_value": 0.01,
+      "minimum_volume": 0.01,
+      "maximum_volume": 100.0,
+      "volume_step": 0.01,
+      "trade_mode": 4,
+      "filling_mode": 1,
+      "stop_level": 0,
+      "freeze_level": 0,
+      "discovery_timestamp": "2026-11-16T19:55:29.144850+00:00",
+      "validation_status": "VALIDATED",
+      "candidates": [
+        "BTCUSD.m"
+      ],
+      "reason": ""
+    },
+    "USDJPY": {
+      "canonical_symbol": "USDJPY",
+      "actual_broker_symbol": "USDJPY.m",
+      "broker_symbol": "USDJPY.m",
+      "broker_server": "JustMarkets-Demo",
+      "account_type": "DEMO_STANDARD",
+      "suffix": ".m",
+      "contract_size": 100000.0,
+      "digits": 3,
+      "point_size": 0.001,
+      "tick_size": 0.001,
+      "tick_value": 0.6270103519409106,
+      "minimum_volume": 0.01,
+      "maximum_volume": 100.0,
+      "volume_step": 0.01,
+      "trade_mode": 4,
+      "filling_mode": 1,
+      "stop_level": 0,
+      "freeze_level": 0,
+      "discovery_timestamp": "2026-11-16T19:55:29.153853+00:00",
+      "validation_status": "VALIDATED",
+      "candidates": [
+        "USDJPY.m"
+      ],
+      "reason": ""
+    }
+  },
+  "unauthorized_rejections": [
+    {
+      "symbol": "US30.std",
+      "authorized": false,
+      "resolved_canonical": null,
+      "rejection_confirmed": true
+    },
+    {
+      "symbol": "EURUSD",
+      "authorized": false,
+      "resolved_canonical": null,
+      "rejection_confirmed": true
+    },
+    {
+      "symbol": "NAS100",
+      "authorized": false,
+      "resolved_canonical": null,
+      "rejection_confirmed": true
+    },
+    {
+      "symbol": "US100.std",
+      "authorized": false,
+      "resolved_canonical": null,
+      "rejection_confirmed": true
+    },
+    {
+      "symbol": "GBPUSD",
+      "authorized": false,
+      "resolved_canonical": null,
+      "rejection_confirmed": true
+    },
+    {
+      "symbol": "EURUSD.m",
+      "authorized": false,
+      "resolved_canonical": null,
+      "rejection_confirmed": true
+    },
+    {
+      "symbol": "XAUUSD.invalid",
+      "authorized": false,
+      "resolved_canonical": null,
+      "rejection_confirmed": true
+    }
+  ],
+  "cent_demo_availability": {
+    "current_server": "JustMarkets-Demo",
+    "cent_symbols_count_on_server": 1,
+    "cent_server_architecture_note": "JustMarkets isolates cent accounts to Cent servers with USC currency."
+  },
+  "overall_status": "VERIFIED_STANDARD_DEMO_AND_MOCKED_CENT_SUITE"
+}

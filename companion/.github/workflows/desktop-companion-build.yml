@@ -1,0 +1,105 @@
+name: Build & Package MT5-OO1 Companion Desktop App
+
+on:
+  push:
+    branches: [main, master, "feature/**"]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  test-and-verify:
+    name: Run Python & Engine Regression Tests
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
+          pip install pyinstaller
+
+      - name: Run Test Suite
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m unittest -v tests/test_companion_supervisor.py tests/test_manual_management.py tests/test_algovistra_skills.py
+
+  build-desktop:
+    name: Package Desktop Installer on ${{ matrix.platform }}
+    needs: test-and-verify
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            os: windows-latest
+            artifact_name: MT5-OO1-Companion-Setup.exe
+            build_cmd: npm run dist:win
+          - platform: macos-arm64
+            os: macos-latest
+            artifact_name: MT5-OO1-Companion.dmg
+            build_cmd: npm run build && npx electron-builder --mac dmg
+          - platform: linux-x64
+            os: ubuntu-latest
+            artifact_name: MT5-OO1-Companion.AppImage
+            build_cmd: npm run build && npx electron-builder --linux AppImage deb
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Python Dependencies & PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
+          pip install pyinstaller
+
+      - name: Bundle Python Sidecars
+        run: |
+          python companion/packaging/build_sidecars.py
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: companion/package.json
+
+      - name: Install Desktop Application Dependencies
+        working-directory: companion
+        run: npm ci || npm install
+
+      - name: Build React Dashboard Frontend
+        working-directory: companion
+        run: npm run build
+
+      - name: Package Desktop Installer
+        working-directory: companion
+        run: ${{ matrix.build_cmd }}
+
+      - name: Upload Desktop Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MT5-OO1-Companion-${{ matrix.platform }}
+          path: |
+            companion/release/*.exe
+            companion/release/*.dmg
+            companion/release/*.AppImage
+            companion/release/*.deb
+          if-no-files-found: warn

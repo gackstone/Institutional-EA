@@ -1,0 +1,56 @@
+{
+  "description": "MT5-001 Broker Compatibility Registry for Account Detection & Symbol Conventions",
+  "version": "1.0.0",
+  "known_cent_currencies": [
+    "USC",
+    "EUC",
+    "GBX",
+    "JPC",
+    "USCENT",
+    "EURCENT",
+    "GLD",
+    "CENT"
+  ],
+  "brokers": {
+    "JustMarkets": {
+      "company_patterns": ["JustMarkets", "Just Global Markets", "JustForex"],
+      "cent_servers": ["JustMarkets-Live-Cent", "JustMarkets-Demo-Cent"],
+      "cent_currencies": ["USC", "EUC"],
+      "cent_symbol_suffix": ".c",
+      "standard_symbol_suffix": ".m",
+      "denomination_factor": 100.0
+    },
+    "Exness": {
+      "company_patterns": ["Exness"],
+      "cent_servers": ["Exness-Cent", "Exness-TrialCent"],
+      "cent_currencies": ["USC"],
+      "cent_symbol_suffix": "c",
+      "standard_symbol_suffix": "m",
+      "denomination_factor": 100.0
+    },
+    "RoboForex": {
+      "company_patterns": ["RoboForex"],
+      "cent_servers": ["RoboForex-ProCent", "RoboForex-DemoProCent"],
+      "cent_currencies": ["USC", "EUX"],
+      "cent_symbol_suffix": ".c",
+      "standard_symbol_suffix": ".pro",
+      "denomination_factor": 100.0
+    },
+    "FBS": {
+      "company_patterns": ["FBS"],
+      "cent_servers": ["FBS-Cent", "FBS-DemoCent"],
+      "cent_currencies": ["USC", "EURCENT"],
+      "cent_symbol_suffix": "-cent",
+      "standard_symbol_suffix": "",
+      "denomination_factor": 100.0
+    },
+    "XM": {
+      "company_patterns": ["XM Global", "Trading Point"],
+      "cent_servers": ["XMGlobal-Demo", "XMGlobal-Real"],
+      "cent_currencies": ["USC"],
+      "cent_symbol_suffix": "micro",
+      "standard_symbol_suffix": "",
+      "denomination_factor": 100.0
+    }
+  }
+}

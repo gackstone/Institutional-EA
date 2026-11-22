@@ -1,0 +1,112 @@
+{
+  "universe_rejections": {
+    "USDJPY": true,
+    "USDJPY.c": true,
+    "USDJPY.m": true,
+    "USDJPYmicro": true,
+    "USDJPYpro": true,
+    "USDJPY.raw": true,
+    "USDJPY_i": true,
+    "USDJPY#": true
+  },
+  "server_rejections": {
+    "USDJPY": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "code": "INSTRUMENT_NOT_ALLOWED",
+      "symbol": "USDJPY",
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPY.c": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "code": "INSTRUMENT_NOT_ALLOWED",
+      "symbol": "USDJPY.c",
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPY.m": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "code": "INSTRUMENT_NOT_ALLOWED",
+      "symbol": "USDJPY.m",
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPYmicro": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "code": "INSTRUMENT_NOT_ALLOWED",
+      "symbol": "USDJPYmicro",
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPYpro": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "code": "INSTRUMENT_NOT_ALLOWED",
+      "symbol": "USDJPYpro",
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPY.raw": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "code": "INSTRUMENT_NOT_ALLOWED",
+      "symbol": "USDJPY.raw",
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPY_i": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "code": "INSTRUMENT_NOT_ALLOWED",
+      "symbol": "USDJPY_i",
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPY#": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "code": "INSTRUMENT_NOT_ALLOWED",
+      "symbol": "USDJPY#",
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    }
+  },
+  "client_rejections": {
+    "USDJPY": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPY.c": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPY.m": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPYmicro": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPYpro": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPY.raw": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPY_i": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    },
+    "USDJPY#": {
+      "status": "ERROR",
+      "retcode": 10016,
+      "message": "INSTRUMENT_NOT_ALLOWED: USDJPY is excluded from the trading universe. Only XAUUSD and BTCUSD are permitted."
+    }
+  }
+}

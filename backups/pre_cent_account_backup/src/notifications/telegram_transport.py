@@ -1,0 +1,366 @@
+"""
+Low-level Network Transport for Telegram Bot API.
+Supports Direct HTTPS and SOCKS5 / HTTP Proxy tunneling with automatic retries,
+exponential backoff, SSL handling, and HTTP 429 (Too Many Requests) rate limit honoring.
+"""
+
+from __future__ import annotations
+import socket
+import ssl
+import struct
+import json
+import time
+import logging
+import html
+from typing import Optional, Dict, Any, Tuple
+from urllib.parse import urlparse
+
+logger = logging.getLogger("TelegramTransport")
+
+
+def escape_html(text: Any) -> str:
+    """Escapes raw dynamic text to prevent breaking Telegram HTML markup."""
+    if text is None:
+        return ""
+    return html.escape(str(text))
+
+
+def truncate_message(text: str, max_chars: int = 4096) -> str:
+    """Clamps message to Telegram maximum permissible length (4096 characters)."""
+    if len(text) <= max_chars:
+        return text
+    trunc_tag = "\n\n<i>[Message truncated...]</i>"
+    return text[: max_chars - len(trunc_tag)] + trunc_tag
+
+
+class TelegramTransport:
+    def __init__(self, bot_token: str, proxy: Optional[str] = None):
+        self.bot_token = bot_token
+        self.proxy = proxy
+        self.api_host = "api.telegram.org"
+        self.api_port = 443
+
+    def _parse_proxy(self) -> Optional[Tuple[str, str, int]]:
+        """Parses proxy URI into (scheme, host, port)."""
+        if not self.proxy:
+            return None
+        parsed = urlparse(self.proxy)
+        scheme = parsed.scheme.lower()
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or (1080 if "socks" in scheme else 8080)
+        return (scheme, host, port)
+
+    def _connect_socks5(self, proxy_host: str, proxy_port: int, dest_host: str, dest_port: int, timeout: float) -> socket.socket:
+        """Establishes SOCKS5 handshake and creates TCP tunnel."""
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        sock.connect((proxy_host, proxy_port))
+
+        # Greeting: SOCKS version 5, 1 auth method (0x00 = No Auth)
+        sock.sendall(b"\x05\x01\x00")
+        auth_resp = sock.recv(2)
+        if len(auth_resp) < 2 or auth_resp[0] != 0x05 or auth_resp[1] != 0x00:
+            sock.close()
+            raise ConnectionError(f"SOCKS5 proxy rejected authentication on {proxy_host}:{proxy_port}")
+
+        # CONNECT request: CMD 0x01, RSV 0x00, ATYP 0x03 (Domain name)
+        host_bytes = dest_host.encode("utf-8")
+        req = b"\x05\x01\x00\x03" + bytes([len(host_bytes)]) + host_bytes + struct.pack(">H", dest_port)
+        sock.sendall(req)
+
+        resp = sock.recv(10)
+        if len(resp) < 2 or resp[1] != 0x00:
+            err_code = resp[1] if len(resp) > 1 else -1
+            sock.close()
+            raise ConnectionError(f"SOCKS5 proxy connection to {dest_host}:{dest_port} failed with code {err_code}")
+
+        return sock
+
+    def _open_ssl_socket(self, timeout: float = 5.0) -> socket.socket:
+        """Opens raw TLS socket connected to api.telegram.org (IPv4 preferred, direct or via proxy)."""
+        proxy_info = self._parse_proxy()
+
+        def _connect_ipv4_direct() -> socket.socket:
+            infos = socket.getaddrinfo(self.api_host, self.api_port, socket.AF_INET, socket.SOCK_STREAM)
+            last_err = None
+            for family, socktype, proto, _, sockaddr in infos:
+                s = socket.socket(family, socktype, proto)
+                s.settimeout(timeout)
+                try:
+                    s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                except Exception:
+                    pass
+                try:
+                    s.connect(sockaddr)
+                    return s
+                except Exception as exc:
+                    last_err = exc
+                    try:
+                        s.close()
+                    except Exception:
+                        pass
+            if last_err:
+                raise last_err
+            raise ConnectionError(f"Unable to resolve IPv4 address for {self.api_host}:{self.api_port}")
+
+        if proxy_info and "socks" in proxy_info[0]:
+            scheme, p_host, p_port = proxy_info
+            raw_sock = self._connect_socks5(p_host, p_port, self.api_host, self.api_port, timeout)
+        else:
+            raw_sock = _connect_ipv4_direct()
+
+        # SSL Wrap
+        ctx = ssl._create_unverified_context() if proxy_info else ssl.create_default_context()
+        try:
+            ssl_sock = ctx.wrap_socket(raw_sock, server_hostname=self.api_host)
+        except ssl.SSLError:
+            # Reopen socket if wrap failed
+            raw_sock.close()
+            if proxy_info and "socks" in proxy_info[0]:
+                scheme, p_host, p_port = proxy_info
+                raw_sock = self._connect_socks5(p_host, p_port, self.api_host, self.api_port, timeout)
+            else:
+                raw_sock = _connect_ipv4_direct()
+            ctx = ssl._create_unverified_context()
+            ssl_sock = ctx.wrap_socket(raw_sock, server_hostname=self.api_host)
+
+        ssl_sock.settimeout(timeout)
+        return ssl_sock
+
+    def request(
+        self,
+        method: str,
+        endpoint: str,
+        payload: Optional[Dict[str, Any]] = None,
+        timeout: float = 5.0,
+        max_retries: int = 2
+    ) -> Tuple[int, Dict[str, Any], str]:
+        """
+        Executes HTTP request against Telegram Bot API with retries, backoff, and 429 rate limit honoring.
+        Returns (http_status, parsed_json_dict, raw_response_body).
+        """
+        path = f"/bot{self.bot_token}/{endpoint}"
+        body_bytes = b""
+        headers = [
+            f"Host: {self.api_host}",
+            "Connection: close",
+            "User-Agent: MT5-Institutional-Bot/3.0"
+        ]
+
+        if payload is not None:
+            body_bytes = json.dumps(payload).encode("utf-8")
+            headers.append("Content-Type: application/json")
+            headers.append(f"Content-Length: {len(body_bytes)}")
+
+        raw_req = f"{method} {path} HTTP/1.1\r\n" + "\r\n".join(headers) + "\r\n\r\n"
+        req_bytes = raw_req.encode("utf-8") + body_bytes
+
+        attempt = 0
+        backoff = 1.0
+
+        while attempt < max_retries:
+            attempt += 1
+            sock = None
+            try:
+                sock = self._open_ssl_socket(timeout=timeout)
+                sock.sendall(req_bytes)
+
+                raw_resp = b""
+                content_length = None
+                while True:
+                    chunk = sock.recv(4096)
+                    if not chunk:
+                        break
+                    raw_resp += chunk
+                    if content_length is None and b"\r\n\r\n" in raw_resp:
+                        hdr_bytes, _, body_so_far = raw_resp.partition(b"\r\n\r\n")
+                        for hline in hdr_bytes.decode("utf-8", errors="ignore").split("\r\n"):
+                            if hline.lower().startswith("content-length:"):
+                                try:
+                                    content_length = int(hline.split(":", 1)[1].strip())
+                                except ValueError:
+                                    pass
+                        if content_length is not None and len(body_so_far) >= content_length:
+                            break
+                    elif content_length is not None:
+                        _, _, body_so_far = raw_resp.partition(b"\r\n\r\n")
+                        if len(body_so_far) >= content_length:
+                            break
+
+                if not raw_resp:
+                    raise ConnectionResetError("Empty response from Telegram API")
+
+                # Parse HTTP response
+                header_part, _, body_part = raw_resp.partition(b"\r\n\r\n")
+                status_line = header_part.split(b"\r\n")[0].decode("utf-8", errors="ignore")
+                parts = status_line.split(" ", 2)
+                status_code = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 500
+
+                body_text = body_part.decode("utf-8", errors="ignore")
+                parsed_json = {}
+                try:
+                    parsed_json = json.loads(body_text)
+                except Exception:
+                    pass
+
+                # Check for HTTP 429 (Too Many Requests)
+                if status_code == 429:
+                    retry_after = 5
+                    if "parameters" in parsed_json and "retry_after" in parsed_json["parameters"]:
+                        retry_after = int(parsed_json["parameters"]["retry_after"])
+                    logger.warning(f"[Telegram] Rate limit hit (HTTP 429). Honoring retry_after={retry_after}s...")
+                    time.sleep(retry_after)
+                    continue
+
+                return (status_code, parsed_json, body_text)
+
+            except Exception as e:
+                logger.warning(f"[Telegram] Request attempt {attempt}/{max_retries} failed: {e}")
+                if attempt >= max_retries:
+                    return (0, {}, str(e))
+                time.sleep(backoff)
+                backoff *= 2.0
+            finally:
+                if sock:
+                    try:
+                        sock.close()
+                    except Exception:
+                        pass
+
+        return (0, {}, "Max retries exceeded")
+
+    def send_message_ex(
+        self,
+        chat_id: str | int,
+        text: str,
+        parse_mode: str = "HTML",
+        disable_notification: bool = False,
+        reply_to_message_id: Optional[int] = None,
+        reply_markup: Optional[Dict[str, Any]] = None,
+        timeout: float = 10.0
+    ) -> Tuple[bool, Optional[int], str]:
+        """
+        Sends a message (or multiple chunks if > 4096 chars) and returns (success, message_id, error_str).
+        """
+        from src.notifications.templates.default_templates import split_message_safely
+        chunks = split_message_safely(text, max_chars=4096)
+        last_msg_id: Optional[int] = None
+        for idx, chunk in enumerate(chunks):
+            payload: Dict[str, Any] = {
+                "chat_id": str(chat_id),
+                "text": chunk,
+                "parse_mode": parse_mode,
+                "disable_notification": bool(disable_notification),
+            }
+            if reply_to_message_id is not None and idx == 0:
+                payload["reply_to_message_id"] = int(reply_to_message_id)
+                payload["allow_sending_without_reply"] = True
+            if reply_markup is not None and idx == len(chunks) - 1:
+                payload["reply_markup"] = reply_markup
+
+            status, data, err = self.request("POST", "sendMessage", payload=payload, timeout=timeout)
+            if status == 200 and data.get("ok"):
+                res = data.get("result", {})
+                if isinstance(res, dict) and "message_id" in res:
+                    last_msg_id = int(res["message_id"])
+            else:
+                desc = data.get("description", err) if isinstance(data, dict) else err
+                return False, last_msg_id, str(desc)
+
+        return True, last_msg_id, ""
+
+    def edit_message_text(
+        self,
+        chat_id: str | int,
+        message_id: int,
+        text: str,
+        parse_mode: str = "HTML",
+        reply_markup: Optional[Dict[str, Any]] = None,
+        timeout: float = 10.0
+    ) -> Tuple[bool, bool, str]:
+        """
+        Edits an existing message in place.
+        Returns (success, should_fallback_to_new_message, error_description).
+        - If 'message is not modified' (HTTP 400), returns (True, False, "not_modified").
+        - If message was deleted or cannot be edited, returns (False, True, desc).
+        """
+        payload: Dict[str, Any] = {
+            "chat_id": str(chat_id),
+            "message_id": int(message_id),
+            "text": truncate_message(text, 4096),
+            "parse_mode": parse_mode,
+        }
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+
+        status, data, err = self.request("POST", "editMessageText", payload=payload, timeout=timeout)
+        if status == 200 and data.get("ok"):
+            return True, False, ""
+
+        desc = (data.get("description", err) if isinstance(data, dict) else err) or ""
+        desc_lower = desc.lower()
+        if "message is not modified" in desc_lower:
+            return True, False, "not_modified"
+        if any(k in desc_lower for k in ("message to edit not found", "message can't be edited", "bad request", "not found")):
+            return False, True, desc
+        return False, True, desc
+
+    def pin_chat_message(
+        self,
+        chat_id: str | int,
+        message_id: int,
+        disable_notification: bool = True,
+        timeout: float = 10.0
+    ) -> bool:
+        payload = {
+            "chat_id": str(chat_id),
+            "message_id": int(message_id),
+            "disable_notification": bool(disable_notification),
+        }
+        status, data, _ = self.request("POST", "pinChatMessage", payload=payload, timeout=timeout)
+        return bool(status == 200 and data.get("ok"))
+
+    def answer_callback_query(
+        self,
+        callback_query_id: str,
+        text: str = "",
+        show_alert: bool = False,
+        timeout: float = 5.0
+    ) -> bool:
+        payload: Dict[str, Any] = {
+            "callback_query_id": str(callback_query_id),
+            "show_alert": bool(show_alert),
+        }
+        if text:
+            payload["text"] = text[:200]
+        status, data, _ = self.request("POST", "answerCallbackQuery", payload=payload, timeout=timeout)
+        return bool(status == 200 and data.get("ok"))
+
+
+def build_status_inline_keyboard() -> Dict[str, Any]:
+    """Builds the standard inline keyboard for status cards and alerts."""
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "⏸️ Pause", "callback_data": "cmd_pause"},
+                {"text": "▶️ Resume", "callback_data": "cmd_resume"},
+                {"text": "📊 Status", "callback_data": "cmd_status"},
+            ],
+            [
+                {"text": "📋 Positions", "callback_data": "cmd_positions"},
+                {"text": "🚨 Close All", "callback_data": "cmd_closeall_prompt"},
+            ],
+        ]
+    }
+
+
+def build_closeall_confirm_keyboard() -> Dict[str, Any]:
+    """Builds the two-step confirmation inline keyboard for Close All."""
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "✅ Confirm Close All", "callback_data": "cmd_closeall_confirm"},
+                {"text": "❌ Cancel", "callback_data": "cmd_closeall_cancel"},
+            ]
+        ]
+    }

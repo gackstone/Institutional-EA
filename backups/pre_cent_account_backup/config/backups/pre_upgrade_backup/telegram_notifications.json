@@ -1,0 +1,12 @@
+{
+  "trade_signals_enabled": true,
+  "execution_success_enabled": true,
+  "trade_closure_enabled": true,
+  "profit_alerts_enabled": true,
+  "critical_alerts_enabled": true,
+  "recovery_alerts_enabled": true,
+  "rejected_trade_alerts_enabled": false,
+  "routine_status_alerts_enabled": false,
+  "daily_summary_enabled": true,
+  "notification_deduplication_enabled": true
+}

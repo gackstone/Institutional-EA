@@ -1,0 +1,18 @@
+# Manual Position Management Configuration (Example Template)
+# Copy to config/manual_management.yaml and modify as needed.
+
+mode: "OBSERVE"
+allow_real_account_management: false
+poll_interval_seconds: 2.0
+user_override_lockout_minutes: 30
+allowed_symbols:
+  - "EURUSD"
+  - "GBPUSD"
+  - "USDJPY"
+  - "XAUUSD"
+break_even_activation_r: 1.0
+break_even_buffer_points: 10.0
+trailing_stop_activation_r: 1.5
+max_addons_per_position: 1
+min_addon_rr_in_profit: 1.0
+pause_all: false

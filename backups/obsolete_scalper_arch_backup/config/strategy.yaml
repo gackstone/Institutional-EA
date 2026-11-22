@@ -1,0 +1,140 @@
+# ==============================================================================
+# AlgoVistra & Art of Trading Combined Confirmation Engine Configuration
+# Single Source of Truth for Quantitative Trading Parameters (28 Videos)
+# Precedence: Where Part 2 (Art of Trading) says AMENDS, Part 2 wins.
+# Every [ASSUMPTION] parameter must be tested via bar-replay and walk-forward ablation.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Operational Mode & Safety Guards [GROUND RULE 3]
+# ------------------------------------------------------------------------------
+mode:
+  # live_trading_enabled: Master kill switch. Must be explicitly true to permit live broker order dispatch.
+  live_trading_enabled: false # [GROUND RULE 3] DEMO / PAPER default
+
+  # default_execution_mode: "DEMO", "SIMULATION", "BACKTEST", "REAL", "PROP"
+  default_execution_mode: "DEMO" # [GROUND RULE 3]
+
+  # closed_candles_only: strictly drop forming bar (index 0) from calculations
+  closed_candles_only: true # [GROUND RULE 4, VIDEO 6, 10, 15, ART-06, ART-10]
+
+# ------------------------------------------------------------------------------
+# 2. Timeframe Hierarchy & Analysis Order [ART-10, ART-09, ASSUMPTION]
+# Mandatory Order: Higher-Timeframe Pools first, then Lower-Timeframe Reaction
+# ------------------------------------------------------------------------------
+timeframes:
+  htf_pools: "D1"            # Higher Timeframe for BSL/SSL pools (PDH/PDL, PWH/PWL) [ART-04, ART-10]
+  htf_bias: "H4"             # Macro structure & long-term swings (LTH) [ART-02, ASSUMPTION]
+  intermediate_context: "H1" # Intermediate structure (ITH) & range loops (ERL/IRL) [ART-02, ART-03]
+  ltf_entry: "M15"           # Execution timeframe for STH swings, triggers & closed candles [ART-02, ART-06]
+
+# ------------------------------------------------------------------------------
+# 3. Gate H0: Higher-Timeframe Liquidity Pool Map (ART-04, ART-10)
+# ------------------------------------------------------------------------------
+htf_pools:
+  track_pwh_pwl: true        # Previous Week High / Low [ART-04]
+  track_pdh_pdl: true        # Previous Day High / Low [ART-04]
+  track_eqh_eql: true        # Equal Highs / Equal Lows [VIDEO 7, ART-04]
+  eq_tolerance_atr_mult: 0.1 # ATR multiplier for defining 'equal' levels [ASSUMPTION]
+  pool_weights:              # Relative order magnitude weights [ASSUMPTION]
+    PWH_PWL: 4.0
+    PDH_PDL: 3.0
+    EQH_EQL: 2.0
+    SWING: 1.0
+
+# ------------------------------------------------------------------------------
+# 4. Gate G1: Trend & Swing Hierarchy (ART-02, Videos 3, 4)
+# ------------------------------------------------------------------------------
+trend_and_structure:
+  # swing_hierarchy: recursive ranking (STH n=1, ITH, LTH) [ART-02]
+  sth_window: 1              # Short-term high/low window (n=1 each side) [ART-02]
+  require_body_close_for_bos: true # Body close required for BOS [VIDEO 4, 9, ART-09]
+  flip_trend_on_choch_only: true   # First close beyond opposite swing [VIDEO 4, ART-09, ART-10]
+  protected_swing_rank: "ITH"# Anchor protected swing to intermediate-term rank [ART-02, ASSUMPTION]
+
+# ------------------------------------------------------------------------------
+# 5. Gate G1b: Structure Momentum Monitor & Market Phase (Video 15, ART-01)
+# ------------------------------------------------------------------------------
+momentum_monitor:
+  decaying_legs_count: 2     # Number of consecutive shrinking impulse legs to flag DECAYING [ASSUMPTION]
+  decaying_action: "BLOCK_CONTINUATIONS" # [DERIVED]
+  size_reduction_multiplier: 0.50 # [ASSUMPTION]
+  track_four_phases: true    # Track Consolidation, Expansion, Retracement, Reversal as context [ART-01]
+
+# ------------------------------------------------------------------------------
+# 6. Gate G2: Location & Range Invalidation (ART-07, Videos 2, 13)
+# ------------------------------------------------------------------------------
+location:
+  equilibrium_level: 0.50    # 50% split of active swing range [VIDEO 2, ART-07]
+  require_discount_for_buys: true # Buy only in discount (< 50%) [VIDEO 2, ART-06, ART-07]
+  require_premium_for_sells: true # Sell only in premium (> 50%) [VIDEO 2, ART-07]
+  range_invalidation_by_close: true # Close beyond swing low/high breaks range [ART-07]
+  
+  # Range middle filter (Video 13)
+  range_middle_lower_bound: 0.40 # [ASSUMPTION]
+  range_middle_upper_bound: 0.60 # [ASSUMPTION]
+  min_range_touches: 2           # Minimum touches at support/resistance to form range [VIDEO 13]
+
+# ------------------------------------------------------------------------------
+# 7. Gate G3: Liquidity Events & Breakout/Trap (ART-10, Video 6)
+# ------------------------------------------------------------------------------
+liquidity_events:
+  sweep_requires_close_inside: true # Wick beyond level, close back inside [ART-10, VIDEO 5]
+  sweep_requires_later_choch: true  # Sweep alone is not an entry; requires CHOCH [ART-06, ART-10]
+  breakout_confirm_mode: "second_close_or_retest" # [ART-10, VIDEO 6, ASSUMPTION]
+  trap_feeds_reversal: true         # TRAP + CHOCH feeds reversal context [ART-10, ART-06]
+
+# ------------------------------------------------------------------------------
+# 8. Gate G4: Trigger Types (ART-06, Videos 1, 5, 8)
+# ------------------------------------------------------------------------------
+triggers:
+  enable_five_check_model: true # Master Setup Type A (Sweep+CHOCH+Discount+FVG/OB+Plan) [ART-06]
+  enable_inducement_ob: true    # Setup Type B (Inducement sweep + OB) [VIDEO 1]
+  enable_ifvg_inversion: true   # Setup Type C (Failed FVG role reversal) [VIDEO 8]
+  five_check_min_rr: 2.0        # Minimum R:R for 5-check trade plan [ART-06, ASSUMPTION]
+
+# ------------------------------------------------------------------------------
+# 9. Gate G5: Zone Quality & Order Block Qualification (ART-08, ART-09, Videos 9, 10, 11)
+# ------------------------------------------------------------------------------
+zone_quality:
+  # Order Block Qualification (ART-09 AMENDS Video 1)
+  ob_requires_bos: true         # Must break structure with body close [ART-09]
+  ob_requires_fvg: true         # Must leave an unmitigated FVG [ART-09]
+  
+  # FVG Quality (Videos 9, 10, 11, ART-08)
+  fvg_score_min: 2              # Minimum FVG quality score to trade [ASSUMPTION]
+  fvg_bos_close_bonus: 2        # Points for causing BOS with body close [VIDEO 9]
+  fvg_range_gap_penalty: 2      # Penalty for forming inside choppy range [VIDEO 9]
+  fvg_held_level: 0.50          # Close above 50% midpoint required for bullish held [VIDEO 10, ART-08]
+  fvg_close_through_invalidates: true # Close through gap immediately kills setup [VIDEO 5, 10, ART-08]
+
+# ------------------------------------------------------------------------------
+# 10. Gate G6: Entry Sanity & Range Liquidity Loop (ART-03, Video 14)
+# ------------------------------------------------------------------------------
+entry_sanity:
+  min_rr: 1.5                   # Minimum reward-to-risk calculated from actual live fill [VIDEO 14]
+  max_extension_multiplier: 1.0 # Max price drift beyond trigger level in units of planned risk [VIDEO 14, ASSUMPTION]
+  forbid_stop_widening: true    # Strictly forbid widening stop loss to force R:R [VIDEO 14]
+  target_next_draw: true        # Target nearest IRL gap, else nearest ERL pool [ART-03]
+
+# ------------------------------------------------------------------------------
+# 11. Gate G7: Risk & Position Sizing (ART-12, ART-13)
+# ------------------------------------------------------------------------------
+risk_and_execution:
+  # Size strictly from stop distance, NEVER derived from margin [ART-12]
+  sizing_method: "STOP_DISTANCE_ONLY" # [ART-12]
+  max_risk_per_trade_pct: 1.0   # Target risk % of account equity [ASSUMPTION]
+  hard_risk_cap_pct: 2.0        # Max allowable risk under any circumstances [RULE R9, ASSUMPTION]
+  max_daily_loss_pct: 5.0       # Max daily loss kill switch [ASSUMPTION]
+  max_spread_pct_of_sl: 20.0    # Reject if spread exceeds 20% of stop loss distance [ART-13, ASSUMPTION]
+  broker_volume_type: "TICK"    # MT5 forex volume is broker tick volume [ART-13]
+
+# ------------------------------------------------------------------------------
+# 12. Trade Management & Stop Policy (ART-06, Video 12)
+# ------------------------------------------------------------------------------
+stop_management:
+  be_move_mode: "structure_only" # Move stop only on confirmed new protected swings [VIDEO 12]
+  enable_fixed_r_be: false      # Fixed +1R BE disabled [VIDEO 12]
+  sweep_setup_stop: "SWEEP_EXTREME" # Setup A stop placed beyond sweep extreme [ART-06, ART-10]
+  ob_setup_stop: "BELOW_BLOCK"  # Setup B stop placed below the block [VIDEO 1]
+  stop_precedence: "SWEEP_EXTREME" # Sweep extreme wins if both apply [ART-06, DERIVED]

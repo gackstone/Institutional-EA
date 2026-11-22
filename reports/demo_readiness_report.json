@@ -1,0 +1,35 @@
+{
+  "generated_at_utc": "2026-11-14T10:10:29.522524+00:00",
+  "status": "READY_FOR_DEMO_AFTER_OPERATOR_STOP_FLAG_CLEARANCE",
+  "demo_mode_enforced": true,
+  "allow_real_trading": false,
+  "stop_flag_active": true,
+  "verified_launcher_command": ".\\.venv\\Scripts\\python.exe .\\scripts\\start_dual_scalper.py --config config\\scalper.yaml",
+  "mt5_terminal": {
+    "connected": true,
+    "server": "JustMarkets-Demo3",
+    "login": 1200057798,
+    "trade_mode": 0,
+    "is_demo_account": true,
+    "balance": 4618.59,
+    "equity": 4447.63,
+    "terminal_connected": true,
+    "resolved_gold": {
+      "symbol": "XAUUSD.m",
+      "contract_size": 100.0,
+      "point": 0.01,
+      "spread": 26
+    },
+    "resolved_btcusd": {
+      "symbol": "BTCUSD.m",
+      "contract_size": 1.0,
+      "point": 0.01,
+      "spread": 858
+    }
+  },
+  "test_suite_results": {
+    "total_tests": 132,
+    "passed": 132,
+    "failed": 0
+  }
+}

@@ -1,0 +1,67 @@
+# ==============================================================================
+# ARCADEFX MANUAL TRADE MANAGEMENT & ADOPTION CONFIGURATION
+# Tags: [SAFETY], [VIDEO/KNOWLEDGE], [ASSUMPTION]
+# ==============================================================================
+
+# Master Enable Flag:
+# [SAFETY] Defaults to false (Opt-in initially). Must be explicitly set to true
+# to authorize automated management of manually executed MT5 positions.
+enabled: true
+
+# Operating Mode:
+# - OBSERVE: (Default) Read-only. Analyses positions, calculates structure SL/TP, logs/alerts. Zero orders.
+# - PROTECT: Adopts naked positions (missing SL/TP), sets structure SL & R:R TP, moves SL to Break-Even at +1.0R.
+# - ASSIST:  PROTECT + trails stops behind swing pivots/ATR at +1.5R + alerts on momentum exhaustion.
+# - FULL:    ASSIST + strictly controlled continuation scale-ins (winners only at BE) + strategy-based exits.
+mode: "ASSIST"
+
+# [SAFETY] Real Account Protection Barrier:
+# Even if mode is PROTECT, ASSIST, or FULL, the engine will FORCE mode to OBSERVE on any
+# REAL account unless this flag is explicitly set to true.
+allow_real_account_management: true
+
+# Detection & Polling cadence in seconds [ASSUMPTION]
+poll_interval_seconds: 2.0
+
+# [SAFETY] User Manual Override Lockout:
+# If the user manually changes SL, TP, or volume in MT5, the bot locks itself out from
+# modifying that specific ticket for this duration (in minutes).
+user_override_lockout_minutes: 30
+
+# Allowed symbols for manual management (empty list = allow all symbols in Market Watch)
+allowed_symbols: []
+
+# Protective Stop Loss & Take Profit Settings:
+auto_sl_enabled: true                # Automatically add SL when a manual trade has no SL
+auto_tp_enabled: true                # Automatically add TP when a manual trade has no TP
+tp_target_r: 2.0                     # Risk-to-reward ratio multiplier for calculated Take Profit
+preserve_user_sl_tp: true            # Never overwrite existing user-defined SL/TP
+
+# Break-Even Protection:
+break_even_enabled: true             # Enable automatic Break-Even progression
+break_even_activation_r: 1.0         # Move SL to BE once structure reaches +1.0R
+break_even_buffer_points: 10.0       # Buffer above/below entry to cover spread, swap and commission
+
+# Trailing Stop Loss:
+trailing_stop_enabled: true          # Enable intelligent trailing stop
+trailing_stop_activation_r: 1.5      # Begin trailing once position is >= +1.5R in profit
+trailing_method: "STRUCTURE"         # "STRUCTURE" (swing pivots), "ATR", or "FIXED"
+trailing_atr_multiplier: 1.5         # ATR trailing distance multiplier
+trailing_fixed_points: 200.0         # Fixed point trailing distance (if method=FIXED)
+
+# Automatic Strategy-Based Exit:
+auto_exit_enabled: true              # Close manual trade if strategy market structure reversal is confirmed
+
+# Risk Limits & Safety Controls:
+adopt_existing_on_startup: true      # Automatically adopt open manual trades upon bot boot
+max_manual_positions: 5              # Max concurrent manual positions under management
+max_risk_per_trade_percent: 2.0      # Maximum permitted risk percentage per manual position
+max_daily_loss_percent: 5.0          # Stop managing/lock out if daily drawdown limit reached
+max_addons_per_position: 1           # [SAFETY] Max 1 continuation scale-in per position (FULL mode only)
+min_addon_rr_in_profit: 1.0          # [SAFETY] Position must be >= +1.0R with SL secured at BE before add-on
+
+# Telegram & Alert Notifications:
+notify_telegram: true                # Dispatch event alerts to Telegram remote control
+
+# Emergency kill switch flag (can also be triggered by creating state/PAUSE)
+pause_all: false
