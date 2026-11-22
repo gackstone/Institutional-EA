@@ -1276,6 +1276,25 @@ function testTelegramMessage() {
 // -----------------------------------------------------------------------------
 // MT5 Terminal Scanner & Integration
 // -----------------------------------------------------------------------------
+function readTextAuto(filePath) {
+  const buf = fs.readFileSync(filePath);
+  if (buf.length >= 2 && ((buf[0] === 0xff && buf[1] === 0xfe) || (buf[0] === 0xfe && buf[1] === 0xff))) {
+    return buf.toString("utf16le").replace(/^\uFEFF/, "");
+  }
+  return buf.toString("utf-8").replace(/^\uFEFF/, "");
+}
+
+function readEaVersion(mq5Path) {
+  try {
+    if (!fs.existsSync(mq5Path)) return "";
+    const txt = fs.readFileSync(mq5Path, "utf-8");
+    const m = txt.match(/#property\s+version\s+"([^"]+)"/);
+    return m ? m[1].trim() : "";
+  } catch (e) {
+    return "";
+  }
+}
+
 function scanMT5Terminals() {
   const terminals = [];
   const isWin = process.platform === "win32";
@@ -1288,18 +1307,22 @@ function scanMT5Terminals() {
         const dirs = fs.readdirSync(root);
         for (const dir of dirs) {
           if (dir.toLowerCase().includes("metatrader") || dir.toLowerCase().includes("mt5") || dir.toLowerCase().includes("justmarkets") || dir.toLowerCase().includes("ic markets") || dir.toLowerCase().includes("ftmo")) {
-            const exePath = path.join(root, dir, "terminal64.exe");
+            const installDir = path.join(root, dir);
+            const exePath = path.join(installDir, "terminal64.exe");
+            const metaeditorPath = path.join(installDir, "metaeditor64.exe");
             if (fs.existsSync(exePath)) {
               terminals.push({
                 id: dir.toLowerCase().replace(/[^a-z0-9]/g, "-"),
                 name: dir,
                 executablePath: exePath,
+                metaeditorPath: fs.existsSync(metaeditorPath) ? metaeditorPath : "",
                 dataFolder: "",
                 expertsFolder: "",
                 isRunning: false,
                 pid: null,
                 eaInstalled: false,
-                eaVersion: "3.10"
+                eaCompiled: false,
+                eaVersion: ""
               });
             }
           }
@@ -1307,34 +1330,60 @@ function scanMT5Terminals() {
       } catch (e) {}
     }
 
-    // AppData Roaming Data Folder Scan
+    // AppData Roaming Data Folder Scan — match via origin.txt to exact install directory
     const roamingMeta = path.join(os.homedir(), "AppData", "Roaming", "MetaQuotes", "Terminal");
     if (fs.existsSync(roamingMeta)) {
       try {
         const hashDirs = fs.readdirSync(roamingMeta);
         for (const hd of hashDirs) {
-          const expertsPath = path.join(roamingMeta, hd, "MQL5", "Experts");
-          if (fs.existsSync(expertsPath)) {
-            const eaFile = path.join(expertsPath, "PythonBridgeEA.mq5");
-            const isInstalled = fs.existsSync(eaFile);
+          const dataPath = path.join(roamingMeta, hd);
+          const expertsPath = path.join(dataPath, "MQL5", "Experts");
+          if (!fs.existsSync(expertsPath)) continue;
 
-            if (terminals.length > 0) {
-              terminals[0].dataFolder = path.join(roamingMeta, hd);
-              terminals[0].expertsFolder = expertsPath;
-              terminals[0].eaInstalled = isInstalled;
-            } else {
-              terminals.push({
-                id: hd,
-                name: "MetaTrader 5 Terminal",
-                executablePath: "C:\\Program Files\\MetaTrader 5\\terminal64.exe",
-                dataFolder: path.join(roamingMeta, hd),
-                expertsFolder: expertsPath,
-                isRunning: false,
-                pid: null,
-                eaInstalled: isInstalled,
-                eaVersion: "3.10"
-              });
-            }
+          const eaFile = path.join(expertsPath, "PythonBridgeEA.mq5");
+          const ex5File = path.join(expertsPath, "PythonBridgeEA.ex5");
+          const isInstalled = fs.existsSync(eaFile);
+          const isCompiled = fs.existsSync(ex5File);
+          const eaVer = readEaVersion(eaFile) || (isInstalled ? "3.10" : "");
+
+          let originDir = "";
+          const originFile = path.join(dataPath, "origin.txt");
+          if (fs.existsSync(originFile)) {
+            try {
+              originDir = path.resolve(readTextAuto(originFile).trim()).toLowerCase();
+            } catch (e) {}
+          }
+
+          let matched = null;
+          if (originDir) {
+            matched = terminals.find((t) => path.resolve(path.dirname(t.executablePath)).toLowerCase() === originDir);
+          }
+          if (!matched && terminals.length > 0 && !terminals[0].dataFolder) {
+            matched = terminals[0];
+          }
+
+          if (matched) {
+            matched.dataFolder = dataPath;
+            matched.expertsFolder = expertsPath;
+            matched.eaInstalled = isInstalled;
+            matched.eaCompiled = isCompiled;
+            matched.eaVersion = eaVer;
+          } else if (originDir) {
+            const exePath = path.join(originDir, "terminal64.exe");
+            const metaeditorPath = path.join(originDir, "metaeditor64.exe");
+            terminals.push({
+              id: hd,
+              name: path.basename(originDir) || "MetaTrader 5 Terminal",
+              executablePath: exePath,
+              metaeditorPath: fs.existsSync(metaeditorPath) ? metaeditorPath : "",
+              dataFolder: dataPath,
+              expertsFolder: expertsPath,
+              isRunning: false,
+              pid: null,
+              eaInstalled: isInstalled,
+              eaCompiled: isCompiled,
+              eaVersion: eaVer
+            });
           }
         }
       } catch (e) {}
@@ -1342,11 +1391,12 @@ function scanMT5Terminals() {
 
     // Process check (tasklist)
     try {
-      const output = execSync("tasklist /FI \"IMAGENAME eq terminal64.exe\" /FO CSV /NH", { encoding: "utf-8" });
+      const output = execSync("tasklist /FI \"IMAGENAME eq terminal64.exe\" /FO CSV /NH", { encoding: "utf-8", windowsHide: true });
       if (output && output.toLowerCase().includes("terminal64.exe")) {
-        const parts = output.split(",");
-        const pid = parts[1] ? parseInt(parts[1].replace(/"/g, "")) : null;
-        if (terminals.length > 0) {
+        const lines = output.trim().split(/\r?\n/).filter((l) => l.toLowerCase().includes("terminal64.exe"));
+        const parts = lines[0] ? lines[0].split(",") : [];
+        const pid = parts[1] ? parseInt(parts[1].replace(/"/g, ""), 10) : null;
+        if (terminals.length > 0 && pid) {
           terminals[0].isRunning = true;
           terminals[0].pid = pid;
         }
@@ -1360,12 +1410,14 @@ function scanMT5Terminals() {
         id: "wine-mt5",
         name: "Wine-Emulated MT5",
         executablePath: path.join(winePrefix, "MetaTrader 5", "terminal64.exe"),
+        metaeditorPath: "",
         dataFolder: path.join(winePrefix, "MetaTrader 5"),
         expertsFolder: path.join(winePrefix, "MetaTrader 5", "MQL5", "Experts"),
         isRunning: false,
         pid: null,
         eaInstalled: false,
-        eaVersion: "3.10"
+        eaCompiled: false,
+        eaVersion: ""
       });
     }
   }
@@ -2218,36 +2270,45 @@ ipcMain.handle("clear-logs", () => { logHistory.length = 0; return true; });
 // MT5 Operations
 ipcMain.handle("scan-mt5-terminals", () => scanMT5Terminals());
 ipcMain.handle("launch-mt5", (_e, exePath) => {
-  if (!fs.existsSync(exePath)) {
+  if (!exePath || !fs.existsSync(exePath)) {
     return { success: false, message: `Executable not found: ${exePath}` };
   }
+  // Prevent spawning duplicate terminal instances
+  const running = scanMT5Terminals().find(
+    (t) => t.isRunning && path.resolve(t.executablePath).toLowerCase() === path.resolve(exePath).toLowerCase()
+  );
+  if (running) {
+    appendLog("MT5", "INFO", `MT5 Terminal already running (PID ${running.pid}): ${exePath}`);
+    return { success: true, alreadyRunning: true, pid: running.pid, message: `MT5 Terminal is already running (PID ${running.pid}).` };
+  }
   try {
-    spawn(exePath, [], { detached: true, stdio: "ignore" }).unref();
-    appendLog("MT5", "INFO", `Launched MT5 Terminal: ${exePath}`);
-    return { success: true, message: "Launched MT5 Terminal." };
+    const child = spawn(exePath, [], { detached: true, stdio: "ignore" });
+    child.unref();
+    appendLog("MT5", "INFO", `Launched MT5 Terminal (PID ${child.pid || "?"}): ${exePath}`);
+    return { success: true, alreadyRunning: false, pid: child.pid || null, message: "Launched MT5 Terminal." };
   } catch (e) {
     return { success: false, message: e.message };
   }
 });
 
-ipcMain.handle("deploy-ea", (_e, targetExpertsDir) => {
-  if (!fs.existsSync(EA_SOURCE_PATH)) {
-    return { success: false, message: `EA source not found at ${EA_SOURCE_PATH}` };
-  }
-  if (!fs.existsSync(targetExpertsDir)) {
-    fs.mkdirSync(targetExpertsDir, { recursive: true });
-  }
-  const dest = path.join(targetExpertsDir, "PythonBridgeEA.mq5");
+ipcMain.handle("deploy-ea", async (_e, payload) => {
+  const opts = typeof payload === "string"
+    ? { experts_dir: payload, compile: true }
+    : {
+        executable_path: payload?.executablePath || payload?.executable_path || null,
+        data_folder: payload?.dataFolder || payload?.data_folder || null,
+        experts_dir: payload?.expertsFolder || payload?.experts_dir || null,
+        compile: payload?.compile !== false,
+      };
+
   try {
-    if (fs.existsSync(dest)) {
-      const timestamp = new Date().toISOString().replace(/[-:T.]/g, "").slice(0, 14);
-      fs.copyFileSync(dest, `${dest}.bak_${timestamp}`);
-    }
-    fs.copyFileSync(EA_SOURCE_PATH, dest);
-    appendLog("MT5", "INFO", `Successfully deployed PythonBridgeEA.mq5 to ${dest}`);
-    return { success: true, message: "PythonBridgeEA.mq5 installed and backed up successfully!" };
+    const res = await httpControlRequest("POST", "/api/mt5/deploy-ea", opts);
+    appendLog("MT5", res.success ? "INFO" : "ERROR", res.message || "EA deployment completed");
+    return res;
   } catch (e) {
-    return { success: false, message: `Deployment failed: ${e.message}` };
+    const msg = e?.message || String(e);
+    appendLog("MT5", "ERROR", `EA deployment failed: ${msg}`);
+    return { success: false, message: msg };
   }
 });
 
@@ -2491,10 +2552,71 @@ ipcMain.handle("save-config", (_e, cfg) => saveConfig(cfg));
 // ---------------------------------------------------------------------------
 // Authenticated Python Local Control Service (127.0.0.1:8765)
 // ---------------------------------------------------------------------------
-const CONTROL_SERVICE_PORT = Number(process.env.MT5_CONTROL_PORT || 8765);
-const CONTROL_TOKEN_FILE = path.join(PROJECT_ROOT, "state", "companion_token.txt");
+const CONTROL_SERVICE_HOST = "127.0.0.1";
+const PREFERRED_CONTROL_PORT = Number(process.env.MT5_CONTROL_PORT || 8765);
+let activeControlPort = PREFERRED_CONTROL_PORT;
+const CONTROL_TOKEN_FILE = path.join(APP_STATE_DIR, "companion_token.txt");
+const CONTROL_LAUNCHER_LOG = path.join(APP_LOGS_DIR, "control_service_launcher.log");
+
 let controlServiceProcess = null;
 let controlAuthToken = process.env.MT5_COMPANION_TOKEN || "";
+let controlWatchdogTimer = null;
+let controlRestartAttempts = 0;
+let controlRestartWindowStart = 0;
+let controlStartInFlight = null;
+const MAX_CONTROL_RESTARTS = 5;
+const CONTROL_RESTART_WINDOW_MS = 120000;
+
+let controlServiceState = {
+  status: "STARTING", // STARTING | ONLINE | OFFLINE | ERROR
+  host: CONTROL_SERVICE_HOST,
+  port: activeControlPort,
+  baseUrl: `http://${CONTROL_SERVICE_HOST}:${activeControlPort}`,
+  pid: null,
+  restarts: 0,
+  lastError: null,
+  checkedAt: null,
+};
+
+function redactControlLog(line) {
+  return String(line || "")
+    .replace(/(Authorization:\s*Bearer\s+)[^\s]+/gi, "$1***REDACTED***")
+    .replace(/(MT5_COMPANION_TOKEN\s*=\s*)[^\s"']+/gi, "$1***REDACTED***")
+    .replace(/(TELEGRAM_BOT_TOKEN\s*=\s*)[^\s"']+/gi, "$1***REDACTED***")
+    .replace(/(MT5_PASSWORD\s*=\s*)[^\s"']+/gi, "$1***REDACTED***");
+}
+
+function writeControlLauncherLog(level, message) {
+  const safe = redactControlLog(message);
+  try {
+    if (fs.existsSync(CONTROL_LAUNCHER_LOG)) {
+      const stat = fs.statSync(CONTROL_LAUNCHER_LOG);
+      if (stat.size > 5 * 1024 * 1024) {
+        const bak = `${CONTROL_LAUNCHER_LOG}.1`;
+        if (fs.existsSync(bak)) fs.unlinkSync(bak);
+        fs.renameSync(CONTROL_LAUNCHER_LOG, bak);
+      }
+    }
+    fs.appendFileSync(CONTROL_LAUNCHER_LOG, `${new Date().toISOString()} [${level}] ${safe}\n`, "utf-8");
+  } catch (e) {}
+  appendLog("CONTROL_SERVICE", level, safe);
+}
+
+function broadcastControlServiceState(patch = {}) {
+  controlServiceState = {
+    ...controlServiceState,
+    ...patch,
+    host: CONTROL_SERVICE_HOST,
+    port: activeControlPort,
+    baseUrl: `http://${CONTROL_SERVICE_HOST}:${activeControlPort}`,
+    checkedAt: new Date().toISOString(),
+  };
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.webContents.send("control-service-status", controlServiceState);
+    } catch (e) {}
+  }
+}
 
 function ensureControlToken() {
   if (controlAuthToken) return controlAuthToken;
@@ -2508,43 +2630,235 @@ function ensureControlToken() {
     }
   } catch (e) {}
   controlAuthToken = crypto.randomBytes(24).toString("base64url");
+  try {
+    fs.mkdirSync(path.dirname(CONTROL_TOKEN_FILE), { recursive: true });
+    fs.writeFileSync(CONTROL_TOKEN_FILE, controlAuthToken, "utf-8");
+  } catch (e) {}
   return controlAuthToken;
 }
 
-function startControlService() {
-  if (controlServiceProcess) return;
-  const token = ensureControlToken();
-  const venvPy = path.join(PROJECT_ROOT, ".venv", "Scripts", "python.exe");
-  const packagedBin = path.join(process.resourcesPath || "", "bin", "mt5_control_service.exe");
-  let cmd = null;
-  let args = [];
-  if (isPackaged && fs.existsSync(packagedBin)) {
-    cmd = packagedBin;
-    args = ["--host", "127.0.0.1", "--port", String(CONTROL_SERVICE_PORT), "--project-root", PROJECT_ROOT];
-  } else if (fs.existsSync(venvPy)) {
-    cmd = venvPy;
-    args = ["-m", "companion.service.main", "--host", "127.0.0.1", "--port", String(CONTROL_SERVICE_PORT), "--project-root", PROJECT_ROOT];
-  } else {
-    cmd = "python";
-    args = ["-m", "companion.service.main", "--host", "127.0.0.1", "--port", String(CONTROL_SERVICE_PORT), "--project-root", PROJECT_ROOT];
-  }
-
-  try {
-    controlServiceProcess = spawn(cmd, args, {
-      cwd: PROJECT_ROOT,
-      env: { ...process.env, MT5_COMPANION_TOKEN: token, PYTHONPATH: PROJECT_ROOT },
-      windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"],
+function probeControlHealth(port = activeControlPort, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    const req = http.get(
+      {
+        hostname: CONTROL_SERVICE_HOST,
+        port,
+        path: "/health",
+        timeout: timeoutMs,
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => (data += chunk));
+        res.on("end", () => {
+          try {
+            const parsed = JSON.parse(data || "{}");
+            resolve({ ok: res.statusCode === 200 && parsed.status === "ok", data: parsed });
+          } catch (e) {
+            resolve({ ok: false, data: null });
+          }
+        });
+      }
+    );
+    req.on("error", () => resolve({ ok: false, data: null }));
+    req.on("timeout", () => {
+      req.destroy();
+      resolve({ ok: false, data: null });
     });
-    controlServiceProcess.on("exit", () => {
-      controlServiceProcess = null;
-    });
-  } catch (err) {
-    console.error("[ControlService] Failed to spawn:", err);
-  }
+  });
 }
 
-function stopControlService() {
+function isLocalPortFree(port) {
+  return new Promise((resolve) => {
+    const srv = net.createServer();
+    srv.once("error", () => resolve(false));
+    srv.once("listening", () => {
+      srv.close(() => resolve(true));
+    });
+    srv.listen(port, CONTROL_SERVICE_HOST);
+  });
+}
+
+async function resolveControlPort() {
+  // Check if preferred port is free or already running our Control Service
+  const existing = await probeControlHealth(PREFERRED_CONTROL_PORT, 800);
+  if (existing.ok) {
+    return { port: PREFERRED_CONTROL_PORT, alreadyRunning: true };
+  }
+  if (await isLocalPortFree(PREFERRED_CONTROL_PORT)) {
+    return { port: PREFERRED_CONTROL_PORT, alreadyRunning: false };
+  }
+  for (let p = PREFERRED_CONTROL_PORT + 1; p <= PREFERRED_CONTROL_PORT + 20; p++) {
+    if (await isLocalPortFree(p)) {
+      writeControlLauncherLog("WARNING", `Port ${PREFERRED_CONTROL_PORT} is busy; switching Control Service to port ${p}`);
+      return { port: p, alreadyRunning: false };
+    }
+  }
+  return { port: PREFERRED_CONTROL_PORT, alreadyRunning: false };
+}
+
+async function waitForControlHealth(port, maxWaitMs = 12000) {
+  const start = Date.now();
+  let delay = 200;
+  while (Date.now() - start < maxWaitMs) {
+    const res = await probeControlHealth(port, 1200);
+    if (res.ok) return res;
+    await new Promise((r) => setTimeout(r, delay));
+    delay = Math.min(1000, Math.round(delay * 1.4));
+  }
+  return { ok: false, data: null };
+}
+
+function resolveControlServiceCommand(port) {
+  const venvPy = path.join(PROJECT_ROOT, ".venv", "Scripts", "python.exe");
+  const packagedBin = path.join(process.resourcesPath || "", "bin", "mt5_control_service.exe");
+  const commonArgs = [
+    "--host", CONTROL_SERVICE_HOST,
+    "--port", String(port),
+    "--project-root", PROJECT_ROOT,
+    "--data-dir", INSTITUTIONAL_EA_DATA_DIR,
+  ];
+  if (isPackaged && fs.existsSync(packagedBin)) {
+    return { cmd: packagedBin, args: commonArgs, mode: "packaged-binary" };
+  }
+  if (fs.existsSync(venvPy)) {
+    return { cmd: venvPy, args: ["-m", "companion.service.main", ...commonArgs], mode: "venv-python" };
+  }
+  return { cmd: "python", args: ["-m", "companion.service.main", ...commonArgs], mode: "system-python" };
+}
+
+async function startControlService() {
+  if (controlStartInFlight) return controlStartInFlight;
+  controlStartInFlight = (async () => {
+    broadcastControlServiceState({ status: "STARTING", lastError: null });
+    const token = ensureControlToken();
+    const { port, alreadyRunning } = await resolveControlPort();
+    activeControlPort = port;
+
+    if (alreadyRunning) {
+      writeControlLauncherLog("INFO", `Control Service already healthy on http://${CONTROL_SERVICE_HOST}:${port}`);
+      broadcastControlServiceState({ status: "ONLINE", lastError: null });
+      startControlWatchdog();
+      return controlServiceState;
+    }
+
+    if (controlServiceProcess) {
+      stopControlService(false);
+    }
+
+    const { cmd, args, mode } = resolveControlServiceCommand(port);
+    writeControlLauncherLog("INFO", `Spawning Control Service (${mode}) on ${CONTROL_SERVICE_HOST}:${port}`);
+
+    try {
+      const child = spawn(cmd, args, {
+        cwd: PROJECT_ROOT,
+        env: {
+          ...process.env,
+          MT5_COMPANION_TOKEN: token,
+          MT5_PROJECT_ROOT: PROJECT_ROOT,
+          MT5_DATA_DIR: INSTITUTIONAL_EA_DATA_DIR,
+          PYTHONPATH: PROJECT_ROOT,
+          PYTHONUNBUFFERED: "1",
+        },
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      controlServiceProcess = child;
+
+      if (child.stdout) {
+        child.stdout.on("data", (chunk) => {
+          String(chunk).split(/\r?\n/).filter(Boolean).forEach((ln) => writeControlLauncherLog("INFO", ln));
+        });
+      }
+      if (child.stderr) {
+        child.stderr.on("data", (chunk) => {
+          String(chunk).split(/\r?\n/).filter(Boolean).forEach((ln) => writeControlLauncherLog("WARNING", ln));
+        });
+      }
+
+      child.on("error", (err) => {
+        writeControlLauncherLog("ERROR", `Control Service spawn error: ${err.message}`);
+        broadcastControlServiceState({ status: "ERROR", pid: null, lastError: err.message });
+      });
+
+      child.on("exit", (code, sig) => {
+        const wasCurrent = controlServiceProcess === child;
+        if (wasCurrent) controlServiceProcess = null;
+        if (isQuitting) return;
+        const msg = `Control Service exited unexpectedly (code=${code}, signal=${sig || "none"})`;
+        writeControlLauncherLog("ERROR", msg);
+        broadcastControlServiceState({ status: "OFFLINE", pid: null, lastError: msg });
+        scheduleControlAutoRestart();
+      });
+
+      const health = await waitForControlHealth(port, 12000);
+      if (health.ok) {
+        controlRestartAttempts = 0;
+        writeControlLauncherLog("INFO", `Control Service ready on http://${CONTROL_SERVICE_HOST}:${port} (PID ${child.pid})`);
+        broadcastControlServiceState({ status: "ONLINE", pid: child.pid || null, lastError: null });
+        startControlWatchdog();
+      } else {
+        const msg = `Control Service did not respond on /health within 12s (port ${port})`;
+        writeControlLauncherLog("ERROR", msg);
+        broadcastControlServiceState({ status: "OFFLINE", pid: child.pid || null, lastError: msg });
+      }
+    } catch (err) {
+      writeControlLauncherLog("ERROR", `Failed to spawn Control Service: ${err.message}`);
+      broadcastControlServiceState({ status: "ERROR", pid: null, lastError: err.message });
+    }
+    return controlServiceState;
+  })().finally(() => {
+    controlStartInFlight = null;
+  });
+  return controlStartInFlight;
+}
+
+function scheduleControlAutoRestart() {
+  if (isQuitting) return;
+  const now = Date.now();
+  if (now - controlRestartWindowStart > CONTROL_RESTART_WINDOW_MS) {
+    controlRestartWindowStart = now;
+    controlRestartAttempts = 0;
+  }
+  if (controlRestartAttempts >= MAX_CONTROL_RESTARTS) {
+    const msg = "Control Service reached max auto-restart attempts. Click Reconnect to retry.";
+    writeControlLauncherLog("ERROR", msg);
+    broadcastControlServiceState({ status: "ERROR", lastError: msg });
+    return;
+  }
+  controlRestartAttempts += 1;
+  const delayMs = Math.min(8000, 1000 * Math.pow(2, controlRestartAttempts - 1));
+  writeControlLauncherLog("WARNING", `Scheduling Control Service auto-restart #${controlRestartAttempts} in ${delayMs}ms`);
+  broadcastControlServiceState({ status: "STARTING", restarts: controlServiceState.restarts + 1 });
+  setTimeout(() => {
+    if (!isQuitting && !controlServiceProcess) {
+      startControlService();
+    }
+  }, delayMs);
+}
+
+function startControlWatchdog() {
+  if (controlWatchdogTimer) return;
+  controlWatchdogTimer = setInterval(async () => {
+    if (isQuitting) return;
+    const health = await probeControlHealth(activeControlPort, 1500);
+    if (health.ok) {
+      if (controlServiceState.status !== "ONLINE") {
+        broadcastControlServiceState({ status: "ONLINE", lastError: null });
+      }
+    } else if (!controlStartInFlight) {
+      broadcastControlServiceState({ status: "OFFLINE", lastError: "Service offline. Retrying..." });
+      if (!controlServiceProcess) {
+        scheduleControlAutoRestart();
+      }
+    }
+  }, 8000);
+}
+
+function stopControlService(stopWatchdog = true) {
+  if (stopWatchdog && controlWatchdogTimer) {
+    clearInterval(controlWatchdogTimer);
+    controlWatchdogTimer = null;
+  }
   if (controlServiceProcess) {
     const pid = controlServiceProcess.pid;
     try {
@@ -2556,6 +2870,9 @@ function stopControlService() {
     } catch (e) {}
     controlServiceProcess = null;
   }
+  if (stopWatchdog) {
+    broadcastControlServiceState({ status: "OFFLINE", pid: null });
+  }
 }
 
 function httpControlRequest(method, apiPath, bodyObj = null) {
@@ -2564,15 +2881,15 @@ function httpControlRequest(method, apiPath, bodyObj = null) {
     const payload = bodyObj ? JSON.stringify(bodyObj) : null;
     const req = http.request(
       {
-        hostname: "127.0.0.1",
-        port: CONTROL_SERVICE_PORT,
+        hostname: CONTROL_SERVICE_HOST,
+        port: activeControlPort,
         path: apiPath,
         method: method || "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           ...(payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {}),
         },
-        timeout: 15000,
+        timeout: 20000,
       },
       (res) => {
         let data = "";
@@ -2581,8 +2898,11 @@ function httpControlRequest(method, apiPath, bodyObj = null) {
           try {
             const parsed = data ? JSON.parse(data) : {};
             if (res.statusCode >= 400) {
-              reject(new Error(parsed.error || `HTTP ${res.statusCode}`));
+              reject(new Error(parsed.error || parsed.message || `HTTP ${res.statusCode}`));
             } else {
+              if (controlServiceState.status !== "ONLINE") {
+                broadcastControlServiceState({ status: "ONLINE", lastError: null });
+              }
               resolve(parsed);
             }
           } catch (e) {
@@ -2591,10 +2911,20 @@ function httpControlRequest(method, apiPath, bodyObj = null) {
         });
       }
     );
-    req.on("error", (err) => reject(err));
+    req.on("error", (err) => {
+      if (err && (err.code === "ECONNREFUSED" || err.code === "ECONNRESET" || err.code === "ETIMEDOUT")) {
+        broadcastControlServiceState({ status: "OFFLINE", lastError: "Service offline" });
+        if (!controlServiceProcess && !controlStartInFlight && !isQuitting) {
+          startControlService();
+        }
+        reject(new Error("Service offline. Retrying connection..."));
+      } else {
+        reject(err);
+      }
+    });
     req.on("timeout", () => {
       req.destroy();
-      reject(new Error("Control service request timed out"));
+      reject(new Error("Service request timed out"));
     });
     if (payload) req.write(payload);
     req.end();
@@ -2606,9 +2936,22 @@ ipcMain.handle("control-request", async (_e, method, apiPath, body) => {
 });
 
 ipcMain.handle("get-control-connection-info", () => ({
-  baseUrl: `http://127.0.0.1:${CONTROL_SERVICE_PORT}`,
+  baseUrl: `http://${CONTROL_SERVICE_HOST}:${activeControlPort}`,
+  host: CONTROL_SERVICE_HOST,
+  port: activeControlPort,
   token: ensureControlToken(),
+  status: controlServiceState.status,
+  lastError: controlServiceState.lastError,
+  pid: controlServiceState.pid,
 }));
+
+ipcMain.handle("get-control-service-status", () => controlServiceState);
+
+ipcMain.handle("reconnect-control-service", async () => {
+  controlRestartAttempts = 0;
+  stopControlService(false);
+  return startControlService();
+});
 
 // Window controls
 ipcMain.handle("minimize-window", () => mainWindow?.minimize());
@@ -2623,6 +2966,7 @@ ipcMain.handle("close-window", () => {
   } else {
     isQuitting = true;
     stopBotServices();
+    stopControlService();
     app.quit();
   }
 });
@@ -2640,7 +2984,8 @@ if (!gotTheLock) {
     }
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    // Launch Control Service and wait briefly for /health before first renderer requests
     startControlService();
     createWindow();
     createTray();
@@ -2659,6 +3004,15 @@ if (!gotTheLock) {
   app.on("before-quit", () => {
     isQuitting = true;
     stopBotServices();
+    stopControlService();
+  });
+
+  app.on("will-quit", () => {
+    isQuitting = true;
+    stopControlService();
+  });
+
+  process.on("exit", () => {
     stopControlService();
   });
 }

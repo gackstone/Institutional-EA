@@ -15,9 +15,10 @@ import {
   WifiOff,
   XCircle,
 } from "lucide-react";
-import { controlClient, IPC } from "../../services/ipc";
+import { controlClient, formatControlError, IPC } from "../../services/ipc";
 import {
   ControlPosition,
+  ControlServiceStatus,
   ControlStatusPayload,
   ScreenId,
   TradeHistoryRecord,
@@ -52,6 +53,8 @@ export const DashboardScreen: React.FC<
     feedStatus?: DataFeedStatus;
     initialSymbol?: ChartSymbol;
     readOnlyMobile?: boolean;
+    serviceStatus?: ControlServiceStatus | null;
+    onReconnectService?: () => Promise<void>;
   }
 > = ({
   status,
@@ -62,11 +65,14 @@ export const DashboardScreen: React.FC<
   feedStatus = "LIVE_SSE",
   initialSymbol = "XAUUSD",
   readOnlyMobile = false,
+  serviceStatus = null,
+  onReconnectService,
 }) => {
   const [selectedSymbol, setSelectedSymbol] = useState<ChartSymbol>(initialSymbol);
   const [selectedTimeframe, setSelectedTimeframe] = useState<ChartTimeframe>("M5");
   const [realCandles, setRealCandles] = useState<CandleBar[]>([]);
   const [liveQuote, setLiveQuote] = useState<ControlSymbolSpec | null>(null);
+  const [candleWaitingReason, setCandleWaitingReason] = useState<string | undefined>(undefined);
   const [utcClockText, setUtcClockText] = useState<string>(() =>
     `${new Date().toISOString().slice(11, 19)} UTC`
   );
@@ -105,11 +111,27 @@ export const DashboardScreen: React.FC<
         if (!cancelled) {
           setRealCandles(res.candles || []);
           setLiveQuote(res.quote || null);
+          if ((res.candles || []).length > 0) {
+            setCandleWaitingReason(undefined);
+          } else if (res.status_reason === "MT5_NOT_CONNECTED") {
+            setCandleWaitingReason("MT5 Not Connected");
+          } else if (res.status_reason === "SYMBOL_NOT_FOUND") {
+            setCandleWaitingReason(`Symbol Not Found (${res.broker_symbol})`);
+          } else if (res.status_reason === "MARKET_CLOSED") {
+            setCandleWaitingReason("Market Closed");
+          } else {
+            setCandleWaitingReason("Waiting for MT5 Candles");
+          }
         }
       } catch {
         if (!cancelled) {
           setRealCandles([]);
           setLiveQuote(null);
+          setCandleWaitingReason(
+            serviceStatus?.status === "STARTING"
+              ? "Control Service Starting..."
+              : "Service Offline — Retrying..."
+          );
         }
       }
     };
@@ -119,7 +141,7 @@ export const DashboardScreen: React.FC<
       cancelled = true;
       clearInterval(timer);
     };
-  }, [selectedSymbol, selectedTimeframe]);
+  }, [selectedSymbol, selectedTimeframe, serviceStatus?.status]);
 
   // Build normalized dashboard state strictly from real MT5/bot data
   const dash = useMemo(
@@ -181,7 +203,12 @@ export const DashboardScreen: React.FC<
       onActionMessage(`${label}: ${res.message || "OK"}`, res.success === false);
       await onRefresh();
     } catch (e: any) {
-      onActionMessage(`${label} failed: ${e.message}`, true);
+      const friendly = formatControlError(e);
+      const offlineSafetyNote =
+        /offline/i.test(friendly) && /close all|stop|pause/i.test(label)
+          ? " Manage open positions directly in MT5."
+          : "";
+      onActionMessage(`${label} failed: ${friendly}${offlineSafetyNote}`, true);
     } finally {
       setBusyAction(null);
     }
@@ -415,14 +442,70 @@ export const DashboardScreen: React.FC<
             <span>{UI_COPY.brand.demoLockChip}</span>
           </div>
 
-          {/* ZMQ Bridge Ports 5555 / 5556 */}
+          {/* Control Service Status Pill + Reconnect */}
+          {serviceStatus && (
+            <div
+              data-testid="control-service-status-pill"
+              title={`Control Service on ${serviceStatus.baseUrl}${serviceStatus.lastError ? ` · ${serviceStatus.lastError}` : ""}`}
+              className="iea-pill-control inline-flex items-center space-x-1.5 px-3 py-1 font-mono text-[11px]"
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  serviceStatus.status === "ONLINE"
+                    ? "bg-[#B0F648] shadow-[0_0_8px_#B0F648]"
+                    : serviceStatus.status === "STARTING"
+                    ? "bg-[#FBBF24]"
+                    : "bg-[#FF5A6E]"
+                }`}
+              />
+              <span className="text-[#B6C5E0]">SVC</span>
+              <span
+                className={`font-bold ${
+                  serviceStatus.status === "ONLINE"
+                    ? "text-[#B0F648]"
+                    : serviceStatus.status === "STARTING"
+                    ? "text-[#FBBF24]"
+                    : "text-[#FF5A6E]"
+                }`}
+              >
+                {serviceStatus.status === "ONLINE"
+                  ? "ONLINE"
+                  : serviceStatus.status === "STARTING"
+                  ? "STARTING"
+                  : "OFFLINE"}
+              </span>
+              {serviceStatus.status !== "ONLINE" && onReconnectService && (
+                <button
+                  type="button"
+                  onClick={() => onReconnectService()}
+                  className="ml-1 px-2 py-0.5 rounded-full bg-[#B0F648] text-[#081321] font-bold text-[10px] hover:bg-[#C2F076]"
+                >
+                  Reconnect
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ZMQ Bridge Ports 5555 / 5556 (Real TCP Probe Status) */}
           <div
-            title="ZMQ/TCP Bridge Sockets: Port 5555 (EA) & Port 5556 (IPC)"
+            title={`ZMQ/TCP Bridge Sockets: Port 5555 (${effectiveStatus.mt5.zmq_bridge?.port_5555 ? "LISTENING" : "IDLE"}) & Port 5556 (${effectiveStatus.mt5.zmq_bridge?.port_5556 ? "LISTENING" : "IDLE"})`}
             className="iea-pill-control inline-flex items-center space-x-1.5 px-3 py-1 font-mono text-[11px]"
           >
-            <span className="w-2 h-2 rounded-full bg-[#B0F648] shadow-[0_0_8px_#B0F648]" />
+            <span
+              className={`w-2 h-2 rounded-full ${
+                effectiveStatus.mt5.zmq_bridge?.port_5555
+                  ? "bg-[#B0F648] shadow-[0_0_8px_#B0F648]"
+                  : "bg-[#8496B8]"
+              }`}
+            />
             <span className="text-[#B6C5E0]">ZMQ</span>
-            <span className="text-[#B0F648] font-bold">5555/5556</span>
+            <span
+              className={`font-bold ${
+                effectiveStatus.mt5.zmq_bridge?.port_5555 ? "text-[#B0F648]" : "text-[#8496B8]"
+              }`}
+            >
+              {effectiveStatus.mt5.zmq_bridge?.port_5555 ? "5555 UP" : "5555 IDLE"}
+            </span>
           </div>
 
           {/* Telegram Status */}
@@ -695,6 +778,7 @@ export const DashboardScreen: React.FC<
             selectedSymbol={selectedSymbol}
             selectedTimeframe={selectedTimeframe}
             feedStatus={feedStatus}
+            waitingReason={candleWaitingReason}
             onSelectSymbol={setSelectedSymbol}
             onSelectTimeframe={setSelectedTimeframe}
             onCaptureScreenshot={handleSaveScreenshot}

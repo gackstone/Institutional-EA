@@ -22,8 +22,23 @@ import {
   AlertEventRecord,
   AlertSettings,
   TradeReplayPayload,
-  ControlSymbolSpec
+  ControlSymbolSpec,
+  ControlServiceStatus,
+  SelfCheckReport,
+  DeployEAResult
 } from "../types";
+
+export function formatControlError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err || "Unknown error");
+  const stripped = raw
+    .replace(/^Error invoking remote method '[^']+':\s*/i, "")
+    .replace(/^Error:\s*/i, "")
+    .trim();
+  if (/ECONNREFUSED|ECONNRESET|Failed to fetch|Service offline/i.test(stripped)) {
+    return "Service offline. Retrying...";
+  }
+  return stripped || "Service request failed.";
+}
 
 declare global {
   interface Window {
@@ -57,8 +72,12 @@ declare global {
       onPendingOrdersChanged: (callback: (orders: PendingOrder[]) => void) => () => void;
       onPairingStatusChanged: (callback: (status: PairingStatus) => void) => () => void;
       scanMT5Terminals: () => Promise<MT5TerminalInfo[]>;
-      launchMT5: (executablePath: string) => Promise<{ success: boolean; message: string }>;
-      deployEA: (targetExpertsDir: string) => Promise<{ success: boolean; message: string }>;
+      launchMT5: (executablePath: string) => Promise<{ success: boolean; message: string; alreadyRunning?: boolean; pid?: number | null }>;
+      deployEA: (
+        target:
+          | string
+          | { executablePath?: string; dataFolder?: string; expertsFolder?: string; compile?: boolean }
+      ) => Promise<DeployEAResult>;
       getPairingStatus: () => Promise<PairingStatus>;
       submitPairingCode: (code: string, instanceName?: string) => Promise<{ success: boolean; message: string }>;
       disconnectPairing: () => Promise<{ success: boolean; message: string }>;
@@ -74,7 +93,10 @@ declare global {
       maximizeWindow: () => void;
       closeWindow: () => void;
       controlRequest?: (method: string, apiPath: string, body?: any) => Promise<any>;
-      getControlConnectionInfo?: () => Promise<{ baseUrl: string; token: string }>;
+      getControlConnectionInfo?: () => Promise<{ baseUrl: string; host?: string; port?: number; token: string; status?: string }>;
+      getControlServiceStatus?: () => Promise<ControlServiceStatus>;
+      reconnectControlService?: () => Promise<ControlServiceStatus>;
+      onControlServiceStatus?: (callback: (status: ControlServiceStatus) => void) => () => void;
     };
     __TAURI__?: any;
   }
@@ -350,14 +372,48 @@ export const IPC = {
     ];
   },
 
-  launchMT5: async (path: string): Promise<{ success: boolean; message: string }> => {
+  launchMT5: async (path: string): Promise<{ success: boolean; message: string; alreadyRunning?: boolean; pid?: number | null }> => {
     if (window.electronAPI) return window.electronAPI.launchMT5(path);
     return { success: true, message: `Mock launched MT5: ${path}` };
   },
 
-  deployEA: async (targetExpertsDir: string): Promise<{ success: boolean; message: string }> => {
-    if (window.electronAPI) return window.electronAPI.deployEA(targetExpertsDir);
+  deployEA: async (
+    target:
+      | string
+      | { executablePath?: string; dataFolder?: string; expertsFolder?: string; compile?: boolean }
+  ): Promise<DeployEAResult> => {
+    if (window.electronAPI) return window.electronAPI.deployEA(target);
     return { success: true, message: "PythonBridgeEA.mq5 installed with backup." };
+  },
+
+  getControlServiceStatus: async (): Promise<ControlServiceStatus> => {
+    if (window.electronAPI?.getControlServiceStatus) {
+      return window.electronAPI.getControlServiceStatus();
+    }
+    return {
+      status: "ONLINE",
+      host: "127.0.0.1",
+      port: 8765,
+      baseUrl: "http://127.0.0.1:8765",
+      pid: null,
+      restarts: 0,
+      lastError: null,
+      checkedAt: new Date().toISOString(),
+    };
+  },
+
+  reconnectControlService: async (): Promise<ControlServiceStatus> => {
+    if (window.electronAPI?.reconnectControlService) {
+      return window.electronAPI.reconnectControlService();
+    }
+    return IPC.getControlServiceStatus();
+  },
+
+  onControlServiceStatus: (callback: (status: ControlServiceStatus) => void): (() => void) => {
+    if (window.electronAPI?.onControlServiceStatus) {
+      return window.electronAPI.onControlServiceStatus(callback);
+    }
+    return () => {};
   },
 
   getPairingStatus: async (): Promise<PairingStatus> => {
@@ -483,23 +539,28 @@ export const IPC = {
 };
 
 async function callControl<T = any>(method: "GET" | "POST", apiPath: string, body?: any): Promise<T> {
-  if (window.electronAPI?.controlRequest) {
-    return window.electronAPI.controlRequest(method, apiPath, body);
+  try {
+    if (window.electronAPI?.controlRequest) {
+      return await window.electronAPI.controlRequest(method, apiPath, body);
+    }
+    const resp = await fetch(`http://127.0.0.1:8765${apiPath}`, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(errText || `HTTP ${resp.status}`);
+    }
+    return await resp.json();
+  } catch (err) {
+    throw new Error(formatControlError(err));
   }
-  const resp = await fetch(`http://127.0.0.1:8765${apiPath}`, {
-    method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(errText || `HTTP ${resp.status}`);
-  }
-  return resp.json();
 }
 
 export const controlClient = {
   getStatus: () => callControl<ControlStatusPayload>("GET", "/api/status"),
+  getSelfCheck: () => callControl<SelfCheckReport>("GET", "/api/health/selfcheck"),
 
   // Top-bar Safety Controls
   stopEngine: () => callControl<{ success: boolean; message: string; state: string }>("POST", "/api/engine/stop", {}),
@@ -509,7 +570,20 @@ export const controlClient = {
     callControl<{ success: boolean; message: string; state?: string }>("POST", "/api/engine/clear-emergency-stop", { confirmed }),
 
   // MT5 Connection & Real Market Candles
-  connectMT5: () => callControl<{ success: boolean; snapshot: ControlStatusPayload["mt5"] }>("POST", "/api/mt5/connect", {}),
+  connectMT5: (terminalPath?: string) =>
+    callControl<{ success: boolean; error?: string | null; snapshot: ControlStatusPayload["mt5"] }>(
+      "POST",
+      "/api/mt5/connect",
+      terminalPath ? { terminal_path: terminalPath } : {}
+    ),
+  syncMT5: (terminalPath?: string) =>
+    callControl<{ success: boolean; error?: string | null; snapshot: ControlStatusPayload["mt5"] }>(
+      "POST",
+      "/api/mt5/sync",
+      terminalPath ? { terminal_path: terminalPath } : {}
+    ),
+  deployEA: (opts: { executable_path?: string; data_folder?: string; experts_dir?: string; compile?: boolean }) =>
+    callControl<DeployEAResult>("POST", "/api/mt5/deploy-ea", opts),
   getCandles: (symbol: string, tf: string, count = 120, fromIso?: string, toIso?: string) => {
     const qs = new URLSearchParams({ symbol, tf, count: String(count) });
     if (fromIso) qs.set("from", fromIso);
@@ -522,6 +596,8 @@ export const controlClient = {
       quote: ControlSymbolSpec | null;
       source: "MT5";
       connected: boolean;
+      status_reason?: "OK" | "MT5_NOT_CONNECTED" | "SYMBOL_NOT_FOUND" | "MARKET_CLOSED" | "NO_CANDLES";
+      last_error?: string | null;
       fetched_at: string;
     }>("GET", `/api/market/candles?${qs.toString()}`);
   },

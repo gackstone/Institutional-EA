@@ -8,6 +8,7 @@ bounded exponential backoff reconnection.
 
 from __future__ import annotations
 import os
+import socket
 import subprocess
 import threading
 import time
@@ -54,6 +55,7 @@ class MT5SyncService:
         self.bridge_port = bridge_port
         self.bot_magic = int(bot_magic)
         self._mt5_override = mt5_module
+        self._bridge_explicit = bridge_client is not None
         self.bridge = bridge_client or BridgeClient(host=bridge_host, port=bridge_port)
 
         self._lock = threading.RLock()
@@ -62,6 +64,14 @@ class MT5SyncService:
         self.last_error: Optional[str] = None
         self.reconnect_attempts: int = 0
         self.max_backoff_sec: float = 30.0
+        self.terminal_path: Optional[str] = None
+        self.last_candle_times: Dict[str, str] = {}
+        self.zmq_status: Dict[str, Any] = {
+            "port_5555": False,
+            "port_5556": False,
+            "connected": False,
+            "checked_at": None,
+        }
 
         self.account: Dict[str, Any] = {
             "account_number": 0,
@@ -122,33 +132,109 @@ class MT5SyncService:
             "running": running,
         }
 
-    def connect(self) -> bool:
-        """Connects via BridgeClient or direct MT5 API with bounded backoff tracking."""
+    def _init_mt5(self, mt5: Any, terminal_path: Optional[str] = None, timeout_ms: int = 5000) -> Tuple[bool, Optional[str]]:
+        """Initializes MetaTrader5 Python API with bounded timeout (5s) and captures last_error()."""
+        path_to_use = terminal_path or self.terminal_path
+
+        # Fast-path: if already initialized to this terminal, avoid redundant IPC handshake
+        term_info_fn = getattr(mt5, "terminal_info", None)
+        if callable(term_info_fn) and not terminal_path:
+            try:
+                if term_info_fn() is not None:
+                    return True, None
+            except Exception:
+                pass
+
+        try:
+            if path_to_use:
+                ok = mt5.initialize(path=path_to_use, timeout=timeout_ms)
+            else:
+                ok = mt5.initialize(timeout=timeout_ms)
+        except TypeError:
+            # Mock MT5 modules in unit tests may define initialize() with no timeout kwarg
+            try:
+                ok = mt5.initialize(path=path_to_use) if path_to_use else mt5.initialize()
+            except TypeError:
+                ok = mt5.initialize()
+        except Exception as exc:
+            return False, f"MT5 initialize exception: {exc}"
+
+        if ok:
+            if path_to_use:
+                self.terminal_path = path_to_use
+            return True, None
+
+        last_err_fn = getattr(mt5, "last_error", None)
+        if callable(last_err_fn):
+            try:
+                err = last_err_fn()
+                return False, f"MT5 initialize failed: {err}"
+            except Exception:
+                pass
+        return False, "MT5 initialize() returned False (terminal may not be running or IPC disabled)"
+
+    def check_zmq_bridge(self) -> Dict[str, Any]:
+        """Probes local TCP bridge ports 5555 (MQL5 EA) and 5556 (IPC switchboard)."""
+        def _probe(port: int) -> bool:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.35)
+            try:
+                return s.connect_ex((self.bridge_host, port)) == 0
+            except Exception:
+                return False
+            finally:
+                try:
+                    s.close()
+                except Exception:
+                    pass
+
+        p5555 = _probe(self.bridge_port)
+        p5556 = _probe(5556)
+        self.zmq_status = {
+            "port_5555": p5555,
+            "port_5556": p5556,
+            "connected": bool(p5555 or self.bridge.is_connected()),
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }
+        return dict(self.zmq_status)
+
+    def connect(self, terminal_path: Optional[str] = None) -> bool:
+        """Connects via direct MetaTrader5 Python API first (fast, non-blocking), or Bridge IPC if listening."""
         with self._lock:
             self.connection_status = "SYNCHRONIZING"
-            try:
-                if self.bridge.connect():
+            if terminal_path:
+                self.terminal_path = terminal_path
+
+            # 1. Prefer direct MetaTrader5 Python API (connects in <200ms without binding port 5555)
+            mt5 = self._get_mt5()
+            if mt5 is not None:
+                ok, err = self._init_mt5(mt5, terminal_path=terminal_path)
+                if ok:
                     self.connection_status = "CONNECTED"
                     self.reconnect_attempts = 0
                     self.last_error = None
-                    self.repo.record_connection_event("MT5_BRIDGE", "CONNECTED", f"Connected to {self.bridge_host}:{self.bridge_port}")
-                    self.repo.resolve_component_errors("MT5SyncService", "MT5 Bridge connection restored")
-                    self.events.log("MT5", "INFO", f"Connected to MT5 Bridge ({self.bridge_host}:{self.bridge_port})")
+                    self.repo.record_connection_event("MT5_DIRECT", "CONNECTED", "Connected via MetaTrader5 Python API")
+                    self.repo.resolve_component_errors("MT5SyncService", "Direct MT5 terminal connection restored")
+                    self.events.log("MT5", "INFO", "Connected to MT5 terminal via MetaTrader5 Python API")
                     return True
-            except Exception as exc:
-                self.last_error = str(exc)
+                if err:
+                    self.last_error = err
 
-            # Fallback to direct MetaTrader5 API
-            mt5 = self._get_mt5()
-            if mt5 is not None:
+            # 2. Fallback to BridgeClient only if explicitly injected or bridge IPC port 5556 is already listening
+            should_try_bridge = self._bridge_explicit
+            if not should_try_bridge and self._mt5_override is None:
+                zmq = self.check_zmq_bridge()
+                should_try_bridge = bool(zmq.get("port_5556"))
+
+            if should_try_bridge:
                 try:
-                    if mt5.initialize():
+                    if self.bridge.connect():
                         self.connection_status = "CONNECTED"
                         self.reconnect_attempts = 0
                         self.last_error = None
-                        self.repo.record_connection_event("MT5_DIRECT", "CONNECTED", "Connected via MetaTrader5 Python API")
-                        self.repo.resolve_component_errors("MT5SyncService", "Direct MT5 terminal connection restored")
-                        self.events.log("MT5", "INFO", "Connected to MT5 terminal via MetaTrader5 Python API")
+                        self.repo.record_connection_event("MT5_BRIDGE", "CONNECTED", f"Connected to {self.bridge_host}:{self.bridge_port}")
+                        self.repo.resolve_component_errors("MT5SyncService", "MT5 Bridge connection restored")
+                        self.events.log("MT5", "INFO", f"Connected to MT5 Bridge ({self.bridge_host}:{self.bridge_port})")
                         return True
                 except Exception as exc:
                     self.last_error = str(exc)
@@ -164,7 +250,7 @@ class MT5SyncService:
                 message=err_msg,
                 trading_affected=True,
                 entries_blocked=True,
-                recommended_recovery="Ensure MetaTrader 5 terminal is open and PythonBridgeEA is attached, or click Reconnect.",
+                recommended_recovery="Ensure MetaTrader 5 terminal is open and PythonBridgeEA is attached, or click Sync MT5.",
                 user_action_required=True,
             )
             self.events.log("MT5", "WARNING", f"MT5 connection failed (attempt {self.reconnect_attempts}): {err_msg}")
@@ -173,9 +259,11 @@ class MT5SyncService:
     def next_backoff_seconds(self) -> float:
         return min(self.max_backoff_sec, float(2 ** min(self.reconnect_attempts, 5)))
 
-    def sync_all(self, target_symbols: Optional[List[str]] = None) -> Dict[str, Any]:
+    def sync_all(self, target_symbols: Optional[List[str]] = None, terminal_path: Optional[str] = None) -> Dict[str, Any]:
         """Synchronizes account, symbols, positions, pending orders, and reconciliation state."""
         with self._lock:
+            if terminal_path:
+                self.terminal_path = terminal_path
             mt5 = self._get_mt5()
             acc_obj: Optional[AccountInfo] = None
             broker_name: str = "MetaTrader 5"
@@ -195,7 +283,8 @@ class MT5SyncService:
 
             if acc_obj is None and mt5 is not None:
                 try:
-                    if mt5.initialize():
+                    ok, init_err = self._init_mt5(mt5, terminal_path=terminal_path)
+                    if ok:
                         info = mt5.account_info()
                         if info is not None:
                             trade_mode = "DEMO" if int(getattr(info, "trade_mode", 0)) == 0 else "REAL"
@@ -215,6 +304,10 @@ class MT5SyncService:
                                 margin_mode_str="NETTING" if margin_mode == 1 else "HEDGING",
                             )
                             self.connection_status = "CONNECTED"
+                            self.last_error = None
+                        else:
+                            self.connection_status = "DISCONNECTED"
+                            self.last_error = "MT5 terminal running, but no account is logged in."
                         pos_list = mt5.positions_get() or []
                         for p in pos_list:
                             from src.core.contracts import OrderType
@@ -249,6 +342,9 @@ class MT5SyncService:
                                     "magic": int(getattr(o, "magic", 0)),
                                 }
                             )
+                    else:
+                        self.last_error = init_err
+                        self.connection_status = "DISCONNECTED"
                 except Exception as exc:
                     self.last_error = str(exc)
                     self.connection_status = "DISCONNECTED"
@@ -308,6 +404,7 @@ class MT5SyncService:
             # Reconcile positions and classify ownership
             self._reconcile_positions(raw_positions)
             self.pending_orders = raw_orders
+            self.check_zmq_bridge()
             self.last_sync_at = datetime.now(timezone.utc).isoformat()
             snapshot = self.get_snapshot()
             self.events.publish_event("mt5_sync", snapshot)
@@ -392,6 +489,7 @@ class MT5SyncService:
         canonical = symbol.upper().split(".")[0]
 
         mt5 = self._get_mt5()
+        now_utc = datetime.now(timezone.utc)
         if mt5 is None:
             return {
                 "symbol": canonical,
@@ -401,15 +499,35 @@ class MT5SyncService:
                 "quote": self.symbols.get(broker_sym),
                 "source": "MT5",
                 "connected": False,
-                "fetched_at": datetime.now(timezone.utc).isoformat(),
+                "status_reason": "MT5_NOT_CONNECTED",
+                "last_error": "MetaTrader5 Python package unavailable",
+                "fetched_at": now_utc.isoformat(),
             }
 
-        try:
-            mt5.initialize()
-        except Exception:
-            pass
+        ok_init, init_err = self._init_mt5(mt5)
+        if not ok_init:
+            return {
+                "symbol": canonical,
+                "broker_symbol": broker_sym,
+                "timeframe": timeframe.upper(),
+                "candles": [],
+                "quote": self.symbols.get(broker_sym),
+                "source": "MT5",
+                "connected": False,
+                "status_reason": "MT5_NOT_CONNECTED",
+                "last_error": init_err,
+                "fetched_at": now_utc.isoformat(),
+            }
 
-        now_utc = datetime.now(timezone.utc)
+        # Ensure symbol is enabled in Market Watch before fetching rates
+        select_fn = getattr(mt5, "symbol_select", None)
+        sym_selected = True
+        if callable(select_fn):
+            try:
+                sym_selected = bool(select_fn(broker_sym, True))
+            except Exception:
+                sym_selected = False
+
         broker_offset = detect_broker_utc_offset_sec(mt5, now_utc=now_utc)
         start_dt = datetime.fromisoformat(start_iso.replace("Z", "+00:00")) if start_iso else None
         end_dt = datetime.fromisoformat(end_iso.replace("Z", "+00:00")) if end_iso else None
@@ -434,6 +552,21 @@ class MT5SyncService:
         if quote:
             self.symbols[broker_sym] = quote
 
+        if candles:
+            last_ts = candles[-1].get("time")
+            if last_ts:
+                self.last_candle_times[broker_sym] = datetime.fromtimestamp(int(last_ts), tz=timezone.utc).isoformat()
+            status_reason = "MARKET_CLOSED" if (quote and quote.get("market_closed")) else "OK"
+        else:
+            sym_info_fn = getattr(mt5, "symbol_info", None)
+            sym_exists = bool(sym_info_fn(broker_sym)) if callable(sym_info_fn) else sym_selected
+            if not sym_exists:
+                status_reason = "SYMBOL_NOT_FOUND"
+            elif quote and quote.get("market_closed"):
+                status_reason = "MARKET_CLOSED"
+            else:
+                status_reason = "NO_CANDLES"
+
         return {
             "symbol": canonical,
             "broker_symbol": broker_sym,
@@ -442,6 +575,8 @@ class MT5SyncService:
             "quote": quote or self.symbols.get(broker_sym),
             "source": "MT5",
             "connected": self.connection_status == "CONNECTED" or len(candles) > 0,
+            "status_reason": status_reason,
+            "last_error": self.last_error,
             "fetched_at": now_utc.isoformat(),
         }
 
@@ -532,6 +667,9 @@ class MT5SyncService:
                 "last_sync_at": self.last_sync_at,
                 "last_error": self.last_error,
                 "reconnect_attempts": self.reconnect_attempts,
+                "terminal_path": self.terminal_path,
+                "zmq_bridge": dict(self.zmq_status),
+                "last_candle_times": dict(self.last_candle_times),
                 "account": dict(self.account),
                 "positions": list(self.positions),
                 "pending_orders": list(self.pending_orders),

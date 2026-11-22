@@ -76,6 +76,7 @@ def build_sidecar(script_path: Path, output_name: str, triple: str):
         "--hidden-import", "src",
         "--hidden-import", "src.core",
         "--hidden-import", "src.data",
+        "--hidden-import", "src.data.market_feed",
         "--hidden-import", "src.smc",
         "--hidden-import", "src.regime",
         "--hidden-import", "src.risk",
@@ -88,6 +89,12 @@ def build_sidecar(script_path: Path, output_name: str, triple: str):
         "--hidden-import", "companion",
         "--hidden-import", "companion.database",
         "--hidden-import", "companion.service",
+        "--hidden-import", "companion.service.api",
+        "--hidden-import", "companion.service.api.server",
+        "--hidden-import", "companion.service.mt5",
+        "--hidden-import", "companion.service.mt5.sync_service",
+        "--hidden-import", "companion.service.mt5.ea_deployer",
+        "--hidden-import", "companion.service.security.auth",
         "--name", output_name,
         str(script_path)
     ]
@@ -123,6 +130,10 @@ def main():
         (PROJECT_ROOT / "agent" / "mt5_bot_agent.py", "mt5_bot_agent"),
         (COMPANION_DIR / "service" / "main.py", "mt5_control_service"),
     ]
+
+    only = sys.argv[1] if len(sys.argv) > 1 else None
+    if only:
+        services = [(s, n) for (s, n) in services if n == only]
 
     success_count = 0
     for script, name in services:

@@ -48,6 +48,7 @@ import {
   AuditLogRecord,
   BalanceSnapshotRecord,
   ControlLogEntry,
+  ControlServiceStatus,
   ControlStatusPayload,
   PairingStatus,
   ScreenId,
@@ -163,6 +164,7 @@ export const App: React.FC = () => {
 
   // Authoritative Control Service state (kept screens only)
   const [rawStatus, setRawStatus] = useState<ControlStatusPayload | null>(null);
+  const [serviceStatus, setServiceStatus] = useState<ControlServiceStatus | null>(null);
   const [trades, setTrades] = useState<TradeHistoryRecord[]>([]);
   const [controlLogs, setControlLogs] = useState<ControlLogEntry[]>([]);
   const [audits, setAudits] = useState<AuditLogRecord[]>([]);
@@ -188,7 +190,12 @@ export const App: React.FC = () => {
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState<boolean>(false);
 
   const handleActionMessage = useCallback((message: string, isError = false) => {
-    setActionToast({ message, isError, ts: Date.now() });
+    setActionToast((prev) => {
+      if (prev && prev.message === message && prev.isError === isError) {
+        return prev;
+      }
+      return { message, isError, ts: Date.now() };
+    });
   }, []);
 
   // Auto-dismiss toast after 6 seconds
@@ -248,6 +255,36 @@ export const App: React.FC = () => {
       // ignore offline
     }
   }, []);
+
+  const handleReconnectService = useCallback(async () => {
+    handleActionMessage("Reconnecting Control Service...", false);
+    try {
+      const next = await IPC.reconnectControlService();
+      setServiceStatus(next);
+      if (next.status === "ONLINE") {
+        setActionToast(null);
+        await refreshStatus();
+      } else {
+        handleActionMessage(next.lastError || "Control Service still starting...", true);
+      }
+    } catch (e: any) {
+      handleActionMessage(`Reconnect failed: ${e?.message || e}`, true);
+    }
+  }, [handleActionMessage, refreshStatus]);
+
+  useEffect(() => {
+    IPC.getControlServiceStatus().then(setServiceStatus).catch(() => {});
+    const unsub = IPC.onControlServiceStatus((next) => {
+      setServiceStatus((prev) => {
+        if (prev?.status !== "ONLINE" && next.status === "ONLINE") {
+          setActionToast((toast) => (toast && /offline|retrying/i.test(toast.message) ? null : toast));
+          refreshStatus();
+        }
+        return next;
+      });
+    });
+    return () => unsub();
+  }, [refreshStatus]);
 
   // Initial load + SSE connection to /api/events + periodic polling backup
   useEffect(() => {
@@ -589,7 +626,9 @@ export const App: React.FC = () => {
                   <Lock className="w-3 h-3" />
                   <span>{UI_COPY.brand.demoLockShort}</span>
                 </span>
-                <span className="text-[#8496B8]">127.0.0.1:8765</span>
+                <span className="text-[#8496B8]">
+                  {serviceStatus ? `${serviceStatus.host}:${serviceStatus.port}` : "127.0.0.1:8765"}
+                </span>
               </div>
               <div className="text-[10px] text-[#B6C5E0] flex items-center justify-between">
                 <span>{feedStatus}</span>
@@ -712,6 +751,8 @@ export const App: React.FC = () => {
                 feedStatus={feedStatus}
                 initialSymbol={chartJumpSymbol}
                 readOnlyMobile={isMobileViewport}
+                serviceStatus={serviceStatus}
+                onReconnectService={handleReconnectService}
               />
             )}
 
