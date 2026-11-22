@@ -49,6 +49,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Local Control Service HTTP/SSE Bridge
   controlRequest: (method, apiPath, body) => ipcRenderer.invoke("control-request", method, apiPath, body),
   getControlConnectionInfo: () => ipcRenderer.invoke("get-control-connection-info"),
+  getControlServiceStatus: () => ipcRenderer.invoke("get-control-service-status"),
+  reconnectControlService: () => ipcRenderer.invoke("reconnect-control-service"),
+  onControlServiceStatus: (callback) => {
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on("control-service-status", handler);
+    return () => ipcRenderer.removeListener("control-service-status", handler);
+  },
 
   // Events from main to renderer
   onLogReceived: (callback) => {
