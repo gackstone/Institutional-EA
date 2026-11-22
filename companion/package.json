@@ -21,7 +21,7 @@
     "electron": "electron electron/main.cjs",
     "electron:dev": "concurrently \"vite\" \"wait-on tcp:5173 && electron electron/main.cjs\"",
     "sidecars": "python packaging/build_sidecars.py",
-    "dist:win": "npm run build && electron-builder --win nsis:x64 && node -e \"const fs=require('fs'),p=require('./package.json');fs.copyFileSync('release/Institutional-EA-Companion-Setup-'+p.version+'.exe','release/setup.exe')\"",
+    "dist:win": "npm run build && electron-builder --win nsis:x64 && node -e \"const fs=require('fs'),p=require('./package.json');fs.copyFileSync('release/Institutional-EA-Setup-'+p.version+'.exe','release/setup.exe')\"",
     "package:win": "python packaging/build_sidecars.py && npm run dist:win",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
@@ -54,7 +54,8 @@
   },
   "build": {
     "appId": "com.institutionalea.companion",
-    "productName": "Institutional EA Companion",
+    "productName": "Institutional EA",
+    "copyright": "Copyright © 2026 Institutional EA",
     "directories": {
       "output": "release",
       "buildResources": "resources"
@@ -100,15 +101,21 @@
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
+      "runAfterFinish": true,
       "shortcutName": "Institutional EA",
-      "uninstallDisplayName": "Institutional EA Companion",
+      "uninstallDisplayName": "Institutional EA",
       "installerIcon": "resources/icon.ico",
       "uninstallerIcon": "resources/icon.ico",
-      "installerHeaderIcon": "resources/icon.ico",
-      "artifactName": "Institutional-EA-Companion-Setup-${version}.${ext}",
+      "installerHeader": "resources/installerHeader.bmp",
+      "installerSidebar": "resources/installerSidebar.bmp",
+      "uninstallerSidebar": "resources/installerSidebar.bmp",
+      "include": "resources/installer.nsh",
+      "artifactName": "Institutional-EA-Setup-${version}.${ext}",
       "deleteAppDataOnUninstall": false
     }
   }
