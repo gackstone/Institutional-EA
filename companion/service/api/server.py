@@ -197,11 +197,19 @@ def create_request_handler(ctx: ControlServiceContext):
                 self.send_header("Content-Type", "text/event-stream")
                 self.send_header("Cache-Control", "no-cache")
                 self.send_header("Connection", "keep-alive")
+                self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 sub = ctx.events.subscribe()
                 try:
-                    # Send initial snapshot
-                    init_payload = json.dumps({"type": "snapshot", "payload": ctx.engine.get_status()})
+                    # Send initial full snapshot matching /api/status schema
+                    init_payload = json.dumps({
+                        "type": "snapshot",
+                        "payload": {
+                            "engine": ctx.engine.get_status(),
+                            "mt5": ctx.mt5_sync.get_snapshot(),
+                            "health": ctx.engine.get_health(),
+                        },
+                    })
                     self.wfile.write(f"data: {init_payload}\n\n".encode("utf-8"))
                     self.wfile.flush()
                     while True:
