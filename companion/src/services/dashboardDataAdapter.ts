@@ -8,7 +8,14 @@ import {
   RiskDecisionRecord,
   TradeHistoryRecord,
 } from "../types";
-import { calculateTradeMetrics, computeScheduleAndSession, maskAccountNumber, TradeDirection } from "../utils/tradeChartMath";
+import {
+  calculateTradeMetrics,
+  computeScheduleAndSession,
+  maskAccountNumber,
+  normalizeCanonicalSymbol,
+  snapTimestampToCandle,
+  TradeDirection,
+} from "../utils/tradeChartMath";
 
 export type ChartSymbol = "XAUUSD" | "USDJPY" | "BTCUSD";
 export type ChartTimeframe = "M1" | "M5" | "M15" | "H1" | "H4";
@@ -27,7 +34,7 @@ export interface ChartTradeLifecycleAnnotation {
   id: string;
   time: number;
   price: number;
-  type: "ENTRY" | "BE_MOVED" | "PARTIAL_CLOSE" | "SL_HIT" | "TP_HIT" | "CLOSED";
+  type: "SIGNAL" | "ENTRY" | "BE_MOVED" | "TRAIL_SL" | "PARTIAL_CLOSE" | "SL_HIT" | "TP_HIT" | "CLOSED";
   label: string;
   detail: string;
   tone: "buy" | "sell" | "be" | "partial" | "tp" | "sl" | "closed";
@@ -61,18 +68,21 @@ export interface LiquidityLevelOverlay {
   code: "PWH" | "PDH" | "PDL" | "PWL" | "EQH" | "EQL";
   label: string;
   price: number;
+  startTime?: number;
+  endTime?: number;
   swept: boolean;
   side: "HIGH" | "LOW";
 }
 
 export interface FvgObZoneOverlay {
   id: string;
-  kind: "FVG" | "OB";
+  kind: "FVG" | "IFVG" | "OB";
   bias: "BULLISH" | "BEARISH";
   label: string;
   topPrice: number;
   bottomPrice: number;
   startTime: number;
+  endTime?: number;
   mitigated: boolean;
 }
 
@@ -81,6 +91,7 @@ export interface StructureBreakOverlay {
   kind: "MSS" | "CHoCH" | "BOS";
   bias: "BULLISH" | "BEARISH";
   price: number;
+  startTime?: number;
   time: number;
   label: string;
 }
@@ -347,15 +358,16 @@ export function buildSymbolChartBundle(
   }
 
   // Extract price range for SMC overlays & trade levels
+  const candleTimes = candles.map((c) => c.time);
   const recentSlice = candles.slice(-48);
   const highestRecent = Math.max(...recentSlice.map((c) => c.high));
   const lowestRecent = Math.min(...recentSlice.map((c) => c.low));
   const allHigh = Math.max(...candles.map((c) => c.high));
   const allLow = Math.min(...candles.map((c) => c.low));
 
-  // Build active trades for this symbol (focusing on BOT-owned trades for the chart overlay, or deterministic DEMO bot trade)
+  // Match positions across broker suffixes (XAUUSD, XAUUSD.m, XAUUSD.pro, XAUUSDc)
   const rawPositions = (status?.mt5?.positions || []).filter(
-    (p) => p.symbol.toUpperCase().includes(symbol) && p.ownership === "BOT"
+    (p) => normalizeCanonicalSymbol(p.symbol) === symbol && p.ownership === "BOT"
   );
 
   const trades: ChartTradeOverlay[] =
@@ -365,116 +377,189 @@ export function buildSymbolChartBundle(
         )
       : buildFallbackChartTrades(symbol, candles, liveBid, meta.digits, meta.volatility * tfScale, meta.contractValuePerPoint);
 
-  // Build SMC Overlays (Liquidity PDL/PWH, FVG/OB, Structure MSS/CHoCH, Sessions)
-  // // TODO(real-data): Populate from strategy SMC engine telemetry once exposed on /api/status or /api/events.
+  // Build Complete SMC Overlays Fixture covering ALL bot drawing types:
+  // Liquidity (PWH, PDH, EQH, PDL, EQL, PWL), Imbalances (FVG, IFVG, OB),
+  // Structure (BOS, CHoCH, MSS), and Sessions (ASIAN, LONDON, NY_OVERLAP, NEW_YORK)
+  const pwhBar = candles[Math.max(4, candles.length - 72)];
+  const pdhBar = candles[Math.max(12, candles.length - 44)];
+  const eqhBar = candles[Math.max(20, candles.length - 30)];
+  const pdlBar = candles[Math.max(16, candles.length - 38)];
+  const pdlSweepBar = candles[Math.max(24, candles.length - 20)];
+  const eqlBar = candles[Math.max(26, candles.length - 26)];
+  const pwlBar = candles[Math.max(6, candles.length - 68)];
+
   const liquidityLevels: LiquidityLevelOverlay[] = [
     {
-      id: `${symbol}-pwh`,
+      id: `${symbol}-${timeframe}-pwh`,
       code: "PWH",
-      label: "PWH (Prev Week High Liquidity)",
-      price: Number((allHigh + meta.volatility * tfScale * 0.45).toFixed(meta.digits)),
+      label: "PWH",
+      price: Number((allHigh + meta.volatility * tfScale * 0.42).toFixed(meta.digits)),
+      startTime: snapTimestampToCandle(pwhBar.time, tfSec, candleTimes),
       swept: false,
       side: "HIGH",
     },
     {
-      id: `${symbol}-pdh`,
+      id: `${symbol}-${timeframe}-pdh`,
       code: "PDH",
-      label: "PDH (Prev Day High)",
-      price: Number((highestRecent + meta.volatility * tfScale * 0.12).toFixed(meta.digits)),
+      label: "PDH",
+      price: Number((highestRecent + meta.volatility * tfScale * 0.14).toFixed(meta.digits)),
+      startTime: snapTimestampToCandle(pdhBar.time, tfSec, candleTimes),
       swept: false,
       side: "HIGH",
     },
     {
-      id: `${symbol}-pdl`,
+      id: `${symbol}-${timeframe}-eqh`,
+      code: "EQH",
+      label: "EQH",
+      price: Number((highestRecent - meta.volatility * tfScale * 0.18).toFixed(meta.digits)),
+      startTime: snapTimestampToCandle(eqhBar.time, tfSec, candleTimes),
+      swept: false,
+      side: "HIGH",
+    },
+    {
+      id: `${symbol}-${timeframe}-pdl`,
       code: "PDL",
-      label: "PDL (Prev Day Low Sweep)",
-      price: Number((lowestRecent - meta.volatility * tfScale * 0.1).toFixed(meta.digits)),
+      label: "PDL",
+      price: Number((lowestRecent - meta.volatility * tfScale * 0.08).toFixed(meta.digits)),
+      startTime: snapTimestampToCandle(pdlBar.time, tfSec, candleTimes),
+      endTime: snapTimestampToCandle(pdlSweepBar.time, tfSec, candleTimes),
       swept: true,
       side: "LOW",
     },
     {
-      id: `${symbol}-pwl`,
+      id: `${symbol}-${timeframe}-eql`,
+      code: "EQL",
+      label: "EQL",
+      price: Number((lowestRecent + meta.volatility * tfScale * 0.22).toFixed(meta.digits)),
+      startTime: snapTimestampToCandle(eqlBar.time, tfSec, candleTimes),
+      swept: false,
+      side: "LOW",
+    },
+    {
+      id: `${symbol}-${timeframe}-pwl`,
       code: "PWL",
-      label: "PWL (Prev Week Low Pool)",
-      price: Number((allLow - meta.volatility * tfScale * 0.4).toFixed(meta.digits)),
+      label: "PWL",
+      price: Number((allLow - meta.volatility * tfScale * 0.36).toFixed(meta.digits)),
+      startTime: snapTimestampToCandle(pwlBar.time, tfSec, candleTimes),
       swept: false,
       side: "LOW",
     },
   ];
 
-  const entryAnchorBar = candles[Math.max(10, candles.length - 18)];
-  const obBar = candles[Math.max(6, candles.length - 26)];
+  const fvgBar = candles[Math.max(14, candles.length - 18)];
+  const ifvgBar = candles[Math.max(8, candles.length - 34)];
+  const ifvgMitBar = candles[Math.max(14, candles.length - 22)];
+  const obBar = candles[Math.max(10, candles.length - 26)];
 
+  const isBearSymbol = symbol === "USDJPY";
   const fvgObZones: FvgObZoneOverlay[] = [
     {
-      id: `${symbol}-fvg-1`,
+      id: `${symbol}-${timeframe}-fvg-1`,
       kind: "FVG",
-      bias: symbol === "USDJPY" ? "BEARISH" : "BULLISH",
-      label: symbol === "USDJPY" ? "Bearish FVG Imbalance" : "Bullish FVG Displacement",
-      topPrice: Number((entryAnchorBar.close + meta.volatility * tfScale * 0.35).toFixed(meta.digits)),
-      bottomPrice: Number((entryAnchorBar.close - meta.volatility * tfScale * 0.25).toFixed(meta.digits)),
-      startTime: entryAnchorBar.time,
+      bias: isBearSymbol ? "BEARISH" : "BULLISH",
+      label: isBearSymbol ? "Bear FVG" : "Bull FVG",
+      topPrice: Number((fvgBar.close + meta.volatility * tfScale * 0.32).toFixed(meta.digits)),
+      bottomPrice: Number((fvgBar.close - meta.volatility * tfScale * 0.22).toFixed(meta.digits)),
+      startTime: snapTimestampToCandle(fvgBar.time, tfSec, candleTimes),
       mitigated: false,
     },
     {
-      id: `${symbol}-ob-1`,
+      id: `${symbol}-${timeframe}-ob-1`,
       kind: "OB",
-      bias: symbol === "USDJPY" ? "BEARISH" : "BULLISH",
-      label: symbol === "USDJPY" ? "H1 Bearish Order Block (Supply)" : "M15 Bullish Order Block (Demand)",
-      topPrice: Number((obBar.low + meta.volatility * tfScale * 0.42).toFixed(meta.digits)),
-      bottomPrice: Number((obBar.low - meta.volatility * tfScale * 0.32).toFixed(meta.digits)),
-      startTime: obBar.time,
+      bias: isBearSymbol ? "BEARISH" : "BULLISH",
+      label: isBearSymbol ? "Supply OB" : "Demand OB",
+      topPrice: Number((obBar.low + meta.volatility * tfScale * 0.38).toFixed(meta.digits)),
+      bottomPrice: Number((obBar.low - meta.volatility * tfScale * 0.28).toFixed(meta.digits)),
+      startTime: snapTimestampToCandle(obBar.time, tfSec, candleTimes),
       mitigated: false,
+    },
+    {
+      id: `${symbol}-${timeframe}-ifvg-1`,
+      kind: "IFVG",
+      bias: isBearSymbol ? "BULLISH" : "BEARISH",
+      label: "IFVG (Mitigated)",
+      topPrice: Number((ifvgBar.high + meta.volatility * tfScale * 0.2).toFixed(meta.digits)),
+      bottomPrice: Number((ifvgBar.high - meta.volatility * tfScale * 0.2).toFixed(meta.digits)),
+      startTime: snapTimestampToCandle(ifvgBar.time, tfSec, candleTimes),
+      endTime: snapTimestampToCandle(ifvgMitBar.time, tfSec, candleTimes),
+      mitigated: true,
     },
   ];
 
+  const mssOriginBar = candles[Math.max(8, candles.length - 30)];
   const mssBar = candles[Math.max(12, candles.length - 22)];
-  const chochBar = candles[Math.max(18, candles.length - 12)];
+  const chochOriginBar = candles[Math.max(14, candles.length - 19)];
+  const chochBar = candles[Math.max(18, candles.length - 13)];
+  const bosOriginBar = candles[Math.max(20, candles.length - 12)];
+  const bosBar = candles[Math.max(24, candles.length - 7)];
 
   const structureBreaks: StructureBreakOverlay[] = [
     {
-      id: `${symbol}-mss`,
+      id: `${symbol}-${timeframe}-mss`,
       kind: "MSS",
-      bias: symbol === "USDJPY" ? "BEARISH" : "BULLISH",
-      price: mssBar.high,
-      time: mssBar.time,
-      label: symbol === "USDJPY" ? "MSS ↓ (Displacement)" : "MSS ↑ (Displacement)",
+      bias: isBearSymbol ? "BEARISH" : "BULLISH",
+      price: Number(mssBar.high.toFixed(meta.digits)),
+      startTime: snapTimestampToCandle(mssOriginBar.time, tfSec, candleTimes),
+      time: snapTimestampToCandle(mssBar.time, tfSec, candleTimes),
+      label: isBearSymbol ? "MSS ↓" : "MSS ↑",
     },
     {
-      id: `${symbol}-choch`,
+      id: `${symbol}-${timeframe}-choch`,
       kind: "CHoCH",
-      bias: symbol === "USDJPY" ? "BEARISH" : "BULLISH",
-      price: chochBar.close,
-      time: chochBar.time,
-      label: symbol === "USDJPY" ? "CHoCH ↓ Internal" : "CHoCH ↑ Continuation",
+      bias: isBearSymbol ? "BEARISH" : "BULLISH",
+      price: Number(chochBar.close.toFixed(meta.digits)),
+      startTime: snapTimestampToCandle(chochOriginBar.time, tfSec, candleTimes),
+      time: snapTimestampToCandle(chochBar.time, tfSec, candleTimes),
+      label: isBearSymbol ? "CHoCH ↓" : "CHoCH ↑",
+    },
+    {
+      id: `${symbol}-${timeframe}-bos`,
+      kind: "BOS",
+      bias: isBearSymbol ? "BEARISH" : "BULLISH",
+      price: Number((isBearSymbol ? bosBar.low : bosBar.high).toFixed(meta.digits)),
+      startTime: snapTimestampToCandle(bosOriginBar.time, tfSec, candleTimes),
+      time: snapTimestampToCandle(bosBar.time, tfSec, candleTimes),
+      label: isBearSymbol ? "BOS ↓" : "BOS ↑",
     },
   ];
 
-  const londonStartBar = candles[Math.max(0, candles.length - 40)];
-  const londonEndBar = candles[Math.max(10, candles.length - 20)];
-  const nyStartBar = candles[Math.max(12, candles.length - 20)];
+  const asiaStartBar = candles[Math.max(0, candles.length - 64)];
+  const asiaEndBar = candles[Math.max(6, candles.length - 42)];
+  const londonStartBar = candles[Math.max(8, candles.length - 42)];
+  const londonEndBar = candles[Math.max(14, candles.length - 22)];
+  const nyStartBar = candles[Math.max(16, candles.length - 22)];
   const nyEndBar = candles[candles.length - 1];
 
   const sessions: SessionMarkerOverlay[] = [
     {
-      id: `${symbol}-sess-ldn`,
-      session: "LONDON",
-      label: "LONDON KILLZONE (07:00–13:00 UTC)",
-      startTime: londonStartBar.time,
-      endTime: londonEndBar.time,
+      id: `${symbol}-${timeframe}-sess-asia`,
+      session: "ASIAN",
+      label: "ASIA (00–07 UTC)",
+      startTime: snapTimestampToCandle(asiaStartBar.time, tfSec, candleTimes),
+      endTime: snapTimestampToCandle(asiaEndBar.time, tfSec, candleTimes),
       highPrice: highestRecent,
       lowPrice: lowestRecent,
-      color: "rgba(56, 189, 248, 0.10)",
+      color: "rgba(94, 234, 212, 0.05)",
     },
     {
-      id: `${symbol}-sess-ny`,
-      session: "NY_OVERLAP",
-      label: "LDN / NY OVERLAP (13:00–16:00 UTC)",
-      startTime: nyStartBar.time,
-      endTime: nyEndBar.time,
+      id: `${symbol}-${timeframe}-sess-ldn`,
+      session: "LONDON",
+      label: "LDN KZ (07–13 UTC)",
+      startTime: snapTimestampToCandle(londonStartBar.time, tfSec, candleTimes),
+      endTime: snapTimestampToCandle(londonEndBar.time, tfSec, candleTimes),
       highPrice: highestRecent,
       lowPrice: lowestRecent,
-      color: "rgba(16, 185, 129, 0.10)",
+      color: "rgba(47, 73, 124, 0.14)",
+    },
+    {
+      id: `${symbol}-${timeframe}-sess-ny`,
+      session: "NY_OVERLAP",
+      label: "LDN/NY (13–16 UTC)",
+      startTime: snapTimestampToCandle(nyStartBar.time, tfSec, candleTimes),
+      endTime: snapTimestampToCandle(nyEndBar.time, tfSec, candleTimes),
+      highPrice: highestRecent,
+      lowPrice: lowestRecent,
+      color: "rgba(176, 246, 72, 0.06)",
     },
   ];
 
@@ -551,14 +636,24 @@ function adaptControlPositionToChartOverlay(
   const ownershipTag: ChartTradeOverlay["ownership"] =
     pos.ownership === "MANUAL" ? "MANUAL" : pos.ownership === "OTHER_EA" ? "OTHER_EA" : "BOT_OWN";
 
+  const sigBar = candles[Math.max(2, candles.length - 18 - idx * 5)];
   const annotations: ChartTradeLifecycleAnnotation[] = [
+    {
+      id: `ann-sig-${pos.ticket}`,
+      time: sigBar.time,
+      price: entryPrice,
+      type: "SIGNAL",
+      label: `SIG ${direction}`,
+      detail: `Gate Approved · Score 89`,
+      tone: direction === "BUY" ? "buy" : "sell",
+    },
     {
       id: `ann-entry-${pos.ticket}`,
       time: entryBar.time,
       price: entryPrice,
       type: "ENTRY",
       label: `${direction} ${pos.volume.toFixed(2)}L`,
-      detail: `Score 89/100 · Magic #${pos.magic || 202601}`,
+      detail: `Score 89 · #${pos.ticket}`,
       tone: direction === "BUY" ? "buy" : "sell",
     },
   ];
@@ -567,10 +662,10 @@ function adaptControlPositionToChartOverlay(
     annotations.push({
       id: `ann-be-${pos.ticket}`,
       time: beBar.time,
-      price: entryPrice,
+      price: stopLoss,
       type: "BE_MOVED",
-      label: "BE+ Lock",
-      detail: `SL moved ${initialStopLoss.toFixed(digits)} → ${stopLoss.toFixed(digits)}`,
+      label: "BE+",
+      detail: `${initialStopLoss.toFixed(digits)} → ${stopLoss.toFixed(digits)}`,
       tone: "be",
     });
   }
@@ -582,8 +677,8 @@ function adaptControlPositionToChartOverlay(
       time: partialBar.time,
       price: tp1,
       type: "PARTIAL_CLOSE",
-      label: "Partial 50% @ TP1",
-      detail: `Banked +1.25R at ${tp1.toFixed(digits)}`,
+      label: "50% TP1",
+      detail: `+1.25R @ ${tp1.toFixed(digits)}`,
       tone: "partial",
     });
   }

@@ -272,27 +272,101 @@ export function validateTightenOnlyStopLoss(params: {
 }
 
 /**
- * Collision-aware vertical label layout solver.
+ * Normalizes any broker symbol string (`XAUUSD.m`, `XAUUSD.pro`, `XAUUSDc`, `BTCUSD.m`, `USDJPY.m`)
+ * to its canonical symbol (`XAUUSD`, `USDJPY`, `BTCUSD`).
+ */
+export function normalizeCanonicalSymbol(rawSymbol: string | null | undefined): "XAUUSD" | "USDJPY" | "BTCUSD" {
+  const upper = String(rawSymbol ?? "").toUpperCase();
+  if (upper.includes("JPY")) return "USDJPY";
+  if (upper.includes("BTC")) return "BTCUSD";
+  return "XAUUSD";
+}
+
+/**
+ * Snaps a UTC timestamp (seconds) to the exact opening bar boundary for the given timeframe (in seconds),
+ * optionally applying a broker server UTC offset and clamping to the loaded candle time range.
+ */
+export function snapTimestampToCandle(
+  timestampSec: number,
+  timeframeSeconds: number,
+  candleTimes?: number[],
+  brokerOffsetSeconds: number = 0
+): number {
+  const tf = Math.max(60, timeframeSeconds);
+  const adjusted = timestampSec - brokerOffsetSeconds;
+  const bucket = Math.floor(adjusted / tf) * tf;
+
+  if (!candleTimes || candleTimes.length === 0) {
+    return bucket;
+  }
+
+  const first = candleTimes[0];
+  const last = candleTimes[candleTimes.length - 1];
+  if (bucket <= first) return first;
+  if (bucket >= last) return last;
+
+  // Binary / linear snap to nearest loaded candle bar (handles weekend gaps cleanly)
+  let best = first;
+  let bestDiff = Math.abs(bucket - first);
+  for (let i = 1; i < candleTimes.length; i++) {
+    const d = Math.abs(bucket - candleTimes[i]);
+    if (d < bestDiff) {
+      bestDiff = d;
+      best = candleTimes[i];
+    }
+  }
+  return best;
+}
+
+const DEFAULT_TONE_PRIORITY: Record<RawPriceLabelItem["tone"], number> = {
+  live: 100,
+  entry: 95,
+  sl: 90,
+  tp1: 85,
+  tp2: 85,
+  ghost_sl: 75,
+  liquidity: 60,
+  structure: 55,
+};
+
+/**
+ * Priority-aware, collision-free vertical label layout solver.
  * Guarantees that no two labels overlap (resolvedY[i+1] - resolvedY[i] >= minGapPx)
  * and that no label clips outside [minY + halfH, maxY - halfH] while preserving vertical price order.
+ * If more labels compete than vertical height allows, highest-priority labels (Live, Entry, SL, TP) always win.
  */
 export function resolveLabelCollisions(
   items: RawPriceLabelItem[],
-  bounds: { minY: number; maxY: number; minGapPx?: number; defaultHeightPx?: number }
+  bounds: { minY: number; maxY: number; minGapPx?: number; defaultHeightPx?: number; maxLabels?: number }
 ): ResolvedPriceLabelItem[] {
   if (items.length === 0) return [];
 
-  const defaultHeightPx = bounds.defaultHeightPx ?? 22;
+  const defaultHeightPx = bounds.defaultHeightPx ?? 21;
   const minGapPx = bounds.minGapPx ?? defaultHeightPx + 3;
   const topLimit = bounds.minY + defaultHeightPx / 2;
   const bottomLimit = Math.max(topLimit, bounds.maxY - defaultHeightPx / 2);
+  const availableSpan = Math.max(1, bottomLimit - topLimit);
+
+  // Determine maximum labels that can comfortably fit
+  const maxByHeight = Math.max(4, Math.floor(availableSpan / Math.max(16, minGapPx - 3)) + 1);
+  const maxCap = Math.min(bounds.maxLabels ?? 12, maxByHeight);
+
+  let pool = [...items];
+  if (pool.length > maxCap) {
+    // Keep highest-priority items (Live, Entry, SL, TP1, TP2 always win)
+    pool.sort((a, b) => {
+      const pa = a.priority ?? DEFAULT_TONE_PRIORITY[a.tone] ?? 50;
+      const pb = b.priority ?? DEFAULT_TONE_PRIORITY[b.tone] ?? 50;
+      return pb - pa;
+    });
+    pool = pool.slice(0, maxCap);
+  }
 
   // Sort from top of chart (smallest Y / highest price) to bottom of chart (largest Y / lowest price)
-  const sorted = [...items].sort((a, b) => {
+  const sorted = pool.sort((a, b) => {
     if (Math.abs(a.idealY - b.idealY) > 0.5) {
       return a.idealY - b.idealY;
     }
-    // Tie-break by descending price (higher price = smaller Y)
     return b.price - a.price;
   });
 

@@ -5,8 +5,10 @@ import {
   calculateTradeZones,
   computeScheduleAndSession,
   maskAccountNumber,
+  normalizeCanonicalSymbol,
   type RawPriceLabelItem,
   resolveLabelCollisions,
+  snapTimestampToCandle,
   validateTightenOnlyStopLoss,
 } from "../tradeChartMath.ts";
 
@@ -171,4 +173,17 @@ test("maskAccountNumber and computeScheduleAndSession return expected schedule m
   assert.equal(sunInfo.scheduleMode, "WEEKEND_BTC_MODE");
   assert.equal(sunInfo.sessionName, "WEEKEND CRYPTO 24/7");
   assert.deepEqual(sunInfo.activeInstruments, ["BTCUSD"]);
+});
+
+test("normalizeCanonicalSymbol strips broker suffixes and snapTimestampToCandle snaps to bar boundaries", () => {
+  assert.equal(normalizeCanonicalSymbol("XAUUSD.m"), "XAUUSD");
+  assert.equal(normalizeCanonicalSymbol("XAUUSD.pro"), "XAUUSD");
+  assert.equal(normalizeCanonicalSymbol("USDJPY.m"), "USDJPY");
+  assert.equal(normalizeCanonicalSymbol("BTCUSDc"), "BTCUSD");
+
+  const candles = [1700000000, 1700000300, 1700000600, 1700000900];
+  assert.equal(snapTimestampToCandle(1700000440, 300, candles), 1700000300);
+  // Clamps to earliest/latest loaded candle across weekend gaps
+  assert.equal(snapTimestampToCandle(1699900000, 300, candles), 1700000000);
+  assert.equal(snapTimestampToCandle(1700050000, 300, candles), 1700000900);
 });

@@ -33,6 +33,7 @@ import {
   resolveLabelCollisions,
 } from "../utils/tradeChartMath";
 import { DESIGN_TOKENS, getSymbolChipSpec } from "../styles/designTokens";
+import { UI_COPY } from "../constants/uiCopy";
 
 export interface OverlayTogglesState {
   liquidity: boolean;
@@ -56,8 +57,19 @@ interface ProjectedZoneBox {
   topY: number;
   heightPx: number;
   leftX: number;
-  kind: "RISK" | "REWARD_TP1" | "REWARD_TP2" | "FVG_BULL" | "FVG_BEAR" | "OB_BULL" | "OB_BEAR";
+  widthPx: number;
+  kind:
+    | "RISK"
+    | "REWARD_TP1"
+    | "REWARD_TP2"
+    | "FVG_BULL"
+    | "FVG_BEAR"
+    | "IFVG"
+    | "OB_BULL"
+    | "OB_BEAR";
   label: string;
+  tooltip: string;
+  mitigated?: boolean;
 }
 
 interface ProjectedLineLevel {
@@ -67,6 +79,8 @@ interface ProjectedLineLevel {
   style: "solid" | "dashed" | "dotted";
   color: string;
   startX: number;
+  endX: number;
+  width: number;
 }
 
 interface ProjectedAnnotationPin {
@@ -75,7 +89,7 @@ interface ProjectedAnnotationPin {
   y: number;
   label: string;
   detail: string;
-  tone: "buy" | "sell" | "be" | "partial" | "tp" | "sl" | "closed" | "mss" | "choch";
+  tone: "buy" | "sell" | "be" | "partial" | "tp" | "sl" | "closed" | "mss" | "choch" | "bos";
 }
 
 interface ProjectedSessionBand {
@@ -88,6 +102,32 @@ interface ProjectedSessionBand {
 
 const SYMBOLS: ChartSymbol[] = ["XAUUSD", "USDJPY", "BTCUSD"];
 const TIMEFRAMES: ChartTimeframe[] = ["M1", "M5", "M15", "H1", "H4"];
+const OVERLAY_STORAGE_KEY = "iea_chart_overlay_toggles_v1";
+
+function loadSavedOverlayToggles(): OverlayTogglesState {
+  try {
+    const raw = localStorage.getItem(OVERLAY_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        liquidity: Boolean(parsed.liquidity ?? true),
+        fvgOb: Boolean(parsed.fvgOb ?? true),
+        structure: Boolean(parsed.structure ?? true),
+        sessions: Boolean(parsed.sessions ?? true),
+        tradeLabels: Boolean(parsed.tradeLabels ?? true),
+      };
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return {
+    liquidity: true,
+    fvgOb: true,
+    structure: true,
+    sessions: true,
+    tradeLabels: true,
+  };
+}
 
 export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
   bundle,
@@ -101,14 +141,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
-  const [overlays, setOverlays] = useState<OverlayTogglesState>({
-    liquidity: true,
-    fvgOb: true,
-    structure: true,
-    sessions: true,
-    tradeLabels: true,
-  });
-
+  const [overlays, setOverlays] = useState<OverlayTogglesState>(loadSavedOverlayToggles);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const [chartDims, setChartDims] = useState<{ width: number; height: number }>({
@@ -122,7 +155,15 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
   const [sessionBands, setSessionBands] = useState<ProjectedSessionBand[]>([]);
 
   const toggleOverlay = (key: keyof OverlayTogglesState) => {
-    setOverlays((prev) => ({ ...prev, [key]: !prev[key] }));
+    setOverlays((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem(OVERLAY_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
   };
 
   const primaryTrade = bundle.trades[0] || null;
@@ -163,7 +204,8 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       }
     };
 
-    const timeToX = (timeSec: number): number | null => {
+    const timeToX = (timeSec?: number): number | null => {
+      if (!timeSec) return null;
       try {
         const x = chart.timeScale().timeToCoordinate(timeSec as UTCTimestamp);
         if (x === null || !Number.isFinite(x)) return null;
@@ -179,11 +221,11 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     const nextPins: ProjectedAnnotationPin[] = [];
     const nextSessions: ProjectedSessionBand[] = [];
 
-    // 1. Sessions shading bands
+    // 1. Sessions shading bands (capped to 3 most recent)
     if (overlays.sessions) {
-      for (const sess of bundle.sessions) {
-        const x1 = timeToX(sess.startTime) ?? 20;
-        const x2 = timeToX(sess.endTime) ?? plotRight - 10;
+      for (const sess of bundle.sessions.slice(-3)) {
+        const x1 = timeToX(sess.startTime) ?? 18;
+        const x2 = timeToX(sess.endTime) ?? plotRight - 6;
         const left = Math.max(0, Math.min(x1, x2));
         const right = Math.min(plotRight, Math.max(x1, x2));
         if (right - left > 24) {
@@ -192,88 +234,119 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             leftX: left,
             widthPx: right - left,
             label: sess.label,
-            color:
-              sess.session === "LONDON"
-                ? "rgba(47, 73, 124, 0.20)"
-                : "rgba(176, 246, 72, 0.08)",
+            color: sess.color,
           });
         }
       }
     }
 
-    // 2. FVG / Order Block boxes
+    // 2. FVG / IFVG / Order Block boxes (capped to 4 most recent)
     if (overlays.fvgOb) {
-      for (const z of bundle.fvgObZones) {
+      for (const z of bundle.fvgObZones.slice(-4)) {
         const yTop = priceToY(z.topPrice);
         const yBot = priceToY(z.bottomPrice);
         if (yTop !== null && yBot !== null) {
           const top = Math.max(6, Math.min(yTop, yBot));
           const bot = Math.min(plotBottom - 4, Math.max(yTop, yBot));
-          const startX = Math.max(12, Math.min(plotRight - 80, timeToX(z.startTime) ?? 48));
+          const startX = Math.max(12, Math.min(plotRight - 70, timeToX(z.startTime) ?? 48));
+          const endX = z.endTime
+            ? Math.max(startX + 36, Math.min(plotRight, timeToX(z.endTime) ?? plotRight))
+            : plotRight;
           nextZones.push({
             id: z.id,
             topY: top,
             heightPx: Math.max(12, bot - top),
             leftX: startX,
+            widthPx: Math.max(36, endX - startX),
             kind:
-              z.kind === "FVG"
+              z.kind === "IFVG"
+                ? "IFVG"
+                : z.kind === "FVG"
                 ? z.bias === "BULLISH"
                   ? "FVG_BULL"
                   : "FVG_BEAR"
                 : z.bias === "BULLISH"
                 ? "OB_BULL"
                 : "OB_BEAR",
-            label: `${z.kind} · ${z.label}`,
+            label: z.label,
+            tooltip: `${z.kind} (${z.bias}) · ${z.bottomPrice.toFixed(bundle.digits)}–${z.topPrice.toFixed(
+              bundle.digits
+            )} · ${z.mitigated ? "Mitigated" : "Active"}`,
+            mitigated: z.mitigated,
           });
         }
       }
     }
 
-    // 3. Liquidity Levels (PWH / PDH / PDL / PWL)
+    // 3. Liquidity Levels (PWH / PDH / EQH / PDL / EQL / PWL — capped to 6)
     if (overlays.liquidity) {
-      for (const liq of bundle.liquidityLevels) {
+      for (const liq of bundle.liquidityLevels.slice(0, 6)) {
         const y = priceToY(liq.price);
         if (y !== null && y >= 6 && y <= plotBottom) {
+          const startX = Math.max(14, Math.min(plotRight - 90, timeToX(liq.startTime) ?? 20));
+          const endX =
+            liq.swept && liq.endTime
+              ? Math.max(startX + 45, Math.min(plotRight, timeToX(liq.endTime) ?? plotRight))
+              : plotRight;
           nextLines.push({
             id: liq.id,
             y,
             price: liq.price,
             style: liq.swept ? "dotted" : "dashed",
-            color: liq.side === "HIGH" ? "rgba(194, 240, 118, 0.55)" : "rgba(94, 234, 212, 0.55)",
-            startX: 16,
+            color:
+              liq.code === "EQH" || liq.code === "EQL"
+                ? "rgba(192, 119, 250, 0.72)"
+                : liq.side === "HIGH"
+                ? "rgba(194, 240, 118, 0.60)"
+                : "rgba(94, 234, 212, 0.60)",
+            startX,
+            endX,
+            width: 1.2,
           });
           rawLabels.push({
             id: liq.id,
             price: liq.price,
             idealY: y,
+            priority: 60,
             label: `${liq.code} ${liq.price.toFixed(bundle.digits)}`,
-            sublabel: liq.swept ? "SWEPT" : "POOL",
+            sublabel: liq.swept ? "SWEPT" : undefined,
             tone: "liquidity",
           });
         }
       }
     }
 
-    // 4. Structure Breaks (MSS / CHoCH)
+    // 4. Structure Breaks (MSS / CHoCH / BOS — with horizontal break ray from swing pivot to break bar)
     if (overlays.structure) {
-      for (const st of bundle.structureBreaks) {
+      for (const st of bundle.structureBreaks.slice(-4)) {
         const y = priceToY(st.price);
-        const x = timeToX(st.time) ?? Math.floor(plotRight * 0.55);
+        const xBreak = timeToX(st.time) ?? Math.floor(plotRight * 0.62);
+        const xStart = timeToX(st.startTime) ?? Math.max(20, xBreak - 85);
         if (y !== null && y >= 14 && y <= plotBottom - 10) {
+          nextLines.push({
+            id: `struct-line-${st.id}`,
+            y,
+            price: st.price,
+            style: st.kind === "BOS" ? "solid" : "dotted",
+            color: st.bias === "BULLISH" ? "rgba(176, 246, 72, 0.70)" : "rgba(192, 119, 250, 0.75)",
+            startX: Math.max(16, Math.min(xStart, xBreak - 24)),
+            endX: Math.min(plotRight - 20, Math.max(xStart + 24, xBreak)),
+            width: 1.4,
+          });
           nextPins.push({
             id: st.id,
-            x: Math.max(40, Math.min(plotRight - 140, x)),
+            x: Math.max(36, Math.min(plotRight - 135, xBreak - 18)),
             y,
             label: st.label,
-            detail: `@ ${st.price.toFixed(bundle.digits)}`,
-            tone: st.kind === "MSS" ? "mss" : "choch",
+            detail: `${st.price.toFixed(bundle.digits)}`,
+            tone: st.kind === "MSS" ? "mss" : st.kind === "BOS" ? "bos" : "choch",
           });
         }
       }
     }
 
     // 5. Bot Trade Overlays: Entry, SL, Ghost Initial SL, TP1, TP2, Shaded Risk/Reward Zones, Event Annotations
-    for (const trade of bundle.trades) {
+    for (const trade of bundle.trades.slice(0, 3)) {
       const zones = calculateTradeZones({
         direction: trade.direction,
         entryPrice: trade.entryPrice,
@@ -283,7 +356,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
         tp2: trade.tp2,
       });
 
-      const entryStartX = Math.max(20, Math.min(plotRight - 120, timeToX(trade.entryTime) ?? Math.floor(plotRight * 0.42)));
+      const entryStartX = Math.max(
+        20,
+        Math.min(plotRight - 120, timeToX(trade.entryTime) ?? Math.floor(plotRight * 0.44))
+      );
 
       if (overlays.tradeLabels) {
         // Risk Zone Shading
@@ -298,8 +374,12 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               topY: top,
               heightPx: Math.max(8, bot - top),
               leftX: entryStartX,
+              widthPx: Math.max(40, plotRight - entryStartX),
               kind: "RISK",
-              label: `RISK ZONE (1.0R)`,
+              label: "RISK 1.0R",
+              tooltip: `Risk Zone (#${trade.ticket}) · Entry ${trade.entryPrice.toFixed(
+                bundle.digits
+              )} to SL ${trade.initialStopLoss.toFixed(bundle.digits)}`,
             });
           }
         }
@@ -316,13 +396,17 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               topY: top,
               heightPx: Math.max(10, bot - top),
               leftX: entryStartX,
+              widthPx: Math.max(40, plotRight - entryStartX),
               kind: "REWARD_TP2",
-              label: `REWARD ZONE (+${trade.tp2R.toFixed(2)}R)`,
+              label: `TGT +${trade.tp2R.toFixed(2)}R`,
+              tooltip: `Reward Zone (#${trade.ticket}) · Target TP2 ${trade.tp2.toFixed(
+                bundle.digits
+              )} (+${trade.tp2R.toFixed(2)}R)`,
             });
           }
         }
 
-        // Entry Line & Badge
+        // Entry Line & Badge (Priority 95)
         const entryY = priceToY(trade.entryPrice);
         if (entryY !== null) {
           nextLines.push({
@@ -332,18 +416,21 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             style: "solid",
             color: trade.direction === "BUY" ? "#5EEAD4" : "#C077FA",
             startX: entryStartX,
+            endX: plotRight,
+            width: 1.6,
           });
           rawLabels.push({
             id: `lbl-entry-${trade.ticket}`,
             price: trade.entryPrice,
             idealY: entryY,
+            priority: 95,
             label: `${trade.direction} ${trade.volume.toFixed(2)}L · ${trade.entryPrice.toFixed(bundle.digits)}`,
-            sublabel: `Score ${trade.qualityScore} · #${trade.ticket}`,
+            sublabel: `S${trade.qualityScore}`,
             tone: "entry",
           });
         }
 
-        // Active Stop Loss Line & Badge (Red)
+        // Active Stop Loss Line & Badge (Priority 90)
         const slY = priceToY(trade.stopLoss);
         if (slY !== null && trade.stopLoss > 0) {
           nextLines.push({
@@ -353,6 +440,8 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             style: "solid",
             color: "#FF5A6E",
             startX: entryStartX,
+            endX: plotRight,
+            width: 1.6,
           });
           const isBeOrPositive =
             trade.direction === "BUY"
@@ -362,13 +451,14 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             id: `lbl-sl-${trade.ticket}`,
             price: trade.stopLoss,
             idealY: slY,
+            priority: 90,
             label: `SL ${trade.stopLoss.toFixed(bundle.digits)}`,
-            sublabel: isBeOrPositive ? "BE+ LOCKED" : "-1.00R STOP",
+            sublabel: isBeOrPositive ? "BE+" : "-1R",
             tone: "sl",
           });
         }
 
-        // Ghosted Initial Stop Loss when moved
+        // Ghosted Initial Stop Loss when moved (Priority 75)
         if (zones.ghostInitialSlPrice !== null) {
           const ghostY = priceToY(zones.ghostInitialSlPrice);
           if (ghostY !== null) {
@@ -379,19 +469,22 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               style: "dashed",
               color: "rgba(255, 90, 110, 0.45)",
               startX: entryStartX,
+              endX: plotRight,
+              width: 1.15,
             });
             rawLabels.push({
               id: `lbl-ghost-sl-${trade.ticket}`,
               price: zones.ghostInitialSlPrice,
               idealY: ghostY,
+              priority: 75,
               label: `INIT SL ${zones.ghostInitialSlPrice.toFixed(bundle.digits)}`,
-              sublabel: "GHOST (MOVED)",
+              sublabel: "GHOST",
               tone: "ghost_sl",
             });
           }
         }
 
-        // TP1 Line & Badge (Neon Lime)
+        // TP1 Line & Badge (Priority 85)
         if (trade.tp1 > 0) {
           const tp1Y = priceToY(trade.tp1);
           if (tp1Y !== null) {
@@ -402,19 +495,22 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               style: "dashed",
               color: "#C2F076",
               startX: entryStartX,
+              endX: plotRight,
+              width: 1.35,
             });
             rawLabels.push({
               id: `lbl-tp1-${trade.ticket}`,
               price: trade.tp1,
               idealY: tp1Y,
+              priority: 85,
               label: `TP1 ${trade.tp1.toFixed(bundle.digits)}`,
-              sublabel: `+${trade.tp1R.toFixed(2)}R (50%)`,
+              sublabel: `+${trade.tp1R.toFixed(2)}R`,
               tone: "tp1",
             });
           }
         }
 
-        // TP2 Line & Badge (Neon Lime)
+        // TP2 Line & Badge (Priority 86)
         if (trade.tp2 > 0) {
           const tp2Y = priceToY(trade.tp2);
           if (tp2Y !== null) {
@@ -425,26 +521,29 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               style: "solid",
               color: "#B0F648",
               startX: entryStartX,
+              endX: plotRight,
+              width: 1.6,
             });
             rawLabels.push({
               id: `lbl-tp2-${trade.ticket}`,
               price: trade.tp2,
               idealY: tp2Y,
+              priority: 86,
               label: `TP2 ${trade.tp2.toFixed(bundle.digits)}`,
-              sublabel: `+${trade.tp2R.toFixed(2)}R TARGET`,
+              sublabel: `+${trade.tp2R.toFixed(2)}R`,
               tone: "tp2",
             });
           }
         }
 
-        // Event Annotations (Entry marker, Break-Even moved, Partial close, SL/TP hit)
+        // Event Annotations (Signal, Entry marker, Break-Even moved, Partial close)
         trade.annotations.forEach((ann, idx) => {
           const ay = priceToY(ann.price);
-          const ax = timeToX(ann.time) ?? entryStartX + idx * 55;
+          const ax = timeToX(ann.time) ?? entryStartX + idx * 52;
           if (ay !== null && ay >= 10 && ay <= plotBottom - 10) {
             nextPins.push({
               id: ann.id,
-              x: Math.max(24, Math.min(plotRight - 165, ax)),
+              x: Math.max(24, Math.min(plotRight - 145, ax)),
               y: ay,
               label: ann.label,
               detail: ann.detail,
@@ -455,43 +554,41 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       }
     }
 
-    // 6. Live Price Tag with Floating R
+    // 6. Live Price Tag with Floating R (Highest Priority 100)
     const liveY = priceToY(bundle.bid);
     if (liveY !== null) {
       const floatR = primaryTrade ? primaryTrade.floatingR : 0;
-      const floatPnl = primaryTrade ? primaryTrade.floatingPnl : 0;
       const rPrefix = floatR >= 0 ? "+" : "";
-      const pnlPrefix = floatPnl >= 0 ? "+" : "";
       rawLabels.push({
         id: `lbl-live-${bundle.symbol}`,
         price: bundle.bid,
         idealY: liveY,
+        priority: 100,
         label: `LIVE ${bundle.bid.toFixed(bundle.digits)}`,
-        sublabel: primaryTrade
-          ? `${rPrefix}${floatR.toFixed(2)}R (${pnlPrefix}$${floatPnl.toFixed(2)})`
-          : `Spread ${bundle.spreadPoints} pts`,
+        sublabel: primaryTrade ? `${rPrefix}${floatR.toFixed(2)}R` : `Spr ${bundle.spreadPoints}`,
         tone: "live",
       });
     }
 
-    // Run collision-aware vertical label placement solver so labels never overlap or clip
+    // Run priority-aware collision-free vertical label placement solver
     const nonOverlapping = resolveLabelCollisions(rawLabels, {
       minY: 8,
       maxY: plotBottom - 6,
-      minGapPx: 24,
-      defaultHeightPx: 21,
+      minGapPx: 23,
+      defaultHeightPx: 20,
+      maxLabels: 11,
     });
 
-    // Also de-collide annotation pins vertically if two share similar X and Y
+    // De-collide annotation pins vertically if two share similar X and Y
     const sortedPins = [...nextPins].sort((a, b) => a.y - b.y);
     for (let i = 1; i < sortedPins.length; i++) {
       if (
-        Math.abs(sortedPins[i].x - sortedPins[i - 1].x) < 115 &&
-        sortedPins[i].y - sortedPins[i - 1].y < 24
+        Math.abs(sortedPins[i].x - sortedPins[i - 1].x) < 110 &&
+        sortedPins[i].y - sortedPins[i - 1].y < 23
       ) {
         sortedPins[i] = {
           ...sortedPins[i],
-          y: Math.min(plotBottom - 14, sortedPins[i - 1].y + 25),
+          y: Math.min(plotBottom - 14, sortedPins[i - 1].y + 24),
         };
       }
     }
@@ -504,7 +601,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     setSessionBands(nextSessions);
   }, [bundle, overlays, primaryTrade]);
 
-  // Initialize lightweight-charts instance and ResizeObserver with the new Navy/Lime theme
+  // Initialize lightweight-charts instance and ResizeObserver
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -639,7 +736,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
 
     series.setData(formatted);
 
-    // Ensure auto-scale price range spans Entry, SL, Ghost Initial SL, TP1, TP2, and Liquidity levels
+    // Ensure auto-scale price range spans Entry, SL, Ghost Initial SL, TP1, TP2
     series.applyOptions({
       autoscaleInfoProvider: (original: () => { priceRange: { minValue: number; maxValue: number } } | null) => {
         const res = original();
@@ -698,6 +795,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       closed: "bg-[#162749]/95 border-[rgba(186,214,255,0.3)] text-[#B6C5E0]",
       mss: "bg-[#221D4E]/95 border-[#C077FA] text-[#E5C7FF]",
       choch: "bg-[#2A1D54]/95 border-[#C9ACDA] text-[#F0DEFF]",
+      bos: "bg-[#16343A]/95 border-[#5EEAD4] text-[#C8FFF4]",
     }),
     []
   );
@@ -713,12 +811,11 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       }
     >
       {/* Chart Toolbar Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2.5 bg-[#0D1B36]/85 border-b border-[rgba(186,214,255,0.13)] shrink-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 bg-[#0D1B36]/85 border-b border-[rgba(186,214,255,0.13)] shrink-0">
         {/* Left: Symbol Switcher with Circular Coin Chips + Timeframes + Live Quote */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Symbol Selector Pills */}
+        <div className="flex flex-wrap items-center gap-2">
           <div
-            className="inline-flex items-center bg-[#091426]/80 border border-[rgba(186,214,255,0.15)] rounded-full p-1 gap-1"
+            className="inline-flex items-center bg-[#091426]/80 border border-[rgba(186,214,255,0.15)] rounded-full p-0.5 gap-0.5"
             role="group"
             aria-label="Select Chart Symbol"
           >
@@ -731,9 +828,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                   type="button"
                   onClick={() => onSelectSymbol(sym)}
                   aria-pressed={active}
+                  title={`${sym} (${chip.tagLabel})`}
                   className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold transition-all duration-150 inline-flex items-center space-x-1.5 ${
                     active
-                      ? "bg-[#B0F648] text-[#081321] shadow-[0_0_16px_rgba(176,246,72,0.4)]"
+                      ? "bg-[#B0F648] text-[#081321] shadow-[0_0_14px_rgba(176,246,72,0.38)]"
                       : "text-[#B6C5E0] hover:text-[#F4F7FF] hover:bg-white/5"
                   }`}
                 >
@@ -752,7 +850,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
 
           {/* Timeframe Selector (Segmented Pill Tabs) */}
           <div
-            className="inline-flex items-center bg-[#091426]/80 border border-[rgba(186,214,255,0.15)] rounded-full p-1 gap-0.5"
+            className="inline-flex items-center bg-[#091426]/80 border border-[rgba(186,214,255,0.15)] rounded-full p-0.5 gap-0.5"
             role="group"
             aria-label="Select Chart Timeframe"
           >
@@ -764,9 +862,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                   type="button"
                   onClick={() => onSelectTimeframe(tf)}
                   aria-pressed={active}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold transition-all duration-150 ${
+                  title={`Timeframe ${tf}`}
+                  className={`px-2 py-1 rounded-full text-[11px] font-mono font-semibold transition-all duration-150 ${
                     active
-                      ? "bg-[#223D6A] text-[#B0F648] border border-[#B0F648]/45 shadow-[0_0_10px_rgba(176,246,72,0.18)]"
+                      ? "bg-[#223D6A] text-[#B0F648] border border-[#B0F648]/45"
                       : "text-[#8496B8] hover:text-[#F4F7FF]"
                   }`}
                 >
@@ -777,92 +876,99 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
           </div>
 
           {/* Live Bid/Ask + Spread Pill */}
-          <div className="hidden xl:flex items-center space-x-2 px-3 py-1 iea-pill-control font-mono text-xs">
+          <div
+            className="hidden xl:flex items-center space-x-1.5 px-2.5 py-1 iea-pill-control font-mono text-xs"
+            title={`Broker symbol ${bundle.brokerSymbol} · Spread ${bundle.spreadPoints} points`}
+          >
             <span
               className={`w-4 h-4 rounded-full text-[9px] font-bold inline-flex items-center justify-center ${activeSymbolChip.chipBg}`}
             >
               {activeSymbolChip.shortCode}
             </span>
-            <span className="text-[#B6C5E0]">{bundle.brokerSymbol}</span>
             <span className="text-[#B0F648] font-bold">{bundle.bid.toFixed(bundle.digits)}</span>
             <span className="text-[#8496B8]">/</span>
             <span className="text-[#FF5A6E] font-bold">{bundle.ask.toFixed(bundle.digits)}</span>
-            <span className="text-[10px] text-[#C2F076] bg-[#B0F648]/12 px-2 py-0.5 rounded-full border border-[#B0F648]/25">
-              {bundle.spreadPoints} pts
+            <span className="text-[10px] text-[#C2F076] bg-[#B0F648]/12 px-1.5 py-0.2 rounded-full">
+              Spr {bundle.spreadPoints}
             </span>
           </div>
         </div>
 
-        {/* Right: Toggleable Overlays + Fullscreen Toggle */}
-        <div className="flex flex-wrap items-center gap-1.5">
+        {/* Right: Short-Form Toggleable Overlays + Fullscreen Toggle */}
+        <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
             onClick={() => toggleOverlay("liquidity")}
             aria-pressed={overlays.liquidity}
-            className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all duration-150 inline-flex items-center space-x-1 ${
+            title={UI_COPY.chart.layers.liquidity.tooltip}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all duration-150 inline-flex items-center space-x-1 ${
               overlays.liquidity
                 ? "bg-[#B0F648]/16 border-[#B0F648]/50 text-[#C2F076]"
                 : "bg-[#0E1E3B]/70 border-[rgba(186,214,255,0.14)] text-[#8496B8] hover:text-[#F4F7FF]"
             }`}
           >
             <Layers className="w-3 h-3" />
-            <span>Liquidity (PDL/PWH)</span>
+            <span>{UI_COPY.chart.layers.liquidity.label}</span>
           </button>
 
           <button
             type="button"
             onClick={() => toggleOverlay("fvgOb")}
             aria-pressed={overlays.fvgOb}
-            className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all duration-150 inline-flex items-center space-x-1 ${
+            title={UI_COPY.chart.layers.fvgOb.tooltip}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all duration-150 inline-flex items-center space-x-1 ${
               overlays.fvgOb
                 ? "bg-[#5EEAD4]/16 border-[#5EEAD4]/50 text-[#5EEAD4]"
                 : "bg-[#0E1E3B]/70 border-[rgba(186,214,255,0.14)] text-[#8496B8] hover:text-[#F4F7FF]"
             }`}
           >
             <Activity className="w-3 h-3" />
-            <span>FVG/OB</span>
+            <span>{UI_COPY.chart.layers.fvgOb.label}</span>
           </button>
 
           <button
             type="button"
             onClick={() => toggleOverlay("structure")}
             aria-pressed={overlays.structure}
-            className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all duration-150 inline-flex items-center space-x-1 ${
+            title={UI_COPY.chart.layers.structure.tooltip}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all duration-150 inline-flex items-center space-x-1 ${
               overlays.structure
                 ? "bg-[#C077FA]/18 border-[#C077FA]/55 text-[#E5C7FF]"
                 : "bg-[#0E1E3B]/70 border-[rgba(186,214,255,0.14)] text-[#8496B8] hover:text-[#F4F7FF]"
             }`}
           >
             <TrendingUp className="w-3 h-3" />
-            <span>Structure (MSS/CHoCH)</span>
+            <span>{UI_COPY.chart.layers.structure.label}</span>
           </button>
 
           <button
             type="button"
             onClick={() => toggleOverlay("sessions")}
             aria-pressed={overlays.sessions}
-            className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all duration-150 inline-flex items-center space-x-1 ${
+            title={UI_COPY.chart.layers.sessions.tooltip}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all duration-150 inline-flex items-center space-x-1 ${
               overlays.sessions
                 ? "bg-[#4F8CFF]/20 border-[#7196CB]/60 text-[#D4E4FF]"
                 : "bg-[#0E1E3B]/70 border-[rgba(186,214,255,0.14)] text-[#8496B8] hover:text-[#F4F7FF]"
             }`}
           >
             <Clock className="w-3 h-3" />
-            <span>Sessions</span>
+            <span>{UI_COPY.chart.layers.sessions.label}</span>
           </button>
 
           <button
             type="button"
             onClick={() => toggleOverlay("tradeLabels")}
             aria-pressed={overlays.tradeLabels}
-            className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all duration-150 inline-flex items-center space-x-1 ${
+            title={UI_COPY.chart.layers.tradeLabels.tooltip}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all duration-150 inline-flex items-center space-x-1 ${
               overlays.tradeLabels
                 ? "bg-[#B0F648]/20 border-[#B0F648]/60 text-[#B0F648]"
                 : "bg-[#0E1E3B]/70 border-[rgba(186,214,255,0.14)] text-[#8496B8] hover:text-[#F4F7FF]"
             }`}
           >
             <Eye className="w-3 h-3" />
-            <span>Trade Labels</span>
+            <span>{UI_COPY.chart.layers.tradeLabels.label}</span>
           </button>
 
           <button
@@ -886,9 +992,9 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
         </div>
       </div>
 
-      {/* Sub-Header Active Trade Strip */}
+      {/* Sub-Header Active Trade Strip + Compact Drawing Legend */}
       {primaryTrade && (
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 bg-[#0B172F]/90 border-b border-[rgba(186,214,255,0.11)] text-xs font-mono shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-1.5 bg-[#0B172F]/90 border-b border-[rgba(186,214,255,0.11)] text-xs font-mono shrink-0">
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
@@ -900,30 +1006,34 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               {primaryTrade.direction} {primaryTrade.volume.toFixed(2)}L
             </span>
             <span className="text-[#F4F7FF] font-bold">#{primaryTrade.ticket}</span>
-            <span className="px-2 py-0.5 rounded-full bg-[#223D6A]/70 text-[#5EEAD4] border border-[#5EEAD4]/30 text-[10px] font-sans font-medium">
-              {primaryTrade.ownership} · Score {primaryTrade.qualityScore}/100
+            <span
+              title="Owner & Setup Quality Score"
+              className="px-2 py-0.5 rounded-full bg-[#223D6A]/70 text-[#5EEAD4] border border-[#5EEAD4]/30 text-[10px] font-sans font-medium"
+            >
+              {primaryTrade.ownership} · S{primaryTrade.qualityScore}
             </span>
-            <span className="text-[#8496B8]">
-              Entry <strong className="text-[#F4F7FF]">{primaryTrade.entryPrice.toFixed(bundle.digits)}</strong>
+            <span className="text-[#8496B8]" title="Entry Price">
+              In <strong className="text-[#F4F7FF]">{primaryTrade.entryPrice.toFixed(bundle.digits)}</strong>
             </span>
-            <span className="text-[#FF7A8A]">
+            <span className="text-[#FF7A8A]" title="Active Stop Loss (Initial SL in brackets)">
               SL <strong>{primaryTrade.stopLoss.toFixed(bundle.digits)}</strong>
               {Math.abs(primaryTrade.initialStopLoss - primaryTrade.stopLoss) > 1e-6 && (
                 <span className="text-[#8496B8] ml-1">
-                  (Init {primaryTrade.initialStopLoss.toFixed(bundle.digits)})
+                  ({primaryTrade.initialStopLoss.toFixed(bundle.digits)})
                 </span>
               )}
             </span>
-            <span className="text-[#C2F076]">
+            <span className="text-[#C2F076]" title="Partial Take Profit 1 (50%)">
               TP1 <strong>{primaryTrade.tp1.toFixed(bundle.digits)}</strong> (+{primaryTrade.tp1R.toFixed(2)}R)
             </span>
-            <span className="text-[#B0F648]">
+            <span className="text-[#B0F648]" title="Final Take Profit 2 Target">
               TP2 <strong>{primaryTrade.tp2.toFixed(bundle.digits)}</strong> (+{primaryTrade.tp2R.toFixed(2)}R)
             </span>
           </div>
 
           <div className="flex items-center space-x-2">
             <span
+              title="Floating P&L and R-Multiple"
               className={`px-2.5 py-0.5 rounded-full font-bold ${
                 primaryTrade.floatingPnl >= 0
                   ? "bg-[#B0F648]/20 text-[#B0F648] border border-[#B0F648]/45"
@@ -934,11 +1044,17 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               {primaryTrade.floatingR >= 0 ? "+" : ""}
               {primaryTrade.floatingR.toFixed(2)}R)
             </span>
-            <span className="inline-flex items-center space-x-1 text-[10px] font-sans text-[#C2F076] bg-[#B0F648]/12 border border-[#B0F648]/30 px-2.5 py-0.5 rounded-full">
+            <span
+              title="Rule R9.3: Stop Loss can only be tightened, never widened or removed"
+              className="inline-flex items-center space-x-1 text-[10px] font-sans text-[#C2F076] bg-[#B0F648]/12 border border-[#B0F648]/30 px-2 py-0.5 rounded-full"
+            >
               <ShieldCheck className="w-3 h-3" />
-              <span>Tighten-Only SL</span>
+              <span>Tighten-SL</span>
             </span>
-            <span className="inline-flex items-center space-x-1 text-[10px] font-sans text-[#B6C5E0] bg-[#091426]/80 px-2.5 py-0.5 rounded-full border border-[rgba(186,214,255,0.14)]">
+            <span
+              title="Real-time telemetry feed status"
+              className="inline-flex items-center space-x-1 text-[10px] font-sans text-[#B6C5E0] bg-[#091426]/80 px-2 py-0.5 rounded-full border border-[rgba(186,214,255,0.14)]"
+            >
               <Radio className="w-3 h-3 text-[#B0F648] animate-pulse" />
               <span>{feedStatus}</span>
             </span>
@@ -948,15 +1064,15 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
 
       {/* Main Chart Viewport — fills 100% remaining height with zero empty space below */}
       <div className="relative flex-1 min-h-0 w-full">
-        {/* Lightweight Charts Canvas Mount */}
+        {/* Lightweight Charts Canvas Mount (z-0) */}
         <div ref={containerRef} className="absolute inset-0 z-0 w-full h-full" />
 
-        {/* Pointer-events-none Synchronized Institutional Overlay Layer (z-10 above lightweight-charts canvas) */}
+        {/* Synchronized Institutional Overlay Layer */}
         <div
           className="absolute inset-0 z-10 pointer-events-none overflow-hidden select-none"
           style={{ right: "72px", bottom: "26px" }}
         >
-          {/* 1. Session Background Bands */}
+          {/* LAYER 1 (z-10): Session Background Bands — ultra-low opacity so candles remain crisp */}
           {sessionBands.map((sb) => (
             <div
               key={sb.id}
@@ -965,54 +1081,56 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                 width: `${sb.widthPx}px`,
                 backgroundColor: sb.color,
               }}
-              className="absolute top-0 bottom-0 border-x border-[rgba(186,214,255,0.14)]"
+              className="absolute top-0 bottom-0 z-10 border-x border-[rgba(186,214,255,0.12)]"
             >
-              <span className="inline-block m-1.5 px-2 py-0.5 rounded-full bg-[#0A152B]/85 text-[9px] font-mono text-[#B6C5E0] border border-[rgba(186,214,255,0.18)]">
+              <span className="inline-block m-1.5 px-2 py-0.5 rounded-full bg-[#0A152B]/85 text-[9px] font-mono text-[#B6C5E0] border border-[rgba(186,214,255,0.16)]">
                 {sb.label}
               </span>
             </div>
           ))}
 
-          {/* 2. Shaded Risk & Reward Zones + FVG/OB Boxes */}
+          {/* LAYER 2 (z-10): Shaded Risk/Reward Zones + FVG/IFVG/OB Boxes (low fill opacity, crisp border) */}
           {zoneBoxes.map((zb) => {
             const boxStyleByKind: Record<ProjectedZoneBox["kind"], string> = {
-              RISK: "bg-[#FF5A6E]/12 border-y border-[#FF5A6E]/40",
-              REWARD_TP1: "bg-[#B0F648]/12 border-y border-[#B0F648]/40",
-              REWARD_TP2: "bg-[#B0F648]/10 border-y border-[#C2F076]/35",
-              FVG_BULL: "bg-[#5EEAD4]/14 border border-[#5EEAD4]/40 rounded-r-md",
-              FVG_BEAR: "bg-[#FBBF24]/14 border border-[#FBBF24]/40 rounded-r-md",
-              OB_BULL: "bg-[#B0F648]/13 border border-[#C2F076]/40 rounded-r-md",
-              OB_BEAR: "bg-[#C077FA]/14 border border-[#C077FA]/45 rounded-r-md",
+              RISK: "bg-[#FF5A6E]/[0.08] border-y border-[#FF5A6E]/35",
+              REWARD_TP1: "bg-[#B0F648]/[0.08] border-y border-[#B0F648]/35",
+              REWARD_TP2: "bg-[#B0F648]/[0.07] border-y border-[#C2F076]/30",
+              FVG_BULL: "bg-[#5EEAD4]/[0.10] border border-[#5EEAD4]/40 rounded-r-md",
+              FVG_BEAR: "bg-[#FBBF24]/[0.10] border border-[#FBBF24]/40 rounded-r-md",
+              IFVG: "bg-[#C077FA]/[0.06] border border-dashed border-[#C077FA]/35 rounded-md opacity-75",
+              OB_BULL: "bg-[#B0F648]/[0.09] border border-[#C2F076]/40 rounded-r-md",
+              OB_BEAR: "bg-[#C077FA]/[0.10] border border-[#C077FA]/45 rounded-r-md",
             };
             return (
               <div
                 key={zb.id}
+                title={zb.tooltip}
                 style={{
                   top: `${zb.topY}px`,
                   height: `${zb.heightPx}px`,
                   left: `${zb.leftX}px`,
-                  right: "0px",
+                  width: `${zb.widthPx}px`,
                 }}
-                className={`absolute ${boxStyleByKind[zb.kind]}`}
+                className={`absolute z-10 pointer-events-auto ${boxStyleByKind[zb.kind]}`}
               >
-                <span className="inline-block ml-1.5 mt-0.5 px-2 py-0.5 text-[9px] font-mono font-semibold text-[#F4F7FF] bg-[#0A152B]/80 rounded-full border border-[rgba(186,214,255,0.15)]">
+                <span className="inline-block ml-1.5 mt-0.5 px-1.5 py-0.2 text-[9px] font-mono font-semibold text-[#F4F7FF] bg-[#0A152B]/85 rounded-full border border-[rgba(186,214,255,0.14)]">
                   {zb.label}
                 </span>
               </div>
             );
           })}
 
-          {/* 3. Horizontal Level Lines + Connector Ticks to De-Collided Labels */}
-          <svg className="absolute inset-0 w-full h-full overflow-visible">
+          {/* LAYER 3 (z-20): Horizontal Level Lines + Structure Break Rays + Leader Connectors */}
+          <svg className="absolute inset-0 z-20 w-full h-full overflow-visible">
             {levelLines.map((ln) => (
               <line
                 key={ln.id}
                 x1={ln.startX}
                 y1={ln.y}
-                x2={chartDims.width}
+                x2={ln.endX}
                 y2={ln.y}
                 stroke={ln.color}
-                strokeWidth={ln.style === "solid" ? 1.5 : 1.15}
+                strokeWidth={ln.width}
                 strokeDasharray={
                   ln.style === "dashed" ? "6 4" : ln.style === "dotted" ? "2 3" : undefined
                 }
@@ -1025,9 +1143,9 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               .map((lbl) => (
                 <path
                   key={`leader-${lbl.id}`}
-                  d={`M ${Math.max(120, chartDims.width - 310)} ${lbl.idealY} L ${Math.max(
+                  d={`M ${Math.max(120, chartDims.width - 280)} ${lbl.idealY} L ${Math.max(
                     135,
-                    chartDims.width - 292
+                    chartDims.width - 262
                   )} ${lbl.resolvedY}`}
                   stroke="rgba(182, 197, 224, 0.55)"
                   strokeWidth={1}
@@ -1037,43 +1155,45 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               ))}
           </svg>
 
-          {/* 4. Event Annotations (Entry marker, Break-Even moved, Partial close, MSS/CHoCH) */}
+          {/* LAYER 4 (z-30): Event Annotations (Signals, Entry, BE+, Partial 50%, MSS/CHoCH/BOS) */}
           {annotationPins.map((pin) => (
             <div
               key={pin.id}
+              title={`${pin.label} · ${pin.detail}`}
               style={{
                 left: `${pin.x}px`,
                 top: `${Math.max(8, pin.y - 11)}px`,
               }}
-              className={`absolute px-2 py-0.5 rounded-lg border text-[10px] font-mono leading-tight shadow-sm whitespace-nowrap ${
+              className={`absolute z-30 pointer-events-auto px-2 py-0.5 rounded-lg border text-[10px] font-mono leading-tight shadow-sm whitespace-nowrap ${
                 pinToneClasses[pin.tone]
               }`}
             >
               <div className="font-bold flex items-center space-x-1">
                 <Target className="w-2.5 h-2.5 shrink-0" />
                 <span>{pin.label}</span>
+                <span className="text-[9px] opacity-80">{pin.detail}</span>
               </div>
-              <div className="text-[9px] opacity-85">{pin.detail}</div>
             </div>
           ))}
 
-          {/* 5. Collision-Aware Right-Aligned Level Labels (Guaranteed Non-Overlapping) */}
+          {/* LAYER 5 (z-30): Collision-Aware Right-Aligned Level Labels (Guaranteed Non-Overlapping) */}
           {resolvedLabels.map((lbl) => (
             <div
               key={lbl.id}
               data-testid={`chart-level-label-${lbl.tone}`}
+              title={`${lbl.label}${lbl.sublabel ? ` (${lbl.sublabel})` : ""}`}
               style={{
                 top: `${lbl.resolvedY - 10}px`,
                 right: "6px",
               }}
-              className={`absolute px-2.5 py-0.5 rounded-full border text-[10px] font-mono leading-none flex items-center space-x-1.5 whitespace-nowrap ${
+              className={`absolute z-30 pointer-events-auto px-2 py-0.5 rounded-full border text-[10px] font-mono leading-none flex items-center space-x-1 whitespace-nowrap ${
                 labelToneClasses[lbl.tone]
               }`}
             >
               <span className="font-bold">{lbl.label}</span>
               {lbl.sublabel && (
                 <span
-                  className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                  className={`text-[9px] px-1.5 py-0.2 rounded-full ${
                     lbl.tone === "live"
                       ? "bg-[#081321]/20 text-[#081321] font-extrabold"
                       : "bg-black/35 text-[#F4F7FF]"
@@ -1084,6 +1204,26 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               )}
             </div>
           ))}
+
+          {/* Compact Bottom-Left Drawing Layer Legend */}
+          <div className="absolute left-2.5 bottom-2 z-30 flex flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#091426]/85 border border-[rgba(186,214,255,0.14)] text-[9px] font-mono text-[#B6C5E0]">
+            <span className="inline-flex items-center space-x-1">
+              <span className="w-2 h-2 rounded-full bg-[#B0F648]" />
+              <span>TP/Bull</span>
+            </span>
+            <span className="inline-flex items-center space-x-1">
+              <span className="w-2 h-2 rounded-full bg-[#FF5A6E]" />
+              <span>SL/Risk</span>
+            </span>
+            <span className="inline-flex items-center space-x-1">
+              <span className="w-2 h-2 rounded-full bg-[#5EEAD4]" />
+              <span>Entry/FVG</span>
+            </span>
+            <span className="inline-flex items-center space-x-1">
+              <span className="w-2 h-2 rounded-full bg-[#C077FA]" />
+              <span>MSS/EQH</span>
+            </span>
+          </div>
         </div>
       </div>
     </section>
