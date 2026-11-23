@@ -18,11 +18,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.core.contracts import Candle, Timeframe
-from src.smc.fvg_ob import FvgObEngine
-from src.smc.liquidity import LiquidityEngine
-from src.smc.market_structure import MarketStructureEngine
-from src.smc.session_liquidity import SessionLiquidityEngine
 from src.smc.weekly_daily import WeeklyDailyEngine
+from companion.service.market.luxalgo_smc import SmcConfig, detect_luxalgo_smc
 
 SCHEMA_VERSION = "1.0"
 
@@ -35,6 +32,7 @@ TF_RANK: Dict[str, int] = {
     "H4": 6,
     "D1": 7,
     "W1": 8,
+    "MN1": 9,
 }
 
 TF_ENUM_MAP: Dict[str, Timeframe] = {
@@ -48,13 +46,13 @@ TF_ENUM_MAP: Dict[str, Timeframe] = {
     "W1": Timeframe.W1,
 }
 
-# Caps per layer to guarantee 60fps canvas rendering without clutter
+# Caps per layer (max 500 per Pine spec to guarantee smooth 60fps canvas rendering)
 LAYER_CAPS = {
-    "LIQ": 24,
+    "LIQ": 120,
     "SESS": 32,
-    "FVG": 16,
-    "OB": 14,
-    "STRUCT": 24,
+    "FVG": 100,
+    "OB": 40,
+    "STRUCT": 200,
     "TRADE": 30,
 }
 
@@ -313,33 +311,20 @@ def compute_drawings_from_candles(
     config_dir: Optional[Path] = None,
     broker_utc_offset_hours: Optional[int] = None,
     broker_symbol: Optional[str] = None,
+    smc_config: Optional[SmcConfig] = None,
 ) -> Dict[str, Any]:
     """
-    Pure, deterministic read-only computation of all engine drawings for (symbol, chart_tf).
-    Uses exact engine analyzers and config files without modifying any engine state.
+    Pure, deterministic read-only computation of all chart drawings for (symbol, chart_tf).
+    Uses LuxAlgo Smart Money Concepts (CC BY-NC-SA 4.0) detection for SMC layers,
+    WeeklyDailyEngine / MN1 for MTF Highs & Lows, sessions.json for SESS, and MT5/repo for TRADES.
+    Never modifies any trading engine state.
     """
     canon = canonical_symbol(symbol)
     tf_upper = str(chart_tf or "M5").upper()
-    pip_size, pip_mult = pip_params_for_symbol(canon)
+    _pip_size, pip_mult = pip_params_for_symbol(canon)
 
     cfg_root = Path(config_dir) if config_dir else Path("config")
-    strategy_cfg = _load_json(cfg_root / "strategy_config.json")
     sessions_cfg = _load_json(cfg_root / "sessions.json")
-
-    ict = strategy_cfg.get("ict_smc", {})
-    rulebook = strategy_cfg.get("smc_rulebook", {})
-
-    swing_lookback = int(ict.get("swing_lookback_bars", 5))
-    fvg_min_pips = float(ict.get("fvg_min_pips", 1.5))
-    fvg_min_atr = float(ict.get("fvg_min_atr", rulebook.get("fvg_min_atr", 0.3)))
-    fvg_requires_impulse = bool(rulebook.get("fvg_requires_impulse", False))
-    ob_requires_displacement = bool(ict.get("ob_requires_displacement", True))
-    ob_disp_atr = float(ict.get("ob_displacement_atr_mult", 1.2))
-    ob_requires_bos = bool(ict.get("ob_requires_bos", True))
-    bos_body_close = bool(ict.get("bos_body_close_required", True))
-    require_both_hh_hl = bool(rulebook.get("require_both_hh_hl_for_trend", True))
-    sweep_close_back = bool(ict.get("sweep_requires_close_back_inside", True))
-    pd_eq = float(ict.get("pd_equilibrium", 0.5))
 
     if broker_utc_offset_hours is None:
         broker_utc_offset_hours = int(sessions_cfg.get("broker_utc_offset_hours", 0))
@@ -349,341 +334,273 @@ def compute_drawings_from_candles(
         k.upper(): _dicts_to_candles(v) for k, v in (candles_by_tf or {}).items()
     }
     chart_candles = converted.get(tf_upper, [])
-    m15_candles = converted.get("M15", chart_candles)
     d1_candles = converted.get("D1", [])
     w1_candles = converted.get("W1", [])
+    mn1_candles = converted.get("MN1", [])
 
     raw_items: List[Dict[str, Any]] = []
     min_chart_ts = int(chart_candles[0].time.timestamp()) if chart_candles else 0
     max_chart_ts = int(chart_candles[-1].time.timestamp()) if chart_candles else 0
 
     # ------------------------------------------------------------------
-    # 1. LIQ: Weekly/Daily levels (PDH/PDL/PWH/PWL/PWM/PDM)
+    # 1. LIQ (MTF Highs & Lows): Daily (PDH/PDL), Weekly (PWH/PWL), Monthly (PMH/PML)
     # ------------------------------------------------------------------
-    if len(w1_candles) >= 2 and len(d1_candles) >= 2:
+    if len(d1_candles) >= 2:
         try:
-            wd_engine = WeeklyDailyEngine(pip_multiplier=pip_mult)
-            wd_levels = wd_engine.calculate_levels(canon, w1_candles, d1_candles)
-            if wd_levels is not None:
-                interactions = wd_engine.analyze_interaction(wd_levels, m15_candles[-40:]) if m15_candles else []
-                swept_map: Dict[str, Tuple[int, float]] = {}
-                for inter in interactions:
-                    if "SWEEP" in str(inter.interaction_type).upper():
-                        swept_map[str(inter.level_name).upper()] = (
-                            int(inter.timestamp.timestamp()),
-                            float(inter.level_price),
-                        )
-
-                prev_w_ts = int(w1_candles[-2].time.timestamp())
-                prev_d_ts = int(d1_candles[-2].time.timestamp())
-                ref_defs = [
-                    ("PWH", wd_levels.pwh, "W1", prev_w_ts, "BEARISH"),
-                    ("PWL", wd_levels.pwl, "W1", prev_w_ts, "BULLISH"),
-                    ("PDH", wd_levels.pdh, "D1", prev_d_ts, "BEARISH"),
-                    ("PDL", wd_levels.pdl, "D1", prev_d_ts, "BULLISH"),
-                ]
-                for code, price, src_tf, origin_ts, direction in ref_defs:
-                    if not _is_finite_pos(price):
-                        continue
-                    sweep_info = swept_map.get(code)
+            prev_d = d1_candles[-2]
+            prev_d_ts = int(prev_d.time.timestamp())
+            for code, price, direction in (
+                ("PDH", prev_d.high, "BEARISH"),
+                ("PDL", prev_d.low, "BULLISH"),
+            ):
+                if _is_finite_pos(price):
                     raw_items.append(
                         {
-                            "id": f"liq:{canon}:{src_tf}:{code}:{origin_ts}",
+                            "id": f"liq:{canon}:D1:{code}:{prev_d_ts}",
                             "type": "LIQ",
                             "subtype": code,
                             "symbol": canon,
                             "broker_symbol": broker_symbol,
-                            "timeframe": src_tf,
-                            "start_time": origin_ts,
-                            "end_time": sweep_info[0] if sweep_info else None,
-                            "price_levels": {
-                                "price": round(float(price), 5),
-                                "sweep_time": sweep_info[0] if sweep_info else None,
-                                "sweep_price": sweep_info[1] if sweep_info else None,
-                            },
+                            "timeframe": "D1",
+                            "start_time": prev_d_ts,
+                            "end_time": None,
+                            "price_levels": {"price": round(float(price), 5)},
                             "direction": direction,
-                            "status": "SWEPT" if sweep_info else "ACTIVE",
-                            "source": "WeeklyDailyEngine",
-                            "meta": {"label": code},
+                            "status": "ACTIVE",
+                            "source": "LuxAlgoSMC_MTF",
+                            "meta": {
+                                "label": code,
+                                "mtf_period": "D",
+                                "irl_erl": "ERL",
+                                "smc": True,
+                            },
+                        }
+                    )
+        except Exception:
+            pass
+
+    if len(w1_candles) >= 2:
+        try:
+            prev_w = w1_candles[-2]
+            prev_w_ts = int(prev_w.time.timestamp())
+            for code, price, direction in (
+                ("PWH", prev_w.high, "BEARISH"),
+                ("PWL", prev_w.low, "BULLISH"),
+            ):
+                if _is_finite_pos(price):
+                    raw_items.append(
+                        {
+                            "id": f"liq:{canon}:W1:{code}:{prev_w_ts}",
+                            "type": "LIQ",
+                            "subtype": code,
+                            "symbol": canon,
+                            "broker_symbol": broker_symbol,
+                            "timeframe": "W1",
+                            "start_time": prev_w_ts,
+                            "end_time": None,
+                            "price_levels": {"price": round(float(price), 5)},
+                            "direction": direction,
+                            "status": "ACTIVE",
+                            "source": "LuxAlgoSMC_MTF",
+                            "meta": {
+                                "label": code,
+                                "mtf_period": "W",
+                                "irl_erl": "ERL",
+                                "smc": True,
+                            },
+                        }
+                    )
+        except Exception:
+            pass
+
+    if len(mn1_candles) >= 2:
+        try:
+            prev_m = mn1_candles[-2]
+            prev_m_ts = int(prev_m.time.timestamp())
+            for code, price, direction in (
+                ("PMH", prev_m.high, "BEARISH"),
+                ("PML", prev_m.low, "BULLISH"),
+            ):
+                if _is_finite_pos(price):
+                    raw_items.append(
+                        {
+                            "id": f"liq:{canon}:MN1:{code}:{prev_m_ts}",
+                            "type": "LIQ",
+                            "subtype": code,
+                            "symbol": canon,
+                            "broker_symbol": broker_symbol,
+                            "timeframe": "MN1",
+                            "start_time": prev_m_ts,
+                            "end_time": None,
+                            "price_levels": {"price": round(float(price), 5)},
+                            "direction": direction,
+                            "status": "ACTIVE",
+                            "source": "LuxAlgoSMC_MTF",
+                            "meta": {
+                                "label": code,
+                                "mtf_period": "M",
+                                "irl_erl": "ERL",
+                                "smc": True,
+                            },
                         }
                     )
         except Exception:
             pass
 
     # ------------------------------------------------------------------
-    # 2. LIQ: Asia Session High / Low + London Sweep (SessionLiquidityEngine)
+    # 2. LuxAlgo Smart Money Concepts (Structure, OBs, FVGs, EQH/EQL, Strong/Weak H/L, P/D)
     # ------------------------------------------------------------------
-    if len(m15_candles) >= 12:
-        try:
-            sess_liq_eng = SessionLiquidityEngine(pip_multiplier=pip_mult)
-            asia_range = sess_liq_eng.calculate_asia_range(canon, m15_candles)
-            if asia_range is not None:
-                sweep_ev = sess_liq_eng.detect_london_asia_sweep(
-                    canon, m15_candles, asia_range, pip_size=pip_size
-                )
-                origin_ts = int(asia_range.start_time.timestamp()) if getattr(asia_range, "start_time", None) else min_chart_ts
-                for code, price, direction, match_dir in (
-                    ("ASIA_HIGH", getattr(asia_range, "high", 0.0), "BEARISH", "BEARISH"),
-                    ("ASIA_LOW", getattr(asia_range, "low", 0.0), "BULLISH", "BULLISH"),
-                ):
-                    if not _is_finite_pos(price):
-                        continue
-                    is_swept = (
-                        sweep_ev is not None
-                        and _direction_str(getattr(sweep_ev, "direction", "")) == match_dir
-                    )
-                    sweep_ts = (
-                        int(sweep_ev.sweep_time.timestamp())
-                        if is_swept and getattr(sweep_ev, "sweep_time", None)
-                        else None
-                    )
-                    raw_items.append(
-                        {
-                            "id": f"liq:{canon}:M15:{code}:{origin_ts}",
-                            "type": "LIQ",
-                            "subtype": code,
-                            "symbol": canon,
-                            "broker_symbol": broker_symbol,
-                            "timeframe": "M15",
-                            "start_time": origin_ts,
-                            "end_time": sweep_ts,
-                            "price_levels": {
-                                "price": round(float(price), 5),
-                                "sweep_time": sweep_ts,
-                                "sweep_price": round(float(price), 5) if is_swept else None,
-                            },
-                            "direction": direction,
-                            "status": "SWEPT" if is_swept else "ACTIVE",
-                            "source": "SessionLiquidityEngine",
-                            "meta": {"label": "Asia High" if code == "ASIA_HIGH" else "Asia Low"},
-                        }
-                    )
-        except Exception:
-            pass
+    raw_chart_rows = [
+        {
+            "time": int(c.time.timestamp()),
+            "open": c.open,
+            "high": c.high,
+            "low": c.low,
+            "close": c.close,
+        }
+        for c in chart_candles
+    ]
+    smc = detect_luxalgo_smc(raw_chart_rows, config=smc_config)
 
-    # ------------------------------------------------------------------
-    # 3. LIQ (EQH/EQL/BSL/SSL), FVG, OB, STRUCT via exact SMC engines
-    #    Run on chart_tf (and also H1/M15 HTF context when viewing LTF)
-    # ------------------------------------------------------------------
-    tfs_to_analyze: List[str] = [tf_upper]
-    if TF_RANK.get(tf_upper, 0) < TF_RANK["M15"] and "M15" in converted:
-        tfs_to_analyze.append("M15")
-    if TF_RANK.get(tf_upper, 0) < TF_RANK["H1"] and "H1" in converted:
-        tfs_to_analyze.append("H1")
+    # 2a. Internal & Swing Structure (BOS / CHoCH)
+    for ev in smc.internal_structures + smc.swing_structures:
+        tier = ev["tier"]
+        tag = ev["tag"]
+        raw_items.append(
+            {
+                "id": f"struct:{canon}:{tf_upper}:{tier}:{tag}:{ev['start_time']}:{ev['end_time']}",
+                "type": "STRUCT",
+                "subtype": tag.upper(),
+                "symbol": canon,
+                "broker_symbol": broker_symbol,
+                "timeframe": tf_upper,
+                "start_time": ev["start_time"],
+                "end_time": ev["end_time"],
+                "price_levels": {"price": ev["price"]},
+                "direction": ev["direction"],
+                "status": "ACTIVE",
+                "source": "LuxAlgoSMC",
+                "meta": {
+                    "label": tag,
+                    "tier": tier,
+                    "irl_erl": ev["irl_erl"],
+                    "smc": True,
+                },
+            }
+        )
 
-    liq_engine = LiquidityEngine(
-        eqh_tolerance_pips=2.0,
-        pip_size=pip_size,
-        sweep_requires_close_back_inside=sweep_close_back,
-    )
-    fvg_ob_engine = FvgObEngine(
-        min_fvg_pips=fvg_min_pips,
-        pip_size=pip_size,
-        fvg_min_atr=fvg_min_atr,
-        fvg_requires_impulse=fvg_requires_impulse,
-        ob_requires_displacement=ob_requires_displacement,
-        ob_displacement_atr_mult=ob_disp_atr,
-        ob_requires_bos=ob_requires_bos,
-        pd_equilibrium=pd_eq,
-    )
-    struct_engine = MarketStructureEngine(
-        swing_lookback=swing_lookback,
-        displacement_ratio_min=0.6,
-        require_both_hh_hl_for_trend=require_both_hh_hl,
-        bos_body_close_required=bos_body_close,
-    )
+    # 2b. Internal & Swing Order Blocks
+    for ob in smc.internal_order_blocks + smc.swing_order_blocks:
+        tier = ob["tier"]
+        raw_items.append(
+            {
+                "id": f"ob:{canon}:{tf_upper}:{tier}:{ob['start_time']}:{ob['bottom']}",
+                "type": "OB",
+                "subtype": f"{tier}_OB",
+                "symbol": canon,
+                "broker_symbol": broker_symbol,
+                "timeframe": tf_upper,
+                "start_time": ob["start_time"],
+                "end_time": None,
+                "price_levels": {
+                    "top": ob["top"],
+                    "bottom": ob["bottom"],
+                    "midpoint": ob["midpoint"],
+                },
+                "direction": ob["direction"],
+                "status": "ACTIVE",
+                "source": "LuxAlgoSMC",
+                "meta": {
+                    "label": "OB",
+                    "tier": tier,
+                    "irl_erl": ob["irl_erl"],
+                    "smc": True,
+                },
+            }
+        )
 
-    for analyze_tf in tfs_to_analyze:
-        tf_candles = converted.get(analyze_tf, [])
-        tf_enum = TF_ENUM_MAP.get(analyze_tf)
-        if len(tf_candles) < 15 or tf_enum is None:
-            continue
+    # 2c. Fair Value Gaps
+    for fvg in smc.fair_value_gaps:
+        raw_items.append(
+            {
+                "id": f"fvg:{canon}:{tf_upper}:FVG:{fvg['start_time']}:{fvg['bottom']}",
+                "type": "FVG",
+                "subtype": "FVG",
+                "symbol": canon,
+                "broker_symbol": broker_symbol,
+                "timeframe": tf_upper,
+                "start_time": fvg["start_time"],
+                "end_time": None,
+                "price_levels": {
+                    "top": fvg["top"],
+                    "bottom": fvg["bottom"],
+                    "midpoint": fvg["midpoint"],
+                },
+                "direction": fvg["direction"],
+                "status": "ACTIVE",
+                "source": "LuxAlgoSMC",
+                "meta": {
+                    "label": "FVG",
+                    "extend_bars": fvg["extend_bars"],
+                    "irl_erl": fvg["irl_erl"],
+                    "smc": True,
+                },
+            }
+        )
 
-        # 3a. Liquidity pools (EQH/EQL/BSL/SSL)
-        try:
-            pools = liq_engine.identify_liquidity_pools(
-                canon, tf_enum, tf_candles, swing_lookback=swing_lookback
-            )
-            for pool in pools[-12:]:
-                origin_ts = _to_unix_sec(pool.formation_time) or min_chart_ts
-                swept = bool(pool.swept)
-                sweep_ts = _to_unix_sec(pool.sweep_time)
-                if not swept:
-                    after = [c for c in tf_candles if int(c.time.timestamp()) > origin_ts]
-                    if after:
-                        sw, _rej, _wk = liq_engine.verify_sweep(pool, after)
-                        if sw:
-                            swept = True
-                            # Find first candle that pierced level
-                            for c in after:
-                                if ("HIGH" in pool.level_type.upper() or "BSL" in pool.level_type.upper() or "EQH" in pool.level_type.upper()):
-                                    if c.high > pool.price:
-                                        sweep_ts = int(c.time.timestamp())
-                                        break
-                                else:
-                                    if c.low < pool.price:
-                                        sweep_ts = int(c.time.timestamp())
-                                        break
-                lvl_type = str(pool.level_type).upper()
-                is_high = any(k in lvl_type for k in ("HIGH", "BSL", "EQH"))
-                raw_items.append(
-                    {
-                        "id": f"liq:{canon}:{analyze_tf}:{lvl_type}:{origin_ts}:{round(pool.price, 4)}",
-                        "type": "LIQ",
-                        "subtype": lvl_type,
-                        "symbol": canon,
-                        "broker_symbol": broker_symbol,
-                        "timeframe": analyze_tf,
-                        "start_time": origin_ts,
-                        "end_time": sweep_ts if swept else None,
-                        "price_levels": {
-                            "price": round(float(pool.price), 5),
-                            "sweep_time": sweep_ts if swept else None,
-                            "sweep_price": round(float(pool.price), 5) if swept else None,
-                        },
-                        "direction": "BEARISH" if is_high else "BULLISH",
-                        "status": "SWEPT" if swept else "ACTIVE",
-                        "source": "LiquidityEngine",
-                        "meta": {"label": f"{analyze_tf} {lvl_type}"},
-                    }
-                )
-        except Exception:
-            pass
+    # 2d. EQH / EQL
+    for eq in smc.equal_highs_lows:
+        raw_items.append(
+            {
+                "id": f"liq:{canon}:{tf_upper}:{eq['tag']}:{eq['start_time']}:{eq['end_time']}",
+                "type": "LIQ",
+                "subtype": eq["tag"],
+                "symbol": canon,
+                "broker_symbol": broker_symbol,
+                "timeframe": tf_upper,
+                "start_time": eq["start_time"],
+                "end_time": eq["end_time"],
+                "price_levels": {
+                    "price": eq["price"],
+                    "high": eq["start_price"],
+                    "low": eq["end_price"],
+                },
+                "direction": eq["direction"],
+                "status": "ACTIVE",
+                "source": "LuxAlgoSMC",
+                "meta": {
+                    "label": eq["tag"],
+                    "irl_erl": eq["irl_erl"],
+                    "smc": True,
+                },
+            }
+        )
 
-        # 3b. FVGs & IFVGs (only from chart_tf or immediate HTF to keep plot clean)
-        try:
-            fvgs = fvg_ob_engine.detect_fvgs(canon, tf_enum, tf_candles)
-            for fvg in fvgs[-12:]:
-                start_ts = _to_unix_sec(fvg.formation_time)
-                if start_ts is None:
-                    continue
-                end_ts = _to_unix_sec(fvg.mitigation_time) if fvg.mitigated else None
-                subtype = "IFVG" if getattr(fvg, "is_inverse", False) else "FVG"
-                raw_items.append(
-                    {
-                        "id": f"fvg:{canon}:{analyze_tf}:{subtype}:{start_ts}:{round(fvg.bottom, 4)}",
-                        "type": "FVG",
-                        "subtype": subtype,
-                        "symbol": canon,
-                        "broker_symbol": broker_symbol,
-                        "timeframe": analyze_tf,
-                        "start_time": start_ts,
-                        "end_time": end_ts,
-                        "price_levels": {
-                            "top": round(float(fvg.top), 5),
-                            "bottom": round(float(fvg.bottom), 5),
-                            "midpoint": round(float(fvg.midpoint), 5),
-                        },
-                        "direction": _direction_str(fvg.direction),
-                        "status": "MITIGATED" if fvg.mitigated else "ACTIVE",
-                        "source": "FvgObEngine",
-                        "meta": {"label": subtype, "is_inverse": bool(getattr(fvg, "is_inverse", False))},
-                    }
-                )
-        except Exception:
-            pass
-
-        # 3c. Order Blocks & Breaker Blocks
-        try:
-            obs = fvg_ob_engine.detect_order_blocks(canon, tf_enum, tf_candles)
-            for ob in obs[-10:]:
-                start_ts = _to_unix_sec(ob.formation_time)
-                if start_ts is None:
-                    continue
-                end_ts = None
-                if ob.mitigated:
-                    for c in tf_candles:
-                        cts = int(c.time.timestamp())
-                        if cts <= start_ts:
-                            continue
-                        if _direction_str(ob.direction) == "BULLISH" and c.low <= ob.low:
-                            end_ts = cts
-                            break
-                        if _direction_str(ob.direction) == "BEARISH" and c.high >= ob.high:
-                            end_ts = cts
-                            break
-                subtype = "BREAKER" if getattr(ob, "is_breaker", False) else "OB"
-                raw_items.append(
-                    {
-                        "id": f"ob:{canon}:{analyze_tf}:{subtype}:{start_ts}:{round(ob.low, 4)}",
-                        "type": "OB",
-                        "subtype": subtype,
-                        "symbol": canon,
-                        "broker_symbol": broker_symbol,
-                        "timeframe": analyze_tf,
-                        "start_time": start_ts,
-                        "end_time": end_ts,
-                        "price_levels": {
-                            "top": round(float(ob.high), 5),
-                            "bottom": round(float(ob.low), 5),
-                            "midpoint": round(float((ob.high + ob.low) / 2.0), 5),
-                        },
-                        "direction": _direction_str(ob.direction),
-                        "status": "MITIGATED" if ob.mitigated else "ACTIVE",
-                        "source": "FvgObEngine",
-                        "meta": {
-                            "label": "OB",
-                            "strength": round(float(getattr(ob, "strength_score", 0.5)), 2),
-                        },
-                    }
-                )
-        except Exception:
-            pass
-
-        # 3d. Structure Breaks (BOS / MSS / CHoCH) anchored from swing point to break candle
-        try:
-            swing_highs, swing_lows = struct_engine.find_swing_points(tf_candles)
-            _trend, events = struct_engine.analyze_structure(canon, tf_enum, tf_candles)
-            for ev in events[-16:]:
-                break_ts = _to_unix_sec(ev.timestamp)
-                if break_ts is None:
-                    continue
-                ev_dir = _direction_str(ev.direction)
-                # Find the originating swing candle preceding break_ts closest to ev.price
-                candidates = swing_highs if ev_dir == "BULLISH" else swing_lows
-                origin_ts = break_ts
-                best_diff = float("inf")
-                for _idx, sw_c in candidates:
-                    sw_ts = int(sw_c.time.timestamp())
-                    if sw_ts >= break_ts:
-                        continue
-                    sw_px = sw_c.high if ev_dir == "BULLISH" else sw_c.low
-                    diff = abs(sw_px - float(ev.price))
-                    if diff < best_diff:
-                        best_diff = diff
-                        origin_ts = sw_ts
-                if origin_ts == break_ts and len(tf_candles) >= 2:
-                    # Fallback to 5 bars before break
-                    earlier = [int(c.time.timestamp()) for c in tf_candles if int(c.time.timestamp()) < break_ts]
-                    if earlier:
-                        origin_ts = earlier[max(0, len(earlier) - swing_lookback)]
-
-                ev_type = str(ev.event_type).upper()
-                raw_items.append(
-                    {
-                        "id": f"struct:{canon}:{analyze_tf}:{ev_type}:{origin_ts}:{break_ts}",
-                        "type": "STRUCT",
-                        "subtype": ev_type,
-                        "symbol": canon,
-                        "broker_symbol": broker_symbol,
-                        "timeframe": analyze_tf,
-                        "start_time": origin_ts,
-                        "end_time": break_ts,
-                        "price_levels": {
-                            "price": round(float(ev.price), 5),
-                        },
-                        "direction": ev_dir,
-                        "status": "ACTIVE",
-                        "source": "MarketStructureEngine",
-                        "meta": {
-                            "label": f"{ev_type} ({analyze_tf})",
-                            "confirmed_by_close": bool(getattr(ev, "confirmed_by_close", True)),
-                            "displacement_ratio": round(float(getattr(ev, "displacement_ratio", 0.0)), 2),
-                        },
-                    }
-                )
-        except Exception:
-            pass
+    # 2e. Strong / Weak High & Low
+    for sw in smc.strong_weak_levels:
+        subtype = f"STRONG_WEAK_{sw['kind']}"
+        raw_items.append(
+            {
+                "id": f"liq:{canon}:{tf_upper}:{subtype}:{sw['start_time']}",
+                "type": "LIQ",
+                "subtype": subtype,
+                "symbol": canon,
+                "broker_symbol": broker_symbol,
+                "timeframe": tf_upper,
+                "start_time": sw["start_time"],
+                "end_time": None,
+                "price_levels": {"price": sw["price"]},
+                "direction": sw["direction"],
+                "status": "ACTIVE",
+                "source": "LuxAlgoSMC",
+                "meta": {
+                    "label": sw["label"],
+                    "is_strong": sw["is_strong"],
+                    "irl_erl": sw["irl_erl"],
+                    "smc": True,
+                },
+            }
+        )
 
     # ------------------------------------------------------------------
     # 4. SESS: Sessions & Killzones from config/sessions.json
@@ -891,6 +808,13 @@ def compute_drawings_from_candles(
         "dropped_count": dropped_count,
         "counts": counts,
         "drawings": final_drawings,
+        "smc": {
+            "swing_trend": smc.swing_trend,
+            "internal_trend": smc.internal_trend,
+            "swing_points": smc.swing_points,
+            "premium_discount_zones": smc.premium_discount_zones,
+            "strong_weak_levels": smc.strong_weak_levels,
+        },
     }
 
 
@@ -907,17 +831,13 @@ class ChartDrawingsService:
         canon = canonical_symbol(symbol)
 
         candles_by_tf: Dict[str, List[Dict[str, Any]]] = {}
-        primary = self.mt5_sync.get_candles(symbol=canon, timeframe=tf_upper, count=max(120, int(count)))
+        primary = self.mt5_sync.get_candles(symbol=canon, timeframe=tf_upper, count=max(160, int(count)))
         broker_symbol = primary.get("broker_symbol") or canon
         candles_by_tf[tf_upper] = primary.get("candles") or []
 
-        # Fetch HTF candles only when primary is connected and has candles
+        # Fetch HTF candles (D1, W1, MN1) for MTF Highs & Lows only when primary is connected
         if candles_by_tf[tf_upper]:
-            htf_requests = [("D1", 10), ("W1", 6)]
-            if TF_RANK.get(tf_upper, 0) < TF_RANK["M15"]:
-                htf_requests.append(("M15", 120))
-            if TF_RANK.get(tf_upper, 0) < TF_RANK["H1"]:
-                htf_requests.append(("H1", 80))
+            htf_requests = [("D1", 10), ("W1", 6), ("MN1", 4)]
             for htf, hcount in htf_requests:
                 if htf not in candles_by_tf:
                     try:
