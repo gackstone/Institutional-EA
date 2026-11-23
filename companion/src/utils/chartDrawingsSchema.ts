@@ -85,6 +85,7 @@ export const DRAWING_TF_RANK: Record<string, number> = {
   H4: 6,
   D1: 7,
   W1: 8,
+  MN1: 9,
 };
 
 const VALID_TYPES = new Set<EngineDrawingType>(["LIQ", "SESS", "FVG", "OB", "STRUCT", "TRADE"]);

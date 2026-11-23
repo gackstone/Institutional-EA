@@ -8,6 +8,51 @@
 export const BULL_COLOR = "#0A997D"; // Sampled bullish teal from reference image
 export const BEAR_COLOR = "#EE3749"; // Sampled bearish red from reference image
 
+/**
+ * LuxAlgo Smart Money Concepts (Pine v5, CC BY-NC-SA 4.0 © LuxAlgo) Palette Tokens.
+ * Centralized so Colored / Monochrome modes and user overrides read from one source.
+ */
+export const LUXALGO_SMC_PALETTE = {
+  colored: {
+    green: "#089981",
+    red: "#F23645",
+    blue: "#2157f3",
+    gray: "#878b94",
+    internalBullOb: "rgba(49, 121, 245, 0.20)",
+    internalBearOb: "rgba(247, 124, 128, 0.20)",
+    swingBullOb: "rgba(24, 72, 204, 0.20)",
+    swingBearOb: "rgba(178, 40, 51, 0.20)",
+    swingBullObBorder: "rgba(24, 72, 204, 0.85)",
+    swingBearObBorder: "rgba(178, 40, 51, 0.85)",
+    bullFvg: "rgba(0, 255, 104, 0.30)",
+    bearFvg: "rgba(255, 0, 8, 0.30)",
+    premiumZone: "rgba(242, 54, 69, 0.20)",
+    equilibriumZone: "rgba(135, 139, 148, 0.20)",
+    discountZone: "rgba(8, 153, 129, 0.20)",
+  },
+  monochrome: {
+    bull: "#b2b5be",
+    bear: "#5d606b",
+    neutral: "#878b94",
+    internalBullOb: "rgba(178, 181, 190, 0.20)",
+    internalBearOb: "rgba(93, 96, 107, 0.20)",
+    swingBullOb: "rgba(178, 181, 190, 0.20)",
+    swingBearOb: "rgba(93, 96, 107, 0.20)",
+    swingBullObBorder: "rgba(178, 181, 190, 0.85)",
+    swingBearObBorder: "rgba(93, 96, 107, 0.85)",
+    bullFvg: "rgba(178, 181, 190, 0.28)",
+    bearFvg: "rgba(93, 96, 107, 0.28)",
+    premiumZone: "rgba(93, 96, 107, 0.20)",
+    equilibriumZone: "rgba(135, 139, 148, 0.20)",
+    discountZone: "rgba(178, 181, 190, 0.20)",
+  },
+  labelSizesPx: {
+    Tiny: 9.5,
+    Small: 11,
+    Normal: 12.5,
+  },
+} as const;
+
 export const CHART_TV_LIGHT_THEME = {
   background: "#FFFFFF",
   gridLine: "rgba(226, 232, 240, 0.45)", // Barely visible 1px light-gray grid

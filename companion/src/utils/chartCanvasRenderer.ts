@@ -1,4 +1,55 @@
 import type { EngineDrawingItem } from "./chartDrawingsSchema";
+import type { SmcComputationResult } from "./luxalgoSmcEngine";
+import type {
+  LabelSizeOption,
+  LineStyleOption,
+  SmcChartSettings,
+} from "./smcChartSettings";
+
+const SMC_RENDER_PALETTE = {
+  colored: {
+    green: "#089981",
+    red: "#F23645",
+    blue: "#2157f3",
+    gray: "#878b94",
+  },
+  monochrome: {
+    bull: "#b2b5be",
+    bear: "#5d606b",
+    neutral: "#878b94",
+    internalBullOb: "rgba(178, 181, 190, 0.20)",
+    internalBearOb: "rgba(93, 96, 107, 0.20)",
+    swingBullOb: "rgba(178, 181, 190, 0.20)",
+    swingBearOb: "rgba(93, 96, 107, 0.20)",
+    swingBullObBorder: "rgba(178, 181, 190, 0.85)",
+    swingBearObBorder: "rgba(93, 96, 107, 0.85)",
+    bullFvg: "rgba(178, 181, 190, 0.28)",
+    bearFvg: "rgba(93, 96, 107, 0.28)",
+    premiumZone: "rgba(93, 96, 107, 0.20)",
+    equilibriumZone: "rgba(135, 139, 148, 0.20)",
+    discountZone: "rgba(178, 181, 190, 0.20)",
+  },
+  labelSizesPx: {
+    Tiny: 9.5,
+    Small: 11,
+    Normal: 12.5,
+  },
+} as const;
+
+function deriveBorderColorLocal(fillColor: string, borderAlpha = 0.85): string {
+  const c = fillColor.trim();
+  const m = c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (m) {
+    return `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${borderAlpha.toFixed(2)})`;
+  }
+  if (/^#[0-9a-f]{6}$/i.test(c)) {
+    const r = parseInt(c.slice(1, 3), 16);
+    const g = parseInt(c.slice(3, 5), 16);
+    const b = parseInt(c.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${borderAlpha.toFixed(2)})`;
+  }
+  return fillColor;
+}
 
 const CANVAS_THEME = {
   fvgFill: "rgba(110, 198, 114, 0.30)",
@@ -332,9 +383,12 @@ export function drawProjectedOverlaysToCanvas(
   projected: ProjectedDrawing[],
   plotWidth: number,
   plotHeight: number,
-  highlightedId: string | null
+  highlightedId: string | null,
+  options?: { clear?: boolean; onlyTypes?: Set<string> }
 ): void {
-  ctx.clearRect(0, 0, plotWidth, plotHeight);
+  if (options?.clear !== false) {
+    ctx.clearRect(0, 0, plotWidth, plotHeight);
+  }
   ctx.save();
 
   // Layer order: SESS -> FVG/OB -> TRADE -> LIQ -> STRUCT
@@ -346,7 +400,10 @@ export function drawProjectedOverlaysToCanvas(
     LIQ: 4,
     STRUCT: 5,
   };
-  const sorted = [...projected].sort(
+  const filtered = options?.onlyTypes
+    ? projected.filter((p) => options.onlyTypes!.has(p.item.type))
+    : projected;
+  const sorted = [...filtered].sort(
     (a, b) => (order[a.item.type] ?? 9) - (order[b.item.type] ?? 9)
   );
 
@@ -607,6 +664,467 @@ export function drawProjectedOverlaysToCanvas(
 
       ctx.restore();
     }
+  }
+
+  ctx.restore();
+}
+
+function getLineDashPattern(style: LineStyleOption): number[] {
+  if (style === "dashed") return [5, 3];
+  if (style === "dotted") return [2, 2.5];
+  return [];
+}
+
+function getLabelFont(size: LabelSizeOption, weight: 500 | 600 | 700 = 600): string {
+  const px = SMC_RENDER_PALETTE.labelSizesPx[size] ?? 10;
+  return `${weight} ${px}px 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif`;
+}
+
+export interface MtfLevelInput {
+  code: "PDH" | "PDL" | "PWH" | "PWL" | "PMH" | "PML";
+  period: "D" | "W" | "M";
+  price: number;
+  startTime: number;
+}
+
+/**
+ * Renders LuxAlgo Smart Money Concepts overlays onto the 2D canvas.
+ * Matches LuxAlgo "Smart Money Concepts" Pine v5 visual styling (CC BY-NC-SA 4.0 © LuxAlgo).
+ */
+export function drawLuxAlgoSmcOverlaysToCanvas(
+  ctx: CanvasRenderingContext2D,
+  smc: SmcComputationResult,
+  mtfLevels: MtfLevelInput[],
+  settings: SmcChartSettings,
+  projector: CoordinateProjector,
+  digits = 2
+): void {
+  const { plotWidth, plotHeight, candles } = projector;
+  if (plotWidth <= 0 || plotHeight <= 0 || candles.length === 0) return;
+
+  const isMono = settings.style === "Monochrome";
+  const mono = SMC_RENDER_PALETTE.monochrome;
+  const colored = SMC_RENDER_PALETTE.colored;
+
+  const allowIrlErl = (tag: "IRL" | "ERL") => (tag === "IRL" ? settings.showIRL : settings.showERL);
+
+  // Estimate bar pixel spacing for FVG right extension
+  let barSpacingPx = 8;
+  if (candles.length >= 2) {
+    const xLast = projector.timeToX(candles[candles.length - 1].time);
+    const xPrev = projector.timeToX(candles[candles.length - 2].time);
+    if (xLast !== null && xPrev !== null && Number.isFinite(xLast - xPrev) && xLast > xPrev) {
+      barSpacingPx = Math.max(2, Math.min(40, xLast - xPrev));
+    }
+  }
+  const lastCandleXRaw = resolveTimeCoordinate(candles[candles.length - 1].time, projector, true);
+  const lastCandleX = lastCandleXRaw !== null ? Math.min(plotWidth, lastCandleXRaw) : plotWidth;
+
+  ctx.save();
+
+  // ------------------------------------------------------------------
+  // 1. Premium / Equilibrium / Discount Zones
+  // ------------------------------------------------------------------
+  if (settings.showPremiumDiscount && smc.premiumDiscountZones.length > 0) {
+    for (const z of smc.premiumDiscountZones) {
+      if (!allowIrlErl(z.irlErl)) continue;
+      const yTop = projector.priceToY(z.top);
+      const yBot = projector.priceToY(z.bottom);
+      if (yTop === null || yBot === null || !Number.isFinite(yTop) || !Number.isFinite(yBot)) continue;
+      const x1Raw = resolveTimeCoordinate(z.startTime, projector, true);
+      if (x1Raw === null) continue;
+      const x1 = Math.max(0, Math.min(plotWidth - 10, x1Raw));
+      const x2 = plotWidth;
+      const top = Math.min(yTop, yBot);
+      const h = Math.max(2, Math.abs(yBot - yTop));
+
+      let fill: string;
+      let textColor: string;
+      if (z.kind === "PREMIUM") {
+        fill = isMono ? mono.premiumZone : settings.premiumColor;
+        textColor = isMono ? mono.bear : colored.red;
+      } else if (z.kind === "DISCOUNT") {
+        fill = isMono ? mono.discountZone : settings.discountColor;
+        textColor = isMono ? mono.bull : colored.green;
+      } else {
+        fill = isMono ? mono.equilibriumZone : settings.equilibriumColor;
+        textColor = isMono ? mono.neutral : colored.gray;
+      }
+
+      ctx.save();
+      ctx.fillStyle = fill;
+      ctx.fillRect(x1, top, x2 - x1, h);
+
+      ctx.font = getLabelFont("Small", 600);
+      ctx.fillStyle = textColor;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const labelX = x1 + (x2 - x1) * 0.5;
+      const labelY =
+        z.kind === "PREMIUM"
+          ? top + Math.min(12, h / 2)
+          : z.kind === "DISCOUNT"
+          ? top + h - Math.min(12, h / 2)
+          : top + h / 2;
+      ctx.fillText(z.label, labelX, labelY);
+      ctx.restore();
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // 2. Order Blocks (Internal: no border; Swing: crisp border; extend right)
+  // ------------------------------------------------------------------
+  const drawObList = (obs: typeof smc.internalOrderBlocks, isSwing: boolean) => {
+    for (const ob of obs) {
+      if (!allowIrlErl(ob.irlErl)) continue;
+      const yTop = projector.priceToY(ob.top);
+      const yBot = projector.priceToY(ob.bottom);
+      if (yTop === null || yBot === null || !Number.isFinite(yTop) || !Number.isFinite(yBot)) continue;
+      const x1Raw = resolveTimeCoordinate(ob.startTime, projector, true);
+      if (x1Raw === null) continue;
+      const x1 = Math.max(0, Math.min(plotWidth - 4, x1Raw));
+      const x2 = plotWidth;
+      const top = Math.min(yTop, yBot);
+      const h = Math.max(2, Math.abs(yBot - yTop));
+      const isBull = ob.direction === "BULLISH";
+
+      const fill = isMono
+        ? isSwing
+          ? isBull
+            ? mono.swingBullOb
+            : mono.swingBearOb
+          : isBull
+          ? mono.internalBullOb
+          : mono.internalBearOb
+        : isSwing
+        ? isBull
+          ? settings.swingBullOBColor
+          : settings.swingBearOBColor
+        : isBull
+        ? settings.internalBullOBColor
+        : settings.internalBearOBColor;
+
+      ctx.save();
+      ctx.fillStyle = fill;
+      ctx.fillRect(x1, top, x2 - x1, h);
+
+      // Swing OB has border; Internal OB has NO border (exact Pine spec)
+      if (isSwing) {
+        ctx.strokeStyle = isMono
+          ? isBull
+            ? mono.swingBullObBorder
+            : mono.swingBearObBorder
+          : deriveBorderColorLocal(fill, 0.85);
+        ctx.lineWidth = 1;
+        ctx.strokeRect(
+          Math.round(x1) + 0.5,
+          Math.round(top) + 0.5,
+          Math.max(1, Math.round(x2 - x1) - 1),
+          Math.max(1, Math.round(h) - 1)
+        );
+      }
+      ctx.restore();
+    }
+  };
+
+  if (settings.showSwingOB) drawObList(smc.swingOrderBlocks, true);
+  if (settings.showInternalOB) drawObList(smc.internalOrderBlocks, false);
+
+  // ------------------------------------------------------------------
+  // 3. Fair Value Gaps (2 stacked half-boxes, extended by fvgExtend bars)
+  // ------------------------------------------------------------------
+  if (settings.showFvg && allowIrlErl("IRL")) {
+    for (const fvg of smc.fairValueGaps) {
+      const yTop = projector.priceToY(fvg.top);
+      const yMid = projector.priceToY(fvg.midpoint);
+      const yBot = projector.priceToY(fvg.bottom);
+      if (
+        yTop === null ||
+        yMid === null ||
+        yBot === null ||
+        !Number.isFinite(yTop) ||
+        !Number.isFinite(yMid) ||
+        !Number.isFinite(yBot)
+      ) {
+        continue;
+      }
+      const x1Raw = resolveTimeCoordinate(fvg.startTime, projector, true);
+      if (x1Raw === null) continue;
+      const x1 = Math.max(0, Math.min(plotWidth - 2, x1Raw));
+      const x2 = Math.min(plotWidth, Math.max(x1 + 8, lastCandleX + fvg.extendBars * barSpacingPx));
+      const w = Math.max(2, x2 - x1);
+      const isBull = fvg.direction === "BULLISH";
+      const fill = isMono
+        ? isBull
+          ? mono.bullFvg
+          : mono.bearFvg
+        : isBull
+        ? settings.fvgBullColor
+        : settings.fvgBearColor;
+
+      const topY = Math.min(yTop, yBot);
+      const midY = Math.max(topY, Math.min(Math.max(yTop, yBot), yMid));
+      const botY = Math.max(yTop, yBot);
+
+      ctx.save();
+      ctx.fillStyle = fill;
+      // Upper half box
+      ctx.fillRect(x1, topY, w, Math.max(1, midY - topY));
+      // Lower half box
+      ctx.fillRect(x1, midY, w, Math.max(1, botY - midY));
+
+      // Subtle midpoint seam between stacked boxes
+      ctx.strokeStyle = deriveBorderColorLocal(fill, 0.35);
+      ctx.lineWidth = 0.75;
+      ctx.beginPath();
+      ctx.moveTo(x1, Math.round(midY) + 0.5);
+      ctx.lineTo(x2, Math.round(midY) + 0.5);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // 4. MTF Highs & Lows (Daily PDH/PDL, Weekly PWH/PWL, Monthly PMH/PML)
+  // ------------------------------------------------------------------
+  if (allowIrlErl("ERL") && mtfLevels.length > 0) {
+    for (const lvl of mtfLevels) {
+      const enabled =
+        (lvl.period === "D" && settings.showDailyHL) ||
+        (lvl.period === "W" && settings.showWeeklyHL) ||
+        (lvl.period === "M" && settings.showMonthlyHL);
+      if (!enabled) continue;
+
+      const y = projector.priceToY(lvl.price);
+      if (y === null || !Number.isFinite(y) || y < -16 || y > plotHeight + 16) continue;
+      const x1Raw = resolveTimeCoordinate(lvl.startTime, projector, true);
+      if (x1Raw === null) continue;
+      const x1 = Math.max(0, Math.min(plotWidth - 20, x1Raw));
+      const yr = Math.round(y) + 0.5;
+
+      const style =
+        lvl.period === "D"
+          ? settings.dailyStyle
+          : lvl.period === "W"
+          ? settings.weeklyStyle
+          : settings.monthlyStyle;
+      const rawColor =
+        lvl.period === "D"
+          ? settings.dailyColor
+          : lvl.period === "W"
+          ? settings.weeklyColor
+          : settings.monthlyColor;
+      const color = isMono ? mono.neutral : rawColor;
+
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.setLineDash(getLineDashPattern(style));
+      ctx.beginPath();
+      ctx.moveTo(x1, yr);
+      ctx.lineTo(plotWidth, yr);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.font = getLabelFont("Tiny", 600);
+      ctx.fillStyle = color;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(lvl.code, plotWidth - 6, yr - 2);
+      ctx.restore();
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // 5. Strong / Weak High & Low (right-extended line + label + right-edge tag)
+  // ------------------------------------------------------------------
+  if (settings.showStrongWeakHL && allowIrlErl("ERL")) {
+    for (const sw of smc.strongWeakLevels) {
+      const y = projector.priceToY(sw.price);
+      if (y === null || !Number.isFinite(y) || y < -16 || y > plotHeight + 16) continue;
+      const x1Raw = resolveTimeCoordinate(sw.startTime, projector, true);
+      if (x1Raw === null) continue;
+      const x1 = Math.max(0, Math.min(plotWidth - 20, x1Raw));
+      const yr = Math.round(y) + 0.5;
+      const isHigh = sw.kind === "HIGH";
+      const color = isMono
+        ? isHigh
+          ? mono.bear
+          : mono.bull
+        : isHigh
+        ? settings.swingBearishColor
+        : settings.swingBullishColor;
+
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      if (!sw.isStrong) ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x1, yr);
+      ctx.lineTo(plotWidth, yr);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Tiny label at right end of line
+      ctx.font = getLabelFont("Tiny", 600);
+      ctx.fillStyle = color;
+      ctx.textAlign = "right";
+      ctx.textBaseline = isHigh ? "bottom" : "top";
+      ctx.fillText(sw.label, plotWidth - 46, isHigh ? yr - 3 : yr + 3);
+
+      // Compact right-axis High / Low tag badge (like Image 1)
+      const tagText = isHigh ? `High ${sw.price.toFixed(digits)}` : `Low ${sw.price.toFixed(digits)}`;
+      ctx.font = "600 9px 'JetBrains Mono', monospace";
+      const tagW = Math.min(86, ctx.measureText(tagText).width + 8);
+      const tagH = 14;
+      const tagX = plotWidth - tagW - 2;
+      const tagY = Math.max(2, Math.min(plotHeight - tagH - 2, yr - tagH / 2));
+      ctx.fillStyle = color;
+      ctx.fillRect(tagX, tagY, tagW, tagH);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(tagText, tagX + tagW / 2, tagY + tagH / 2 + 0.5);
+      ctx.restore();
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // 6. EQH / EQL (dotted line between two pivots + centered label)
+  // ------------------------------------------------------------------
+  if (settings.showEqhEql && allowIrlErl("ERL")) {
+    for (const eq of smc.equalHighsLows) {
+      const y1 = projector.priceToY(eq.startPrice);
+      const y2 = projector.priceToY(eq.endPrice);
+      const x1 = resolveTimeCoordinate(eq.startTime, projector, false);
+      const x2 = resolveTimeCoordinate(eq.endTime, projector, false);
+      if (
+        y1 === null ||
+        y2 === null ||
+        x1 === null ||
+        x2 === null ||
+        !Number.isFinite(y1) ||
+        !Number.isFinite(y2)
+      ) {
+        continue;
+      }
+      if (Math.max(x1, x2) < 0 || Math.min(x1, x2) > plotWidth) continue;
+
+      const isHigh = eq.tag === "EQH";
+      const color = isMono
+        ? isHigh
+          ? mono.bear
+          : mono.bull
+        : isHigh
+        ? settings.swingBearishColor
+        : settings.swingBullishColor;
+
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2.5]);
+      ctx.beginPath();
+      ctx.moveTo(x1, Math.round(y1) + 0.5);
+      ctx.lineTo(x2, Math.round(y2) + 0.5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const midX = (x1 + x2) / 2;
+      const midY = (y1 + y2) / 2;
+      ctx.font = getLabelFont(settings.eqhLabelSize, 600);
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = isHigh ? "bottom" : "top";
+      ctx.fillText(eq.tag, midX, isHigh ? midY - 3 : midY + 3);
+      ctx.restore();
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // 7. Market Structure (Internal: dashed; Swing: solid; centered BOS/CHoCH)
+  // ------------------------------------------------------------------
+  const drawStructureList = (
+    list: typeof smc.internalStructures,
+    isSwing: boolean
+  ) => {
+    const bullFilter = isSwing ? settings.swingBullishFilter : settings.internalBullishFilter;
+    const bearFilter = isSwing ? settings.swingBearishFilter : settings.internalBearishFilter;
+    const labelSize = isSwing ? settings.swingLabelSize : settings.internalLabelSize;
+
+    for (const ev of list) {
+      if (!allowIrlErl(ev.irlErl)) continue;
+      const isBull = ev.direction === "BULLISH";
+      const activeFilter = isBull ? bullFilter : bearFilter;
+      if (activeFilter !== "All" && ev.tag !== activeFilter) continue;
+
+      const y = projector.priceToY(ev.price);
+      if (y === null || !Number.isFinite(y) || y < -16 || y > plotHeight + 16) continue;
+      const x1Raw = resolveTimeCoordinate(ev.startTime, projector, true);
+      const x2Raw = resolveTimeCoordinate(ev.endTime, projector, false);
+      if (x1Raw === null || x2Raw === null) continue;
+      const x1 = Math.max(0, Math.min(plotWidth, Math.min(x1Raw, x2Raw)));
+      const x2 = Math.max(x1 + 4, Math.min(plotWidth, Math.max(x1Raw, x2Raw)));
+      if (x2 <= 0 || x1 >= plotWidth) continue;
+
+      const color = isMono
+        ? isBull
+          ? mono.bull
+          : mono.bear
+        : isBull
+        ? isSwing
+          ? settings.swingBullishColor
+          : settings.internalBullishColor
+        : isSwing
+        ? settings.swingBearishColor
+        : settings.internalBearishColor;
+
+      const yr = Math.round(y) + 0.5;
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = isSwing ? 1.25 : 1;
+      if (!isSwing) ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x1, yr);
+      ctx.lineTo(x2, yr);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Centered BOS / CHoCH text, NO background, colored same as line
+      ctx.font = getLabelFont(labelSize, isSwing ? 700 : 600);
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = isBull ? "bottom" : "top";
+      ctx.fillText(ev.tag, (x1 + x2) / 2, isBull ? yr - 3 : yr + 3);
+      ctx.restore();
+    }
+  };
+
+  if (settings.showInternalStructure) drawStructureList(smc.internalStructures, false);
+  if (settings.showSwingStructure) drawStructureList(smc.swingStructures, true);
+
+  // ------------------------------------------------------------------
+  // 8. Swing Points (HH / HL / LH / LL)
+  // ------------------------------------------------------------------
+  if (settings.showSwingPoints && allowIrlErl("ERL")) {
+    ctx.save();
+    ctx.font = getLabelFont(settings.swingLabelSize, 700);
+    ctx.textAlign = "center";
+    for (const sp of smc.swingPoints) {
+      const x = resolveTimeCoordinate(sp.time, projector, false);
+      const y = projector.priceToY(sp.price);
+      if (x === null || y === null || !Number.isFinite(y) || x < 0 || x > plotWidth) continue;
+      const isHigh = sp.tag === "HH" || sp.tag === "LH";
+      ctx.fillStyle = isMono
+        ? isHigh
+          ? mono.bear
+          : mono.bull
+        : isHigh
+        ? settings.swingBearishColor
+        : settings.swingBullishColor;
+      ctx.textBaseline = isHigh ? "bottom" : "top";
+      ctx.fillText(sp.tag, x, isHigh ? y - 6 : y + 6);
+    }
+    ctx.restore();
   }
 
   ctx.restore();

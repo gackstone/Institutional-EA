@@ -16,7 +16,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "test": "node --experimental-strip-types --test src/utils/__tests__/tradeChartMath.test.ts src/utils/__tests__/chartTvLightFixture.test.ts src/utils/__tests__/topBarControlState.test.ts src/utils/__tests__/chartDrawingsParity.test.ts src/utils/__tests__/startupSafety.test.ts",
+    "test": "node --experimental-strip-types --test src/utils/__tests__/tradeChartMath.test.ts src/utils/__tests__/chartTvLightFixture.test.ts src/utils/__tests__/topBarControlState.test.ts src/utils/__tests__/chartDrawingsParity.test.ts src/utils/__tests__/startupSafety.test.ts src/utils/__tests__/luxalgoSmc.test.ts",
     "test:smoke": "node scripts/smoke_test.cjs",
     "preview": "vite preview",
     "electron": "electron electron/main.cjs",
