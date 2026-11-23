@@ -23,6 +23,7 @@ import {
   Pin,
   Radio,
   RotateCcw,
+  Settings,
   ShieldCheck,
   TrendingUp,
   X,
@@ -34,7 +35,7 @@ import {
   SymbolChartBundle,
 } from "../services/dashboardDataAdapter";
 import { getSymbolChipSpec } from "../styles/designTokens";
-import { BEAR_COLOR, BULL_COLOR, CHART_TV_LIGHT_THEME } from "../styles/chartTheme";
+import { BEAR_COLOR, BULL_COLOR, CHART_TV_LIGHT_THEME, LUXALGO_SMC_PALETTE } from "../styles/chartTheme";
 import { UI_COPY } from "../constants/uiCopy";
 
 const IS_DEV = Boolean((import.meta as any).env?.DEV);
@@ -45,12 +46,22 @@ import {
   validateEngineDrawingsFeed,
 } from "../utils/chartDrawingsSchema";
 import {
+  drawLuxAlgoSmcOverlaysToCanvas,
   drawProjectedOverlaysToCanvas,
   hitTestProjectedDrawings,
+  type MtfLevelInput,
   ProjectedDrawing,
   projectEngineDrawings,
 } from "../utils/chartCanvasRenderer";
-import { readVersionedState, writeVersionedState } from "../utils/persistedState";
+import { computeLuxAlgoSmc, SMC_BEARISH, SMC_BULLISH } from "../utils/luxalgoSmcEngine";
+import {
+  applyLayerChipToggle,
+  deriveLayerChipStates,
+  loadSmcChartSettings,
+  saveSmcChartSettings,
+  type SmcChartSettings,
+} from "../utils/smcChartSettings";
+import { SmcSettingsPopover } from "./SmcSettingsPopover";
 
 export interface OverlayTogglesState {
   liquidity: boolean;
@@ -75,49 +86,9 @@ interface LiveTradingChartProps {
 
 const SYMBOLS: ChartSymbol[] = ["XAUUSD", "USDJPY", "BTCUSD"];
 const TIMEFRAMES: ChartTimeframe[] = ["M1", "M5", "M15", "H1", "H4"];
-const OVERLAY_STORAGE_KEY = "iea_chart_overlay_toggles_v1";
 
 // Remember visible range per (symbol:timeframe) within the app session
 const sessionVisibleRanges = new Map<string, LogicalRange>();
-
-const DEFAULT_OVERLAY_TOGGLES: OverlayTogglesState = {
-  liquidity: true,
-  fvgOb: true,
-  structure: true,
-  sessions: true,
-  tradeLabels: true,
-};
-
-function isValidOverlayToggles(v: unknown): v is OverlayTogglesState {
-  if (!v || typeof v !== "object") return false;
-  const o = v as Record<string, unknown>;
-  return (
-    typeof o.liquidity === "boolean" &&
-    typeof o.fvgOb === "boolean" &&
-    typeof o.structure === "boolean" &&
-    typeof o.sessions === "boolean" &&
-    typeof o.tradeLabels === "boolean"
-  );
-}
-
-function loadSavedOverlayToggles(): OverlayTogglesState {
-  return readVersionedState<OverlayTogglesState>({
-    key: OVERLAY_STORAGE_KEY,
-    defaultValue: DEFAULT_OVERLAY_TOGGLES,
-    validate: isValidOverlayToggles,
-    migrate: (legacy) => {
-      if (!legacy || typeof legacy !== "object") return null;
-      const o = legacy as Record<string, unknown>;
-      return {
-        liquidity: Boolean(o.liquidity ?? true),
-        fvgOb: Boolean(o.fvgOb ?? true),
-        structure: Boolean(o.structure ?? true),
-        sessions: Boolean(o.sessions ?? true),
-        tradeLabels: Boolean(o.tradeLabels ?? o.trades ?? true),
-      };
-    },
-  }).value;
-}
 
 function formatPrice(value: number | undefined | null, digits: number): string {
   if (typeof value !== "number" || !Number.isFinite(value)) return "—";
@@ -224,7 +195,14 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
   const rafIdRef = useRef<number | null>(null);
   const lastRangeKeyRef = useRef<string>("");
 
-  const [overlays, setOverlays] = useState<OverlayTogglesState>(loadSavedOverlayToggles);
+  const [committedSettings, setCommittedSettings] = useState<SmcChartSettings>(() =>
+    loadSmcChartSettings()
+  );
+  const [previewSettings, setPreviewSettings] = useState<SmcChartSettings | null>(null);
+  const [showSettingsPopover, setShowSettingsPopover] = useState<boolean>(false);
+  const activeSettings = previewSettings ?? committedSettings;
+  const overlays = useMemo(() => deriveLayerChipStates(activeSettings), [activeSettings]);
+
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showJumpLatest, setShowJumpLatest] = useState<boolean>(false);
   const [showDebugOverlay, setShowDebugOverlay] = useState<boolean>(false);
@@ -272,10 +250,79 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     return res;
   }, [drawingsFeed, selectedSymbol, selectedTimeframe]);
 
-  // Persist overlay toggles with schema version
+  // Persist committed SMC settings with schema version
   useEffect(() => {
-    writeVersionedState(OVERLAY_STORAGE_KEY, overlays);
-  }, [overlays]);
+    saveSmcChartSettings(committedSettings);
+  }, [committedSettings]);
+
+  // Recompute LuxAlgo SMC ONLY when bar count / closed bar timestamp or detection settings change (never on every tick)
+  const smcClosedBarKey = useMemo(() => {
+    const len = bundle.candles.length;
+    const prevClosedTime = len >= 2 ? bundle.candles[len - 2].time : 0;
+    const lastOpenTime = len >= 1 ? bundle.candles[len - 1].time : 0;
+    return [
+      selectedSymbol,
+      selectedTimeframe,
+      len,
+      prevClosedTime,
+      lastOpenTime,
+      activeSettings.mode,
+      activeSettings.swingPointsLength,
+      activeSettings.internalConfluenceFilter ? 1 : 0,
+      activeSettings.obFilter,
+      activeSettings.obMitigation,
+      activeSettings.internalOBCount,
+      activeSettings.swingOBCount,
+      activeSettings.eqhBarsConfirmation,
+      activeSettings.eqhThreshold,
+      activeSettings.fvgAutoThreshold ? 1 : 0,
+      activeSettings.fvgTimeframe,
+      activeSettings.fvgExtend,
+    ].join("|");
+  }, [
+    bundle.candles,
+    selectedSymbol,
+    selectedTimeframe,
+    activeSettings.mode,
+    activeSettings.swingPointsLength,
+    activeSettings.internalConfluenceFilter,
+    activeSettings.obFilter,
+    activeSettings.obMitigation,
+    activeSettings.internalOBCount,
+    activeSettings.swingOBCount,
+    activeSettings.eqhBarsConfirmation,
+    activeSettings.eqhThreshold,
+    activeSettings.fvgAutoThreshold,
+    activeSettings.fvgTimeframe,
+    activeSettings.fvgExtend,
+  ]);
+
+  const smcCandlesRef = useRef(bundle.candles);
+  smcCandlesRef.current = bundle.candles;
+  const smcSettingsRef = useRef(activeSettings);
+  smcSettingsRef.current = activeSettings;
+
+  const smcResult = useMemo(() => {
+    return computeLuxAlgoSmc(smcCandlesRef.current, smcSettingsRef.current, selectedTimeframe);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smcClosedBarKey]);
+
+  // Extract MTF Highs & Lows (PDH/PDL, PWH/PWL, PMH/PML) from backend drawings feed
+  const mtfLevels = useMemo<MtfLevelInput[]>(() => {
+    const out: MtfLevelInput[] = [];
+    for (const item of validatedDrawings.items) {
+      if (item.type !== "LIQ" || typeof item.price_levels.price !== "number") continue;
+      const st = item.subtype.toUpperCase();
+      if (st === "PDH" || st === "PDL") {
+        out.push({ code: st, period: "D", price: item.price_levels.price, startTime: item.start_time });
+      } else if (st === "PWH" || st === "PWL") {
+        out.push({ code: st, period: "W", price: item.price_levels.price, startTime: item.start_time });
+      } else if (st === "PMH" || st === "PML") {
+        out.push({ code: st, period: "M", price: item.price_levels.price, startTime: item.start_time });
+      }
+    }
+    return out;
+  }, [validatedDrawings.items]);
 
   // Latest bar fallback for OHLC toolbar readout
   const activeOhlc = useMemo(() => {
@@ -334,6 +381,15 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
 
       ctx.save();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, plotW, plotH);
+
+      const projector = {
+        timeToX: (t: number) => chart.timeScale().timeToCoordinate(t as UTCTimestamp),
+        priceToY: (p: number) => series.priceToCoordinate(p),
+        plotWidth: plotW,
+        plotHeight: plotH,
+        candles: bundle.candles,
+      };
 
       const projected = projectEngineDrawings(
         validatedDrawings.items,
@@ -344,18 +400,29 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
           sessions: overlays.sessions,
           trades: overlays.tradeLabels,
         },
-        {
-          timeToX: (t) => chart.timeScale().timeToCoordinate(t as UTCTimestamp),
-          priceToY: (p) => series.priceToCoordinate(p),
-          plotWidth: plotW,
-          plotHeight: plotH,
-          candles: bundle.candles,
-        }
+        projector
       );
 
       projectedRef.current = projected;
       const activeHighlightId = pinnedHit?.item.id ?? hoveredHit?.item.id ?? null;
-      drawProjectedOverlaysToCanvas(ctx, projected, plotW, plotH, activeHighlightId);
+
+      // 1. Session bands (lowest z-order)
+      drawProjectedOverlaysToCanvas(ctx, projected, plotW, plotH, activeHighlightId, {
+        clear: false,
+        onlyTypes: new Set(["SESS"]),
+      });
+
+      // 2. LuxAlgo Smart Money Concepts overlays (when enabled for current timeframe)
+      if (activeSettings.visibleTimeframes[selectedTimeframe]) {
+        drawLuxAlgoSmcOverlaysToCanvas(ctx, smcResult, mtfLevels, activeSettings, projector, digits);
+      }
+
+      // 3. Trade position templates on top (LONG POSITION / SHORT POSITION)
+      drawProjectedOverlaysToCanvas(ctx, projected, plotW, plotH, activeHighlightId, {
+        clear: false,
+        onlyTypes: new Set(["TRADE"]),
+      });
+
       ctx.restore();
 
       // Expose dev parity report on window for quick debugging
@@ -375,6 +442,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     validatedDrawings,
     overlays,
     bundle.candles,
+    activeSettings,
+    smcResult,
+    mtfLevels,
+    digits,
     hoveredHit?.item.id,
     pinnedHit?.item.id,
     selectedSymbol,
@@ -529,13 +600,42 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       priceFormat: { type: "price", precision: digits, minMove },
     });
 
-    const data = bundle.candles.map((c) => ({
-      time: c.time as UTCTimestamp,
-      open: c.open,
-      high: c.high,
-      low: c.low,
-      close: c.close,
-    }));
+    const isMono = activeSettings.style === "Monochrome";
+    const trendBullColor = isMono
+      ? LUXALGO_SMC_PALETTE.monochrome.bull
+      : activeSettings.internalBullishColor;
+    const trendBearColor = isMono
+      ? LUXALGO_SMC_PALETTE.monochrome.bear
+      : activeSettings.internalBearishColor;
+
+    const data = bundle.candles.map((c, idx) => {
+      const base = {
+        time: c.time as UTCTimestamp,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+      };
+      if (!activeSettings.colorCandles) return base;
+      const tr = smcResult.candleTrends[idx] ?? 0;
+      if (tr === SMC_BULLISH) {
+        return {
+          ...base,
+          color: trendBullColor,
+          borderColor: trendBullColor,
+          wickColor: trendBullColor,
+        };
+      }
+      if (tr === SMC_BEARISH) {
+        return {
+          ...base,
+          color: trendBearColor,
+          borderColor: trendBearColor,
+          wickColor: trendBearColor,
+        };
+      }
+      return base;
+    });
     series.setData(data);
 
     // Restore remembered visible range per (symbol, timeframe) or fit on first view
@@ -556,7 +656,17 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     }
 
     redrawCanvas();
-  }, [bundle.candles, digits, rangeKey, redrawCanvas]);
+  }, [
+    bundle.candles,
+    digits,
+    rangeKey,
+    redrawCanvas,
+    activeSettings.colorCandles,
+    activeSettings.style,
+    activeSettings.internalBullishColor,
+    activeSettings.internalBearishColor,
+    smcResult.candleTrends,
+  ]);
 
   // Trigger canvas redraw whenever drawings, toggles, or highlight change
   useEffect(() => {
@@ -742,8 +852,32 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
   }, [onCaptureScreenshot, selectedSymbol]);
 
   const toggleLayer = (key: keyof OverlayTogglesState) => {
-    setOverlays((prev) => ({ ...prev, [key]: !prev[key] }));
+    setCommittedSettings((prev) => applyLayerChipToggle(prev, key));
+    if (previewSettings) {
+      setPreviewSettings((prev) => (prev ? applyLayerChipToggle(prev, key) : null));
+    }
   };
+
+  const handleOpenSettings = useCallback(() => {
+    setShowSettingsPopover((open) => {
+      if (open) {
+        setPreviewSettings(null);
+        return false;
+      }
+      return true;
+    });
+  }, []);
+
+  const handleConfirmSettings = useCallback((next: SmcChartSettings) => {
+    setCommittedSettings(next);
+    setPreviewSettings(null);
+    setShowSettingsPopover(false);
+  }, []);
+
+  const handleCancelSettings = useCallback(() => {
+    setPreviewSettings(null);
+    setShowSettingsPopover(false);
+  }, []);
 
   const activeCard = pinnedHit || hoveredHit;
   const activeCardDetails = activeCard
@@ -762,6 +896,23 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     return { left: `${left}px`, top: `${top}px` };
   }, [activeCard]);
 
+  const smcCounts = useMemo(() => {
+    const liqCount =
+      mtfLevels.length + smcResult.equalHighsLows.length + smcResult.strongWeakLevels.length;
+    const fvgObCount =
+      (activeSettings.showInternalOB ? smcResult.internalOrderBlocks.length : 0) +
+      (activeSettings.showSwingOB ? smcResult.swingOrderBlocks.length : 0) +
+      (activeSettings.showFvg ? smcResult.fairValueGaps.length : 0);
+    const structCount =
+      (activeSettings.showInternalStructure ? smcResult.internalStructures.length : 0) +
+      (activeSettings.showSwingStructure ? smcResult.swingStructures.length : 0);
+    return {
+      liquidity: liqCount,
+      fvgOb: fvgObCount,
+      structure: structCount,
+    };
+  }, [mtfLevels.length, smcResult, activeSettings]);
+
   const layerToggleSpecs: Array<{
     key: keyof OverlayTogglesState;
     label: string;
@@ -772,22 +923,22 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     {
       key: "liquidity",
       label: UI_COPY.chart.layers.liquidity.label,
-      count: validatedDrawings.counts.liquidity,
-      tooltip: "Engine Liquidity levels (PDH/PDL, PWH/PWL, Asia H/L, EQH/EQL & Sweeps)",
+      count: smcCounts.liquidity,
+      tooltip: "Liquidity levels (PDH/PDL, PWH/PWL, PMH/PML, EQH/EQL & Strong/Weak H/L)",
       icon: Activity,
     },
     {
       key: "fvgOb",
       label: UI_COPY.chart.layers.fvgOb.label,
-      count: validatedDrawings.counts.fvgOb,
-      tooltip: "Engine Fair Value Gaps (FVG/IFVG) & Order Blocks (OB)",
+      count: smcCounts.fvgOb,
+      tooltip: "Fair Value Gaps (FVG) & Internal/Swing Order Blocks (OB)",
       icon: Layers,
     },
     {
       key: "structure",
       label: UI_COPY.chart.layers.structure.label,
-      count: validatedDrawings.counts.structure,
-      tooltip: "Engine Market Structure Breaks (BOS / MSS / CHoCH)",
+      count: smcCounts.structure,
+      tooltip: "Internal & Swing Market Structure Breaks (BOS / CHoCH)",
       icon: TrendingUp,
     },
     {
@@ -905,6 +1056,22 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
           })}
 
           <div className="flex items-center space-x-1 pl-1 border-l border-[rgba(186,214,255,0.16)]">
+            <button
+              type="button"
+              data-testid="btn-smc-settings"
+              aria-expanded={showSettingsPopover}
+              onClick={handleOpenSettings}
+              title="Smart Money Concepts Settings"
+              aria-label="Smart Money Concepts Settings"
+              className={`p-1.5 rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648] ${
+                showSettingsPopover
+                  ? "bg-[#5EEAD4]/20 text-[#5EEAD4]"
+                  : "text-[#B6C5E0] hover:text-[#F4F7FF] hover:bg-white/10"
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+
             <button
               type="button"
               onClick={handleResetView}
@@ -1043,6 +1210,15 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
           data-testid="engine-drawings-canvas"
           aria-hidden="true"
           className="absolute top-0 left-0 z-20 pointer-events-none"
+        />
+
+        {/* SMC Indicator Settings Popover (Inputs | Style | Visibility) */}
+        <SmcSettingsPopover
+          open={showSettingsPopover}
+          settings={committedSettings}
+          onLiveChange={setPreviewSettings}
+          onConfirm={handleConfirmSettings}
+          onCancel={handleCancelSettings}
         />
 
         {/* Waiting / Empty Candles Overlay */}

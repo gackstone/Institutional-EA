@@ -1,0 +1,883 @@
+import React, { useEffect, useRef, useState } from "react";
+import { RotateCcw, X } from "lucide-react";
+import {
+  cloneDefaultSmcSettings,
+  formatCssRgba,
+  parseCssColor,
+  type FvgTimeframeOption,
+  type LabelSizeOption,
+  type LineStyleOption,
+  type ObFilterOption,
+  type ObMitigationOption,
+  type SmcChartSettings,
+  type SmcMode,
+  type SmcStyle,
+  type StructureFilter,
+} from "../utils/smcChartSettings";
+
+type SettingsTab = "Inputs" | "Style" | "Visibility";
+
+interface SmcSettingsPopoverProps {
+  open: boolean;
+  settings: SmcChartSettings;
+  onLiveChange: (draft: SmcChartSettings) => void;
+  onConfirm: (next: SmcChartSettings) => void;
+  onCancel: () => void;
+}
+
+const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
+  <div className="pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#9BA3B0] border-t border-white/10 first:border-t-0 first:pt-0">
+    {title}
+  </div>
+);
+
+const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <div className="flex items-center justify-between gap-2 py-1 text-[11px] text-[#DCE2EC]">
+    <span className="truncate">{label}</span>
+    <div className="flex items-center gap-1.5 shrink-0">{children}</div>
+  </div>
+);
+
+const ColorAlphaPicker: React.FC<{
+  value: string;
+  onChange: (next: string) => void;
+  allowAlpha?: boolean;
+  ariaLabel: string;
+}> = ({ value, onChange, allowAlpha = false, ariaLabel }) => {
+  const { hex, alpha } = parseCssColor(value);
+  return (
+    <div className="inline-flex items-center gap-1">
+      <label
+        className="relative w-5 h-5 rounded border border-white/25 overflow-hidden cursor-pointer shrink-0"
+        style={{ backgroundColor: value }}
+        title={`${ariaLabel} (${value})`}
+      >
+        <input
+          type="color"
+          aria-label={ariaLabel}
+          value={hex}
+          onChange={(e) => onChange(allowAlpha ? formatCssRgba(e.target.value, alpha) : e.target.value)}
+          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+        />
+      </label>
+      {allowAlpha && (
+        <input
+          type="number"
+          aria-label={`${ariaLabel} opacity percent`}
+          min={5}
+          max={100}
+          step={5}
+          value={Math.round(alpha * 100)}
+          onChange={(e) => {
+            const pct = Math.min(100, Math.max(5, Number(e.target.value) || 20));
+            onChange(formatCssRgba(hex, pct / 100));
+          }}
+          className="w-11 px-1 py-0.5 rounded bg-[#141619] border border-white/15 text-[10px] font-mono text-[#E8ECF2] text-right focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]"
+          title="Opacity (%)"
+        />
+      )}
+    </div>
+  );
+};
+
+const selectCls =
+  "px-1.5 py-0.5 rounded bg-[#141619] border border-white/15 text-[11px] text-[#E8ECF2] focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]";
+const numCls =
+  "w-14 px-1.5 py-0.5 rounded bg-[#141619] border border-white/15 text-[11px] font-mono text-[#E8ECF2] text-right focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]";
+const checkCls = "w-3.5 h-3.5 accent-[#5EEAD4] rounded cursor-pointer";
+
+export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
+  open,
+  settings,
+  onLiveChange,
+  onConfirm,
+  onCancel,
+}) => {
+  const [tab, setTab] = useState<SettingsTab>("Inputs");
+  const [draft, setDraft] = useState<SmcChartSettings>(settings);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setDraft({ ...settings, visibleTimeframes: { ...settings.visibleTimeframes } });
+      setTimeout(() => dialogRef.current?.focus(), 0);
+    }
+  }, [open, settings]);
+
+  if (!open) return null;
+
+  const update = (patch: Partial<SmcChartSettings>) => {
+    const next: SmcChartSettings = { ...draft, ...patch };
+    setDraft(next);
+    onLiveChange(next);
+  };
+
+  const handleResetDefaults = () => {
+    const def = cloneDefaultSmcSettings();
+    setDraft(def);
+    onLiveChange(def);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      onCancel();
+    }
+  };
+
+  return (
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Smart Money Concepts Settings"
+      data-testid="smc-settings-popover"
+      onKeyDown={handleKeyDown}
+      onClick={(e) => e.stopPropagation()}
+      className="absolute right-2 top-2 z-50 w-[min(360px,calc(100%-16px))] max-h-[min(78vh,540px)] flex flex-col rounded-xl bg-[#181B20]/98 border border-white/15 text-[#E8ECF2] shadow-2xl backdrop-blur-md focus:outline-none"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-bold tracking-tight truncate">
+            Smart Money Concepts [LuxAlgo]
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onCancel}
+          aria-label="Close settings"
+          className="p-1 rounded hover:bg-white/10 text-[#9BA3B0] hover:text-white focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Tabs: Inputs | Style | Visibility */}
+      <div className="flex items-center border-b border-white/10 px-3 shrink-0" role="tablist">
+        {(["Inputs", "Style", "Visibility"] as const).map((t) => {
+          const active = tab === t;
+          return (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t)}
+              className={`px-3 py-1.5 text-[11px] font-semibold border-b-2 transition ${
+                active
+                  ? "border-[#5EEAD4] text-[#F4F7FF]"
+                  : "border-transparent text-[#9BA3B0] hover:text-[#DCE2EC]"
+              }`}
+            >
+              {t}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Scrollable Body */}
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+        {tab === "Inputs" && (
+          <>
+            <SectionHeader title="Smart Money Concepts" />
+            <Row label="Mode">
+              <select
+                aria-label="SMC Mode"
+                value={draft.mode}
+                onChange={(e) => update({ mode: e.target.value as SmcMode })}
+                className={selectCls}
+              >
+                <option value="Historical">Historical</option>
+                <option value="Present">Present</option>
+              </select>
+            </Row>
+            <Row label="Style">
+              <select
+                aria-label="SMC Style"
+                value={draft.style}
+                onChange={(e) => update({ style: e.target.value as SmcStyle })}
+                className={selectCls}
+              >
+                <option value="Colored">Colored</option>
+                <option value="Monochrome">Monochrome</option>
+              </select>
+            </Row>
+            <Row label="Color Candles">
+              <input
+                type="checkbox"
+                aria-label="Color Candles"
+                checked={draft.colorCandles}
+                onChange={(e) => update({ colorCandles: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+
+            <SectionHeader title="Real Time Internal Structure" />
+            <Row label="Show Internal Structure">
+              <input
+                type="checkbox"
+                aria-label="Show Internal Structure"
+                checked={draft.showInternalStructure}
+                onChange={(e) => update({ showInternalStructure: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+            <Row label="Bullish Structure">
+              <select
+                aria-label="Internal Bullish Structure Filter"
+                value={draft.internalBullishFilter}
+                onChange={(e) => update({ internalBullishFilter: e.target.value as StructureFilter })}
+                className={selectCls}
+              >
+                <option value="All">All</option>
+                <option value="BOS">BOS</option>
+                <option value="CHoCH">CHoCH</option>
+              </select>
+              <ColorAlphaPicker
+                ariaLabel="Internal Bullish Color"
+                value={draft.internalBullishColor}
+                onChange={(c) => update({ internalBullishColor: c })}
+              />
+            </Row>
+            <Row label="Bearish Structure">
+              <select
+                aria-label="Internal Bearish Structure Filter"
+                value={draft.internalBearishFilter}
+                onChange={(e) => update({ internalBearishFilter: e.target.value as StructureFilter })}
+                className={selectCls}
+              >
+                <option value="All">All</option>
+                <option value="BOS">BOS</option>
+                <option value="CHoCH">CHoCH</option>
+              </select>
+              <ColorAlphaPicker
+                ariaLabel="Internal Bearish Color"
+                value={draft.internalBearishColor}
+                onChange={(c) => update({ internalBearishColor: c })}
+              />
+            </Row>
+            <Row label="Confluence Filter">
+              <input
+                type="checkbox"
+                aria-label="Confluence Filter"
+                checked={draft.internalConfluenceFilter}
+                onChange={(e) => update({ internalConfluenceFilter: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+            <Row label="Internal Label Size">
+              <select
+                aria-label="Internal Label Size"
+                value={draft.internalLabelSize}
+                onChange={(e) => update({ internalLabelSize: e.target.value as LabelSizeOption })}
+                className={selectCls}
+              >
+                <option value="Tiny">Tiny</option>
+                <option value="Small">Small</option>
+                <option value="Normal">Normal</option>
+              </select>
+            </Row>
+
+            <SectionHeader title="Real Time Swing Structure" />
+            <Row label="Show Swing Structure">
+              <input
+                type="checkbox"
+                aria-label="Show Swing Structure"
+                checked={draft.showSwingStructure}
+                onChange={(e) => update({ showSwingStructure: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+            <Row label="Bullish Structure">
+              <select
+                aria-label="Swing Bullish Structure Filter"
+                value={draft.swingBullishFilter}
+                onChange={(e) => update({ swingBullishFilter: e.target.value as StructureFilter })}
+                className={selectCls}
+              >
+                <option value="All">All</option>
+                <option value="BOS">BOS</option>
+                <option value="CHoCH">CHoCH</option>
+              </select>
+              <ColorAlphaPicker
+                ariaLabel="Swing Bullish Color"
+                value={draft.swingBullishColor}
+                onChange={(c) => update({ swingBullishColor: c })}
+              />
+            </Row>
+            <Row label="Bearish Structure">
+              <select
+                aria-label="Swing Bearish Structure Filter"
+                value={draft.swingBearishFilter}
+                onChange={(e) => update({ swingBearishFilter: e.target.value as StructureFilter })}
+                className={selectCls}
+              >
+                <option value="All">All</option>
+                <option value="BOS">BOS</option>
+                <option value="CHoCH">CHoCH</option>
+              </select>
+              <ColorAlphaPicker
+                ariaLabel="Swing Bearish Color"
+                value={draft.swingBearishColor}
+                onChange={(c) => update({ swingBearishColor: c })}
+              />
+            </Row>
+            <Row label="Swing Label Size">
+              <select
+                aria-label="Swing Label Size"
+                value={draft.swingLabelSize}
+                onChange={(e) => update({ swingLabelSize: e.target.value as LabelSizeOption })}
+                className={selectCls}
+              >
+                <option value="Tiny">Tiny</option>
+                <option value="Small">Small</option>
+                <option value="Normal">Normal</option>
+              </select>
+            </Row>
+            <Row label="Show Swings Points">
+              <input
+                type="checkbox"
+                aria-label="Show Swing Points"
+                checked={draft.showSwingPoints}
+                onChange={(e) => update({ showSwingPoints: e.target.checked })}
+                className={checkCls}
+              />
+              <input
+                type="number"
+                aria-label="Swing Points Length"
+                min={10}
+                max={200}
+                value={draft.swingPointsLength}
+                onChange={(e) =>
+                  update({ swingPointsLength: Math.max(10, Math.min(200, Number(e.target.value) || 50)) })
+                }
+                className={numCls}
+              />
+            </Row>
+            <Row label="Show Strong/Weak High/Low">
+              <input
+                type="checkbox"
+                aria-label="Show Strong/Weak High/Low"
+                checked={draft.showStrongWeakHL}
+                onChange={(e) => update({ showStrongWeakHL: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+
+            <SectionHeader title="Order Blocks" />
+            <Row label="Internal Order Blocks">
+              <input
+                type="checkbox"
+                aria-label="Show Internal Order Blocks"
+                checked={draft.showInternalOB}
+                onChange={(e) => update({ showInternalOB: e.target.checked })}
+                className={checkCls}
+              />
+              <input
+                type="number"
+                aria-label="Internal Order Blocks Count"
+                min={1}
+                max={20}
+                value={draft.internalOBCount}
+                onChange={(e) =>
+                  update({ internalOBCount: Math.max(1, Math.min(20, Number(e.target.value) || 5)) })
+                }
+                className={numCls}
+              />
+            </Row>
+            <Row label="Swing Order Blocks">
+              <input
+                type="checkbox"
+                aria-label="Show Swing Order Blocks"
+                checked={draft.showSwingOB}
+                onChange={(e) => update({ showSwingOB: e.target.checked })}
+                className={checkCls}
+              />
+              <input
+                type="number"
+                aria-label="Swing Order Blocks Count"
+                min={1}
+                max={20}
+                value={draft.swingOBCount}
+                onChange={(e) =>
+                  update({ swingOBCount: Math.max(1, Math.min(20, Number(e.target.value) || 5)) })
+                }
+                className={numCls}
+              />
+            </Row>
+            <Row label="Order Block Filter">
+              <select
+                aria-label="Order Block Filter"
+                value={draft.obFilter}
+                onChange={(e) => update({ obFilter: e.target.value as ObFilterOption })}
+                className={selectCls}
+              >
+                <option value="Atr">Atr</option>
+                <option value="Cumulative Mean Range">Cumulative Mean Range</option>
+              </select>
+            </Row>
+            <Row label="Order Block Mitigation">
+              <select
+                aria-label="Order Block Mitigation"
+                value={draft.obMitigation}
+                onChange={(e) => update({ obMitigation: e.target.value as ObMitigationOption })}
+                className={selectCls}
+              >
+                <option value="High/Low">High/Low</option>
+                <option value="Close">Close</option>
+              </select>
+            </Row>
+            <Row label="Internal Bullish OB">
+              <ColorAlphaPicker
+                ariaLabel="Internal Bullish OB Color"
+                value={draft.internalBullOBColor}
+                allowAlpha
+                onChange={(c) => update({ internalBullOBColor: c })}
+              />
+            </Row>
+            <Row label="Internal Bearish OB">
+              <ColorAlphaPicker
+                ariaLabel="Internal Bearish OB Color"
+                value={draft.internalBearOBColor}
+                allowAlpha
+                onChange={(c) => update({ internalBearOBColor: c })}
+              />
+            </Row>
+            <Row label="Swing Bullish OB">
+              <ColorAlphaPicker
+                ariaLabel="Swing Bullish OB Color"
+                value={draft.swingBullOBColor}
+                allowAlpha
+                onChange={(c) => update({ swingBullOBColor: c })}
+              />
+            </Row>
+            <Row label="Swing Bearish OB">
+              <ColorAlphaPicker
+                ariaLabel="Swing Bearish OB Color"
+                value={draft.swingBearOBColor}
+                allowAlpha
+                onChange={(c) => update({ swingBearOBColor: c })}
+              />
+            </Row>
+
+            <SectionHeader title="EQH/EQL" />
+            <Row label="Equal High/Low">
+              <input
+                type="checkbox"
+                aria-label="Show Equal High/Low"
+                checked={draft.showEqhEql}
+                onChange={(e) => update({ showEqhEql: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+            <Row label="Bars Confirmation">
+              <input
+                type="number"
+                aria-label="EQH/EQL Bars Confirmation"
+                min={1}
+                max={20}
+                value={draft.eqhBarsConfirmation}
+                onChange={(e) =>
+                  update({ eqhBarsConfirmation: Math.max(1, Math.min(20, Number(e.target.value) || 3)) })
+                }
+                className={numCls}
+              />
+            </Row>
+            <Row label="Threshold">
+              <input
+                type="number"
+                aria-label="EQH/EQL Threshold"
+                min={0}
+                max={0.5}
+                step={0.1}
+                value={draft.eqhThreshold}
+                onChange={(e) =>
+                  update({ eqhThreshold: Math.max(0, Math.min(0.5, Number(e.target.value) || 0)) })
+                }
+                className={numCls}
+              />
+            </Row>
+            <Row label="Label Size">
+              <select
+                aria-label="EQH/EQL Label Size"
+                value={draft.eqhLabelSize}
+                onChange={(e) => update({ eqhLabelSize: e.target.value as LabelSizeOption })}
+                className={selectCls}
+              >
+                <option value="Tiny">Tiny</option>
+                <option value="Small">Small</option>
+                <option value="Normal">Normal</option>
+              </select>
+            </Row>
+
+            <SectionHeader title="Fair Value Gaps" />
+            <Row label="Fair Value Gaps">
+              <input
+                type="checkbox"
+                aria-label="Show Fair Value Gaps"
+                checked={draft.showFvg}
+                onChange={(e) => update({ showFvg: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+            <Row label="Auto Threshold">
+              <input
+                type="checkbox"
+                aria-label="FVG Auto Threshold"
+                checked={draft.fvgAutoThreshold}
+                onChange={(e) => update({ fvgAutoThreshold: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+            <Row label="Timeframe">
+              <select
+                aria-label="FVG Timeframe"
+                value={draft.fvgTimeframe}
+                onChange={(e) => update({ fvgTimeframe: e.target.value as FvgTimeframeOption })}
+                className={selectCls}
+              >
+                <option value="Chart">Chart</option>
+                <option value="M15">M15</option>
+                <option value="H1">H1</option>
+                <option value="H4">H4</option>
+                <option value="D1">D1</option>
+              </select>
+            </Row>
+            <Row label="Bullish FVG">
+              <ColorAlphaPicker
+                ariaLabel="Bullish FVG Color"
+                value={draft.fvgBullColor}
+                allowAlpha
+                onChange={(c) => update({ fvgBullColor: c })}
+              />
+            </Row>
+            <Row label="Bearish FVG">
+              <ColorAlphaPicker
+                ariaLabel="Bearish FVG Color"
+                value={draft.fvgBearColor}
+                allowAlpha
+                onChange={(c) => update({ fvgBearColor: c })}
+              />
+            </Row>
+            <Row label="Extend FVG">
+              <input
+                type="number"
+                aria-label="Extend FVG Bars"
+                min={0}
+                max={20}
+                value={draft.fvgExtend}
+                onChange={(e) =>
+                  update({ fvgExtend: Math.max(0, Math.min(20, Number(e.target.value) || 0)) })
+                }
+                className={numCls}
+              />
+            </Row>
+
+            <SectionHeader title="Highs & Lows MTF" />
+            <Row label="Daily">
+              <input
+                type="checkbox"
+                aria-label="Show Daily High/Low"
+                checked={draft.showDailyHL}
+                onChange={(e) => update({ showDailyHL: e.target.checked })}
+                className={checkCls}
+              />
+              <select
+                aria-label="Daily Line Style"
+                value={draft.dailyStyle}
+                onChange={(e) => update({ dailyStyle: e.target.value as LineStyleOption })}
+                className={selectCls}
+              >
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+              </select>
+              <ColorAlphaPicker
+                ariaLabel="Daily Line Color"
+                value={draft.dailyColor}
+                onChange={(c) => update({ dailyColor: c })}
+              />
+            </Row>
+            <Row label="Weekly">
+              <input
+                type="checkbox"
+                aria-label="Show Weekly High/Low"
+                checked={draft.showWeeklyHL}
+                onChange={(e) => update({ showWeeklyHL: e.target.checked })}
+                className={checkCls}
+              />
+              <select
+                aria-label="Weekly Line Style"
+                value={draft.weeklyStyle}
+                onChange={(e) => update({ weeklyStyle: e.target.value as LineStyleOption })}
+                className={selectCls}
+              >
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+              </select>
+              <ColorAlphaPicker
+                ariaLabel="Weekly Line Color"
+                value={draft.weeklyColor}
+                onChange={(c) => update({ weeklyColor: c })}
+              />
+            </Row>
+            <Row label="Monthly">
+              <input
+                type="checkbox"
+                aria-label="Show Monthly High/Low"
+                checked={draft.showMonthlyHL}
+                onChange={(e) => update({ showMonthlyHL: e.target.checked })}
+                className={checkCls}
+              />
+              <select
+                aria-label="Monthly Line Style"
+                value={draft.monthlyStyle}
+                onChange={(e) => update({ monthlyStyle: e.target.value as LineStyleOption })}
+                className={selectCls}
+              >
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+              </select>
+              <ColorAlphaPicker
+                ariaLabel="Monthly Line Color"
+                value={draft.monthlyColor}
+                onChange={(c) => update({ monthlyColor: c })}
+              />
+            </Row>
+
+            <SectionHeader title="Premium & Discount Zones" />
+            <Row label="Premium/Discount Zones">
+              <input
+                type="checkbox"
+                aria-label="Show Premium/Discount Zones"
+                checked={draft.showPremiumDiscount}
+                onChange={(e) => update({ showPremiumDiscount: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+            <Row label="Premium Zone">
+              <ColorAlphaPicker
+                ariaLabel="Premium Zone Color"
+                value={draft.premiumColor}
+                allowAlpha
+                onChange={(c) => update({ premiumColor: c })}
+              />
+            </Row>
+            <Row label="Equilibrium Zone">
+              <ColorAlphaPicker
+                ariaLabel="Equilibrium Zone Color"
+                value={draft.equilibriumColor}
+                allowAlpha
+                onChange={(c) => update({ equilibriumColor: c })}
+              />
+            </Row>
+            <Row label="Discount Zone">
+              <ColorAlphaPicker
+                ariaLabel="Discount Zone Color"
+                value={draft.discountColor}
+                allowAlpha
+                onChange={(c) => update({ discountColor: c })}
+              />
+            </Row>
+
+            <SectionHeader title="Range Liquidity Filters (IRL / ERL)" />
+            <Row label="IRL (Internal Structure, Internal OB, FVG, Eq)">
+              <input
+                type="checkbox"
+                aria-label="Show IRL"
+                checked={draft.showIRL}
+                onChange={(e) => update({ showIRL: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+            <Row label="ERL (Swing, Strong/Weak, EQH/EQL, MTF H/L)">
+              <input
+                type="checkbox"
+                aria-label="Show ERL"
+                checked={draft.showERL}
+                onChange={(e) => update({ showERL: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+          </>
+        )}
+
+        {tab === "Style" && (
+          <>
+            <SectionHeader title="Palette & Theme" />
+            <Row label="Palette Mode">
+              <select
+                aria-label="Palette Mode"
+                value={draft.style}
+                onChange={(e) => update({ style: e.target.value as SmcStyle })}
+                className={selectCls}
+              >
+                <option value="Colored">Colored</option>
+                <option value="Monochrome">Monochrome</option>
+              </select>
+            </Row>
+            <Row label="Color Candles by Trend">
+              <input
+                type="checkbox"
+                aria-label="Color Candles by Trend"
+                checked={draft.colorCandles}
+                onChange={(e) => update({ colorCandles: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+
+            <SectionHeader title="Structure Colors" />
+            <Row label="Internal Bullish / Bearish">
+              <ColorAlphaPicker
+                ariaLabel="Internal Bullish"
+                value={draft.internalBullishColor}
+                onChange={(c) => update({ internalBullishColor: c })}
+              />
+              <ColorAlphaPicker
+                ariaLabel="Internal Bearish"
+                value={draft.internalBearishColor}
+                onChange={(c) => update({ internalBearishColor: c })}
+              />
+            </Row>
+            <Row label="Swing Bullish / Bearish">
+              <ColorAlphaPicker
+                ariaLabel="Swing Bullish"
+                value={draft.swingBullishColor}
+                onChange={(c) => update({ swingBullishColor: c })}
+              />
+              <ColorAlphaPicker
+                ariaLabel="Swing Bearish"
+                value={draft.swingBearishColor}
+                onChange={(c) => update({ swingBearishColor: c })}
+              />
+            </Row>
+
+            <SectionHeader title="Order Block & FVG Fills" />
+            <Row label="Internal Bull / Bear OB">
+              <ColorAlphaPicker
+                ariaLabel="Internal Bull OB"
+                value={draft.internalBullOBColor}
+                allowAlpha
+                onChange={(c) => update({ internalBullOBColor: c })}
+              />
+              <ColorAlphaPicker
+                ariaLabel="Internal Bear OB"
+                value={draft.internalBearOBColor}
+                allowAlpha
+                onChange={(c) => update({ internalBearOBColor: c })}
+              />
+            </Row>
+            <Row label="Swing Bull / Bear OB">
+              <ColorAlphaPicker
+                ariaLabel="Swing Bull OB"
+                value={draft.swingBullOBColor}
+                allowAlpha
+                onChange={(c) => update({ swingBullOBColor: c })}
+              />
+              <ColorAlphaPicker
+                ariaLabel="Swing Bear OB"
+                value={draft.swingBearOBColor}
+                allowAlpha
+                onChange={(c) => update({ swingBearOBColor: c })}
+              />
+            </Row>
+            <Row label="Bullish / Bearish FVG">
+              <ColorAlphaPicker
+                ariaLabel="Bullish FVG"
+                value={draft.fvgBullColor}
+                allowAlpha
+                onChange={(c) => update({ fvgBullColor: c })}
+              />
+              <ColorAlphaPicker
+                ariaLabel="Bearish FVG"
+                value={draft.fvgBearColor}
+                allowAlpha
+                onChange={(c) => update({ fvgBearColor: c })}
+              />
+            </Row>
+          </>
+        )}
+
+        {tab === "Visibility" && (
+          <>
+            <SectionHeader title="Timeframes" />
+            {(["M1", "M5", "M15", "H1", "H4"] as const).map((tf) => (
+              <Row key={tf} label={`Show SMC on ${tf}`}>
+                <input
+                  type="checkbox"
+                  aria-label={`Show SMC on ${tf}`}
+                  checked={draft.visibleTimeframes[tf]}
+                  onChange={(e) =>
+                    update({
+                      visibleTimeframes: {
+                        ...draft.visibleTimeframes,
+                        [tf]: e.target.checked,
+                      },
+                    })
+                  }
+                  className={checkCls}
+                />
+              </Row>
+            ))}
+
+            <SectionHeader title="Companion Chart Layers" />
+            <Row label="Sessions & Killzones">
+              <input
+                type="checkbox"
+                aria-label="Show Sessions"
+                checked={draft.showSessions}
+                onChange={(e) => update({ showSessions: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+            <Row label="Trades (Open / Pending / Closed)">
+              <input
+                type="checkbox"
+                aria-label="Show Trades"
+                checked={draft.showTrades}
+                onChange={(e) => update({ showTrades: e.target.checked })}
+                className={checkCls}
+              />
+            </Row>
+          </>
+        )}
+      </div>
+
+      {/* Footer: Defaults | Cancel | OK */}
+      <div className="flex items-center justify-between px-3 py-2 border-t border-white/10 bg-[#141619]/80 rounded-b-xl shrink-0">
+        <button
+          type="button"
+          onClick={handleResetDefaults}
+          data-testid="smc-settings-defaults"
+          className="px-2 py-1 rounded text-[11px] font-medium text-[#9BA3B0] hover:text-white hover:bg-white/10 inline-flex items-center gap-1 transition focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]"
+        >
+          <RotateCcw className="w-3 h-3" />
+          <span>Defaults</span>
+        </button>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onCancel}
+            data-testid="smc-settings-cancel"
+            className="px-2.5 py-1 rounded text-[11px] font-medium text-[#DCE2EC] bg-white/5 hover:bg-white/12 border border-white/10 transition focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(draft)}
+            data-testid="smc-settings-ok"
+            className="px-3 py-1 rounded text-[11px] font-semibold bg-[#2157f3] hover:bg-[#1b49cf] text-white transition focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
