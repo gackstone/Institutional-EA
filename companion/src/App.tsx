@@ -294,13 +294,21 @@ export const App: React.FC = () => {
     return () => clearTimeout(t);
   }, [actionToast]);
 
+  const consecutivePollErrorsRef = useRef<number>(0);
+
   const refreshStatus = useCallback(async () => {
     try {
       const st = await controlClient.getStatus();
+      consecutivePollErrorsRef.current = 0;
       setRawStatus(st);
       setFeedStatus((prev) => (prev === "LIVE_SSE" ? "LIVE_SSE" : "POLLING"));
     } catch {
-      setFeedStatus((prev) => (prev === "LIVE_SSE" ? "LIVE_SSE" : "POLLING"));
+      consecutivePollErrorsRef.current += 1;
+      if (consecutivePollErrorsRef.current >= 2) {
+        setFeedStatus("DISCONNECTED");
+      } else {
+        setFeedStatus((prev) => (prev === "LIVE_SSE" ? "LIVE_SSE" : "POLLING"));
+      }
     }
   }, []);
 
@@ -386,9 +394,32 @@ export const App: React.FC = () => {
     IPC.getPairingStatus().then(setPairing).catch(() => {});
 
     let es: EventSource | null = null;
+    let sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let sseBackoffMs = 2500;
     let cancelled = false;
 
+    const scheduleSseReconnect = () => {
+      if (cancelled || sseReconnectTimer) return;
+      const delay = sseBackoffMs;
+      sseBackoffMs = Math.min(15000, Math.round(sseBackoffMs * 1.6));
+      sseReconnectTimer = setTimeout(() => {
+        sseReconnectTimer = null;
+        if (!cancelled) {
+          connectSse();
+        }
+      }, delay);
+    };
+
     const connectSse = async () => {
+      if (cancelled) return;
+      if (es) {
+        try {
+          es.close();
+        } catch {
+          // ignore
+        }
+        es = null;
+      }
       try {
         let baseUrl = "http://127.0.0.1:8765";
         let token = "";
@@ -404,7 +435,11 @@ export const App: React.FC = () => {
         es = new EventSource(sseUrl);
 
         es.onopen = () => {
-          if (!cancelled) setFeedStatus("LIVE_SSE");
+          if (!cancelled) {
+            sseBackoffMs = 2500;
+            consecutivePollErrorsRef.current = 0;
+            setFeedStatus("LIVE_SSE");
+          }
         };
 
         es.onmessage = (evt) => {
@@ -436,12 +471,24 @@ export const App: React.FC = () => {
         };
 
         es.onerror = () => {
+          if (es) {
+            try {
+              es.close();
+            } catch {
+              // ignore
+            }
+            es = null;
+          }
           if (!cancelled) {
-            setFeedStatus("POLLING");
+            setFeedStatus((prev) => (prev === "DISCONNECTED" ? "DISCONNECTED" : "POLLING"));
+            scheduleSseReconnect();
           }
         };
       } catch {
-        if (!cancelled) setFeedStatus("POLLING");
+        if (!cancelled) {
+          setFeedStatus((prev) => (prev === "DISCONNECTED" ? "DISCONNECTED" : "POLLING"));
+          scheduleSseReconnect();
+        }
       }
     };
 
@@ -453,6 +500,7 @@ export const App: React.FC = () => {
     return () => {
       cancelled = true;
       clearInterval(interval);
+      if (sseReconnectTimer) clearTimeout(sseReconnectTimer);
       if (es) es.close();
     };
   }, [refreshStatus, reloadTrades, reloadLogs, reloadAudits]);
@@ -754,7 +802,7 @@ export const App: React.FC = () => {
           {/* Navigation Body */}
           <nav
             aria-label="Screen Navigation"
-            className="flex-1 px-3 py-3 overflow-y-auto overflow-x-hidden space-y-1"
+            className="flex-1 px-3 py-2 overflow-y-auto overflow-x-hidden space-y-0.5"
           >
             {/* Top-Level: Dashboard */}
             {(() => {
@@ -767,10 +815,10 @@ export const App: React.FC = () => {
                   aria-current={active ? "page" : undefined}
                   aria-label={dashboardItem.label}
                   title={`${dashboardItem.label} — ${dashboardItem.tooltip}`}
-                  className={`group relative w-full flex items-center rounded-[12px] transition-all duration-200 ${
+                  className={`group relative w-full flex items-center rounded-[11px] transition-all duration-200 ${
                     isSidebarExpanded
-                      ? "h-11 px-3 justify-between"
-                      : "h-11 justify-center"
+                      ? "h-10 px-3 justify-between"
+                      : "h-9 justify-center"
                   } ${
                     active
                       ? isSidebarExpanded
@@ -794,13 +842,13 @@ export const App: React.FC = () => {
                     </div>
                   ) : (
                     <div
-                      className={`w-10 h-10 rounded-[11px] flex items-center justify-center transition-colors ${
+                      className={`w-9 h-9 rounded-[10px] flex items-center justify-center transition-colors ${
                         active
                           ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
                           : "text-iea-textSecondary group-hover:text-iea-textPrimary group-hover:bg-white/[0.05]"
                       }`}
                     >
-                      <Icon className="w-[18px] h-[18px]" />
+                      <Icon className="w-[17px] h-[17px]" />
                     </div>
                   )}
                 </button>
@@ -816,9 +864,9 @@ export const App: React.FC = () => {
               if (!isSidebarExpanded) {
                 // Collapsed Rail: Continuous icon list with subtle divider between groups
                 return (
-                  <div key={grp.group} className="pt-1.5 space-y-1">
+                  <div key={grp.group} className="pt-1 space-y-0.5">
                     <div
-                      className="w-6 h-px mx-auto bg-iea-borderSubtle mb-1.5"
+                      className="w-6 h-px mx-auto bg-iea-borderSubtle mb-1"
                       aria-hidden="true"
                     />
                     {grp.items.map((item) => {
@@ -832,16 +880,16 @@ export const App: React.FC = () => {
                           aria-current={active ? "page" : undefined}
                           aria-label={item.label}
                           title={`${item.label} — ${item.tooltip}`}
-                          className="group relative w-full h-11 flex items-center justify-center rounded-[12px] transition"
+                          className="group relative w-full h-9 flex items-center justify-center rounded-[10px] transition"
                         >
                           <div
-                            className={`relative w-10 h-10 rounded-[11px] flex items-center justify-center transition-colors ${
+                            className={`relative w-9 h-9 rounded-[10px] flex items-center justify-center transition-colors ${
                               active
                                 ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
                                 : "text-iea-textSecondary group-hover:text-iea-textPrimary group-hover:bg-white/[0.05]"
                             }`}
                           >
-                            <Icon className="w-[18px] h-[18px]" />
+                            <Icon className="w-[17px] h-[17px]" />
                             {renderCollapsedBadgeDot(item.badge, item.badgeTone)}
                           </div>
                         </button>

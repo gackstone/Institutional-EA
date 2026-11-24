@@ -686,6 +686,29 @@ export const DashboardScreen: React.FC<
         </div>
       )}
 
+      {topBar.engineState === "ERROR" && eng.last_execution_error && (
+        <div
+          role="alert"
+          className="flex items-center justify-between px-4 py-2.5 rounded-[14px] bg-iea-dangerSoft border border-iea-dangerBorder text-xs"
+        >
+          <div className="flex items-center space-x-2 min-w-0">
+            <AlertTriangle className="w-4 h-4 text-iea-danger shrink-0" />
+            <span className="font-semibold text-iea-danger truncate">
+              {eng.last_execution_error}
+            </span>
+          </div>
+          {topBar.startBtn.enabled && (
+            <button
+              type="button"
+              onClick={handleStartEngineClick}
+              className="ml-3 px-3 py-1 rounded-full bg-iea-accent hover:bg-iea-accentHover text-white font-bold shrink-0 transition"
+            >
+              Retry Start
+            </button>
+          )}
+        </div>
+      )}
+
       {/* =====================================================================
           ROW 1: BM FOREX HUB SLIM TOP HEADER BAR (Bottom Border, Search Left,
           Telemetry + Controls Center, Clock Pill + Rounded-Square Icon Buttons Right)
@@ -693,10 +716,10 @@ export const DashboardScreen: React.FC<
       <PanelErrorBoundary panelName="Top Control Bar">
         <section
           aria-label="Terminal Top Status Bar"
-          className="relative flex flex-wrap items-center justify-between gap-2.5 pb-4 border-b border-iea-borderSubtle"
+          className="relative flex flex-wrap xl:flex-nowrap items-center justify-between gap-2 pb-3.5 border-b border-iea-borderSubtle"
         >
           {/* Left: Rounded Search Icon Button + Status Pills */}
-          <div className="flex flex-wrap items-center gap-2 text-xs min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] min-w-0">
             <button
               type="button"
               onClick={() => setIsSearchOpen((prev) => !prev)}
@@ -715,7 +738,7 @@ export const DashboardScreen: React.FC<
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Filter symbol..."
                   aria-label="Filter watchlist symbol"
-                  className="bg-transparent text-xs text-iea-textPrimary placeholder:text-iea-textMuted focus:outline-none w-28 font-mono"
+                  className="bg-transparent text-xs text-iea-textPrimary placeholder:text-iea-textMuted focus:outline-none w-24 font-mono"
                 />
               </div>
             )}
@@ -727,12 +750,12 @@ export const DashboardScreen: React.FC<
                   ? `Connected MT5 Account ${dash.maskedAccount} (${effectiveStatus.mt5.account.broker})`
                   : "MT5 Terminal disconnected"
               }
-              className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1.5 whitespace-nowrap"
+              className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 whitespace-nowrap"
             >
               {topBar.mt5Connected ? (
-                <Wifi className="w-3.5 h-3.5 text-iea-profit shrink-0" />
+                <Wifi className="w-3 h-3 text-iea-profit shrink-0" />
               ) : (
-                <WifiOff className="w-3.5 h-3.5 text-iea-danger shrink-0" />
+                <WifiOff className="w-3 h-3 text-iea-danger shrink-0" />
               )}
               <span className="font-medium text-iea-textPrimary">MT5</span>
               <span
@@ -751,7 +774,7 @@ export const DashboardScreen: React.FC<
               title={`Engine State: ${topBar.engineState} · Mode: ${topBar.operatingMode}${
                 eng.engine_pid ? ` · PID ${eng.engine_pid}` : ""
               }`}
-              className={`inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full border font-mono text-[11px] font-bold whitespace-nowrap ${
+              className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full border font-mono text-[11px] font-bold whitespace-nowrap ${
                 topBar.engineChipTone === "lime"
                   ? "bg-iea-profitSoft border-iea-profitBorder text-iea-profit"
                   : topBar.engineChipTone === "amber"
@@ -781,10 +804,10 @@ export const DashboardScreen: React.FC<
             <div
               data-testid="demo-lock-badge"
               title={UI_COPY.brand.demoLockTooltip}
-              className="hidden xl:inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-full bg-iea-accentSoft border border-iea-accentBorder text-iea-accent font-mono text-[11px] font-bold whitespace-nowrap"
+              className="hidden 2xl:inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-iea-accentSoft border border-iea-accentBorder text-iea-accent font-mono text-[11px] font-bold whitespace-nowrap"
             >
               <Lock className="w-3 h-3 text-iea-accent shrink-0" />
-              <span>{UI_COPY.brand.demoLockChip}</span>
+              <span>{UI_COPY.brand.demoLockShort}</span>
             </div>
 
             {/* Control Service Status Pill + Reconnect */}
@@ -794,7 +817,7 @@ export const DashboardScreen: React.FC<
                 title={`Control Service on ${serviceStatus.baseUrl}${
                   serviceStatus.lastError ? ` · ${serviceStatus.lastError}` : ""
                 }`}
-                className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1.5 font-mono text-[11px] whitespace-nowrap"
+                className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 font-mono text-[11px] whitespace-nowrap"
               >
                 <span
                   className={`w-2 h-2 rounded-full shrink-0 ${
@@ -840,7 +863,7 @@ export const DashboardScreen: React.FC<
               }) & Port 5556 (${
                 effectiveStatus.mt5.zmq_bridge?.port_5556 ? "LISTENING" : "IDLE"
               })`}
-              className="iea-pill-control hidden lg:inline-flex items-center space-x-1.5 px-2.5 py-1.5 font-mono text-[11px] whitespace-nowrap"
+              className="iea-pill-control hidden 2xl:inline-flex items-center space-x-1.5 px-2.5 py-1 font-mono text-[11px] whitespace-nowrap"
             >
               <span
                 className={`w-2 h-2 rounded-full shrink-0 ${
@@ -869,7 +892,7 @@ export const DashboardScreen: React.FC<
               }
               aria-label="Telegram status and quick connectivity test"
               title="Telegram notification dispatcher ready (click to test)"
-              className="iea-pill-control hidden sm:inline-flex items-center space-x-1.5 px-2.5 py-1.5 text-[11px] text-iea-textPrimary whitespace-nowrap"
+              className="iea-pill-control hidden 2xl:inline-flex items-center space-x-1.5 px-2.5 py-1 text-[11px] text-iea-textPrimary whitespace-nowrap"
             >
               <Send className="w-3 h-3 text-iea-accent shrink-0" />
               <span className="text-iea-profit font-semibold">TG Ready</span>
@@ -879,7 +902,7 @@ export const DashboardScreen: React.FC<
           {/* Right: Engine & MT5 Controls + Clock Pill ("Tue 17:38") + Rounded-Square Icon Buttons (Bot, Notifications, Theme Toggle) */}
           <div
             aria-label="Engine and MT5 Controls"
-            className="flex flex-wrap items-center gap-2 shrink-0"
+            className="flex flex-wrap items-center gap-1.5 shrink-0"
           >
             {/* 1. Connect MT5 (or Connected + Disconnect) */}
             {!readOnlyMobile && (
@@ -981,22 +1004,31 @@ export const DashboardScreen: React.FC<
 
             {/* 2. Start */}
             {!readOnlyMobile && (
-              <button
-                type="button"
-                data-testid="btn-start-engine"
-                disabled={!topBar.startBtn.enabled}
-                onClick={handleStartEngineClick}
-                aria-label="Start trading engine"
-                title={topBar.startBtn.tooltip}
-                className="h-9 px-3.5 rounded-[10px] bg-iea-accent hover:bg-iea-accentHover disabled:bg-iea-card disabled:text-iea-textMuted disabled:border disabled:border-iea-borderSubtle disabled:cursor-not-allowed text-white text-xs font-bold inline-flex items-center space-x-1.5 whitespace-nowrap transition"
+              <div
+                onClick={() => {
+                  if (!topBar.startBtn.enabled && busyAction === null) {
+                    onActionMessage(`Start: ${topBar.startBtn.tooltip}`, true);
+                  }
+                }}
+                className="inline-flex"
               >
-                {busyAction === "Start" ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                ) : (
-                  <Play className="w-3.5 h-3.5 shrink-0 fill-current" />
-                )}
-                <span>{topBar.startBtn.label}</span>
-              </button>
+                <button
+                  type="button"
+                  data-testid="btn-start-engine"
+                  disabled={!topBar.startBtn.enabled}
+                  onClick={handleStartEngineClick}
+                  aria-label="Start trading engine"
+                  title={topBar.startBtn.tooltip}
+                  className="h-9 px-3.5 rounded-[10px] bg-iea-accent hover:bg-iea-accentHover disabled:bg-iea-card disabled:text-iea-textMuted disabled:border disabled:border-iea-borderSubtle disabled:cursor-not-allowed text-white text-xs font-bold inline-flex items-center space-x-1.5 whitespace-nowrap transition"
+                >
+                  {busyAction === "Start" || topBar.engineState === "STARTING" ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                  ) : (
+                    <Play className="w-3.5 h-3.5 shrink-0 fill-current" />
+                  )}
+                  <span>{topBar.startBtn.label}</span>
+                </button>
+              </div>
             )}
 
             {/* 3. Pause / Resume toggle */}

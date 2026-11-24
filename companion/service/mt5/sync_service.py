@@ -90,6 +90,7 @@ class MT5SyncService:
             "margin_mode_str": "HEDGING",
             "demo_verified": False,
             "netting_observe_only": False,
+            "autotrading_enabled": True,
         }
         self.positions: List[Dict[str, Any]] = []
         self.pending_orders: List[Dict[str, Any]] = []
@@ -433,6 +434,14 @@ class MT5SyncService:
             if acc_obj is not None:
                 demo_verified = str(acc_obj.trade_mode).upper() == "DEMO"
                 netting_obs = str(getattr(acc_obj, "margin_mode_str", "HEDGING")).upper() == "NETTING"
+                autotrading_enabled = True
+                if mt5 is not None and callable(getattr(mt5, "terminal_info", None)):
+                    try:
+                        t_info = mt5.terminal_info()
+                        if t_info is not None and hasattr(t_info, "trade_allowed"):
+                            autotrading_enabled = bool(getattr(t_info, "trade_allowed", True))
+                    except Exception:
+                        autotrading_enabled = True
                 acc_bal = round(float(acc_obj.balance), 2)
                 acc_eq = round(float(acc_obj.equity), 2)
                 acc_credit = round(float(getattr(acc_obj, "credit", 0.0)), 2)
@@ -455,6 +464,7 @@ class MT5SyncService:
                     "margin_mode_str": getattr(acc_obj, "margin_mode_str", "HEDGING"),
                     "demo_verified": demo_verified,
                     "netting_observe_only": netting_obs,
+                    "autotrading_enabled": autotrading_enabled,
                 }
                 if acc_bal > 0 or acc_eq > 0:
                     try:
@@ -467,11 +477,12 @@ class MT5SyncService:
                     except Exception:
                         pass
                 if not demo_verified:
+                    masked_acc = f"***{str(acc_obj.account_number)[-4:]}" if acc_obj.account_number else "N/A"
                     self.repo.record_error(
                         category="RISK",
                         severity="CRITICAL",
                         component="MT5SyncService",
-                        message=f"Connected account #{acc_obj.account_number} is {acc_obj.trade_mode}, not DEMO. Order submission locked.",
+                        message=f"Connected account {masked_acc} is {acc_obj.trade_mode}, not DEMO. Order submission locked.",
                         trading_affected=True,
                         entries_blocked=True,
                         recommended_recovery="Switch MT5 terminal to a verified DEMO account.",

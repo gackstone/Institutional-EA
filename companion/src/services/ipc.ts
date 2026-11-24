@@ -538,24 +538,63 @@ export const IPC = {
   },
 };
 
-async function callControl<T = any>(method: "GET" | "POST", apiPath: string, body?: any): Promise<T> {
-  try {
-    if (window.electronAPI?.controlRequest) {
-      return await window.electronAPI.controlRequest(method, apiPath, body);
-    }
-    const resp = await fetch(`http://127.0.0.1:8765${apiPath}`, {
-      method,
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    if (!resp.ok) {
-      const errText = await resp.text();
-      throw new Error(errText || `HTTP ${resp.status}`);
-    }
-    return await resp.json();
-  } catch (err) {
-    throw new Error(formatControlError(err));
+async function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function callControlOnce<T = any>(
+  method: "GET" | "POST",
+  apiPath: string,
+  body?: any
+): Promise<T> {
+  if (window.electronAPI?.controlRequest) {
+    return await window.electronAPI.controlRequest(method, apiPath, body);
   }
+  const resp = await fetch(`http://127.0.0.1:8765${apiPath}`, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(errText || `HTTP ${resp.status}`);
+  }
+  return await resp.json();
+}
+
+async function callControl<T = any>(
+  method: "GET" | "POST",
+  apiPath: string,
+  body?: any
+): Promise<T> {
+  const maxAttempts = method === "POST" ? 3 : 2;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await callControlOnce<T>(method, apiPath, body);
+    } catch (err) {
+      lastError = err;
+      const msg = formatControlError(err);
+      const isTransientOffline = /Service offline|ECONNREFUSED|ECONNRESET|Failed to fetch/i.test(
+        msg
+      );
+      if (isTransientOffline && attempt < maxAttempts) {
+        if (attempt === 1 && method === "POST" && window.electronAPI?.reconnectControlService) {
+          try {
+            await window.electronAPI.reconnectControlService();
+          } catch {
+            // ignore reconnect error during backoff
+          }
+        }
+        await sleepMs(300 * Math.pow(2, attempt - 1));
+        continue;
+      }
+      break;
+    }
+  }
+
+  throw new Error(formatControlError(lastError));
 }
 
 export const controlClient = {

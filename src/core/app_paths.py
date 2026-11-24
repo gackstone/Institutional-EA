@@ -23,7 +23,11 @@ def get_base_app_data_dir() -> Path:
     Windows: %LOCALAPPDATA%\\InstitutionalEA\\Institutional EA Companion
     macOS / Linux: ~/.institutional-ea/institutional-ea-companion
     """
-    override = os.environ.get("INSTITUTIONAL_EA_APP_DATA_DIR") or os.environ.get("MT5_APP_DATA_DIR")
+    override = (
+        os.environ.get("INSTITUTIONAL_EA_APP_DATA_DIR")
+        or os.environ.get("MT5_APP_DATA_DIR")
+        or os.environ.get("MT5_DATA_DIR")
+    )
     if override:
         try:
             p = Path(override).resolve()
@@ -35,9 +39,9 @@ def get_base_app_data_dir() -> Path:
     if sys.platform == "win32":
         local_app_data = os.environ.get("LOCALAPPDATA")
         if local_app_data:
-            base = Path(local_app_data) / "Institutional EA" / "Institutional EA Companion"
+            base = Path(local_app_data) / "InstitutionalEA" / "Institutional EA Companion"
         else:
-            base = Path.home() / "AppData" / "Local" / "Institutional EA" / "Institutional EA Companion"
+            base = Path.home() / "AppData" / "Local" / "InstitutionalEA" / "Institutional EA Companion"
     elif sys.platform == "darwin":
         base = Path.home() / "Library" / "Application Support" / "Institutional EA" / "Institutional EA Companion"
     else:

@@ -204,6 +204,97 @@ class TestTopBarControlsService(unittest.TestCase):
         self.assertTrue(res_fail["reconciled"])
         self.assertEqual(res_fail["remaining_bot_positions"], 1)
 
+    def test_start_pause_resume_stop_state_machine_and_packaged_sidecar_resolution(self):
+        demo_mt5 = FakeMT5(trade_mode=0)
+        sync = MT5SyncService(self.repo, self.events, mt5_module=demo_mt5)
+        sync.connect()
+        sync.sync_all()
+
+        # 1. Create a fake long-lived scripts/start_bot.py to test real process spawn -> pause -> resume -> stop
+        scripts_dir = self.root / "scripts"
+        scripts_dir.mkdir(parents=True, exist_ok=True)
+        fake_bot = scripts_dir / "start_bot.py"
+        fake_bot.write_text(
+            "import os, pathlib, time, sys\n"
+            "print('[INFO] Fake engine booted')\n"
+            "sys.stdout.flush()\n"
+            "sf = pathlib.Path(os.environ.get('MT5_DATA_DIR', '.')) / 'state' / 'engine_stop.flag'\n"
+            "for _ in range(100):\n"
+            "    if sf.exists(): break\n"
+            "    time.sleep(0.05)\n",
+            encoding="utf-8",
+        )
+
+        ctrl = EngineController(
+            self.root,
+            self.repo,
+            self.events,
+            self.cfg,
+            sync,
+            python_executable=sys.executable,
+            data_dir=self.root,
+        )
+        try:
+            start_res = ctrl.start_engine(dry_run=True)
+            self.assertTrue(start_res["success"], start_res)
+            self.assertEqual(start_res["state"], "RUNNING")
+            self.assertIsNotNone(start_res.get("pid"))
+
+            # Idempotent second start adopts the running engine PID without spawning a duplicate
+            second_start = ctrl.start_engine(dry_run=True)
+            self.assertTrue(second_start["success"])
+            self.assertTrue(second_start.get("adopted"))
+            self.assertEqual(second_start["pid"], start_res["pid"])
+
+            # Pause transitions state to PAUSED while engine remains running
+            pause_res = ctrl.pause_entries()
+            self.assertTrue(pause_res["success"])
+            self.assertEqual(pause_res["state"], "PAUSED")
+            self.assertEqual(ctrl.get_status()["engine_state"], "PAUSED")
+
+            # Resume transitions state back to RUNNING
+            resume_res = ctrl.resume_entries()
+            self.assertTrue(resume_res["success"])
+            self.assertEqual(resume_res["state"], "RUNNING")
+            self.assertEqual(ctrl.get_status()["engine_state"], "RUNNING")
+
+            # Stop terminates the engine and transitions state to STOPPED
+            stop_res = ctrl.stop_engine()
+            self.assertTrue(stop_res["success"])
+            self.assertEqual(stop_res["state"], "STOPPED")
+            self.assertEqual(ctrl.get_status()["engine_state"], "STOPPED")
+        finally:
+            ctrl.stop_engine()
+
+    def test_start_engine_detects_early_crash_and_sets_error_state(self):
+        demo_mt5 = FakeMT5(trade_mode=0)
+        sync = MT5SyncService(self.repo, self.events, mt5_module=demo_mt5)
+        sync.connect()
+        sync.sync_all()
+
+        scripts_dir = self.root / "scripts"
+        scripts_dir.mkdir(parents=True, exist_ok=True)
+        fake_bot = scripts_dir / "start_bot.py"
+        fake_bot.write_text(
+            "import sys\nprint('[ERROR] Simulated startup crash')\nsys.stdout.flush()\nsys.exit(2)\n",
+            encoding="utf-8",
+        )
+
+        ctrl = EngineController(
+            self.root,
+            self.repo,
+            self.events,
+            self.cfg,
+            sync,
+            python_executable=sys.executable,
+            data_dir=self.root,
+        )
+        res = ctrl.start_engine(dry_run=True)
+        self.assertFalse(res["success"])
+        self.assertEqual(res["state"], "ERROR")
+        self.assertEqual(ctrl.get_status()["engine_state"], "ERROR")
+        self.assertIsNotNone(ctrl.get_status()["last_execution_error"])
+
 
 if __name__ == "__main__":
     unittest.main()
