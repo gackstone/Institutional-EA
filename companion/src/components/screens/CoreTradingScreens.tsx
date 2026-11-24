@@ -3,7 +3,6 @@ import {
   Activity,
   AlertTriangle,
   Award,
-  BarChart3,
   Bell,
   Bot,
   ChevronDown,
@@ -23,7 +22,9 @@ import {
   Square,
   Sun,
   TrendingDown,
+  TrendingUp,
   Unplug,
+  Wallet,
   Wifi,
   WifiOff,
   XCircle,
@@ -58,6 +59,7 @@ import {
 import { getNeutralSymbolChipSpec } from "../../styles/designTokens";
 import { UI_COPY } from "../../constants/uiCopy";
 import { useTheme } from "../../context/ThemeContext";
+import { readVersionedState, writeVersionedState } from "../../utils/persistedState";
 import { LiveTradingChart } from "../LiveTradingChart";
 import { PanelErrorBoundary } from "../ErrorBoundary";
 import type { EngineDrawingsFeed } from "../../utils/chartDrawingsSchema";
@@ -66,6 +68,26 @@ import type { EngineDrawingsFeed } from "../../utils/chartDrawingsSchema";
 let sessionStartDemoConfirmed = false;
 
 type TrendMetricMode = "PNL" | "EQUITY";
+type AccountKpiMode = "BALANCE" | "EQUITY";
+const ACCOUNT_KPI_MODE_STORAGE_KEY = "iea_account_kpi_mode_v1";
+
+function isValidAccountKpiMode(v: unknown): v is AccountKpiMode {
+  return v === "BALANCE" || v === "EQUITY";
+}
+
+function formatCurrencyValue(value: number | null | undefined, signed = false): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "-";
+  }
+  const absFormatted = Math.abs(value).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  if (!signed) {
+    return value < 0 ? `-$${absFormatted}` : `$${absFormatted}`;
+  }
+  return `${value >= 0 ? "+" : "-"}$${absFormatted}`;
+}
 type TrendRangeOption =
   | "1 Day"
   | "1 Week"
@@ -138,9 +160,23 @@ export const DashboardScreen: React.FC<
 
   // Main Card Header states (PNL Trend segmented toggle, range selector, quick search)
   const [trendMode, setTrendMode] = useState<TrendMetricMode>("EQUITY");
+  const [accountKpiMode, setAccountKpiMode] = useState<AccountKpiMode>(
+    () =>
+      readVersionedState<AccountKpiMode>({
+        key: ACCOUNT_KPI_MODE_STORAGE_KEY,
+        defaultValue: "BALANCE",
+        validate: isValidAccountKpiMode,
+        migrate: (legacy) => (isValidAccountKpiMode(legacy) ? legacy : null),
+      }).value
+  );
   const [selectedRange, setSelectedRange] = useState<TrendRangeOption>("1 Month");
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  const handleSelectAccountKpiMode = (nextMode: AccountKpiMode) => {
+    setAccountKpiMode(nextMode);
+    writeVersionedState(ACCOUNT_KPI_MODE_STORAGE_KEY, nextMode);
+  };
 
   // Sync external symbol jump (e.g., clicking a row in Live Signal Grid)
   useEffect(() => {
@@ -276,7 +312,7 @@ export const DashboardScreen: React.FC<
       }`
     : "Waiting for MT5";
 
-  // Derive 4 KPI Metrics: Net Realized P/L, Win Rate, Profit Factor, Max Drawdown
+  // Derive 4 KPI Metrics: Account (Balance/Equity), Win Rate, Today P/L, Total Profits
   const kpiSummary = useMemo(() => {
     const closedTrades = (dash.recentTrades || []).filter(
       (t) =>
@@ -286,40 +322,62 @@ export const DashboardScreen: React.FC<
     );
     const wins = closedTrades.filter((t) => Number(t.profit || 0) > 0);
     const losses = closedTrades.filter((t) => Number(t.profit || 0) < 0);
-    const realizedNetPnl = closedTrades.reduce((sum, t) => sum + Number(t.profit || 0), 0);
-    const grossWin = wins.reduce((sum, t) => sum + Number(t.profit || 0), 0);
-    const grossLoss = Math.abs(losses.reduce((sum, t) => sum + Number(t.profit || 0), 0));
+    const realizedNetPnl = closedTrades.reduce((sum, t) => {
+      const p = Number(t.profit || 0);
+      return Number.isFinite(p) ? sum + p : sum;
+    }, 0);
+
+    const todayUtcDate = new Date().toISOString().slice(0, 10);
+    const closedToday = closedTrades.filter(
+      (t) => t.closed_at && String(t.closed_at).slice(0, 10) === todayUtcDate
+    );
+    const closedPnlToday = closedToday.reduce((sum, t) => {
+      const p = Number(t.profit || 0);
+      return Number.isFinite(p) ? sum + p : sum;
+    }, 0);
+    const todayTradesCount = closedToday.length + activePositions.length;
+
+    const todayPnlVal =
+      kpis.todayPnlUsd !== null && Number.isFinite(kpis.todayPnlUsd)
+        ? kpis.todayPnlUsd
+        : closedToday.length > 0
+        ? Number(closedPnlToday.toFixed(2))
+        : dash.connected
+        ? 0
+        : null;
+
+    const totalProfitsVal =
+      closedTrades.length > 0
+        ? Number(realizedNetPnl.toFixed(2))
+        : dash.connected
+        ? kpis.todayPnlUsd ?? kpis.floatingPnl ?? 0
+        : null;
 
     const netPnlValue =
       closedTrades.length > 0
-        ? realizedNetPnl
-        : kpis.todayPnlUsd !== null
+        ? Number(realizedNetPnl.toFixed(2))
+        : kpis.todayPnlUsd !== null && Number.isFinite(kpis.todayPnlUsd)
         ? kpis.todayPnlUsd
         : kpis.floatingPnl;
 
     const winRatePct =
-      closedTrades.length > 0 ? (wins.length / closedTrades.length) * 100 : null;
-
-    const profitFactorVal =
-      closedTrades.length === 0
-        ? null
-        : grossLoss > 0
-        ? grossWin / grossLoss
-        : grossWin > 0
-        ? 99.9
-        : 0;
+      closedTrades.length > 0
+        ? Number(((wins.length / closedTrades.length) * 100).toFixed(1))
+        : dash.connected
+        ? 0
+        : null;
 
     return {
       closedCount: closedTrades.length,
       winsCount: wins.length,
       lossesCount: losses.length,
+      todayTradesCount,
+      todayPnlVal,
+      totalProfitsVal,
       netPnlValue,
       winRatePct,
-      profitFactorVal,
-      grossWin,
-      grossLoss,
     };
-  }, [dash.recentTrades, kpis.todayPnlUsd, kpis.floatingPnl]);
+  }, [dash.recentTrades, dash.connected, activePositions.length, kpis.todayPnlUsd, kpis.floatingPnl]);
 
   const handleRangeSelect = (range: TrendRangeOption) => {
     setSelectedRange(range);
@@ -1167,78 +1225,83 @@ export const DashboardScreen: React.FC<
 
       {/* =====================================================================
           ROW 2: 4 EQUAL KPI CARDS IN A RESPONSIVE GRID
-          (Net Realized P/L, Win Rate, Profit Factor, Max Drawdown)
+          (Account [Balance | Equity], Win Rate, Today P/L, Total Profits)
       ====================================================================== */}
       <PanelErrorBoundary panelName="KPI Summary">
         <section
           aria-label="Account and Risk Key Performance Indicators"
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[18px]"
         >
-          {/* KPI 1: NET REALIZED P/L */}
+          {/* KPI 1: ACCOUNT (Balance / Equity Switch) */}
           <div
+            data-testid="kpi-card-account"
             className="iea-card p-5 flex flex-col justify-between"
-            title={`${UI_COPY.kpis.todayPnl.tooltip} · ${syncedTimeLabel}`}
+            title={`Live MT5 Account ${accountKpiMode === "BALANCE" ? "Balance" : "Equity"} · ${syncedTimeLabel}`}
           >
-            <div className="flex items-center justify-between">
-              <span className="iea-label-caps">NET REALIZED P/L</span>
-              <div
-                className={`w-8 h-8 rounded-[10px] flex items-center justify-center border ${
-                  (kpiSummary.netPnlValue ?? 0) >= 0
-                    ? "bg-iea-profitSoft border-iea-profitBorder text-iea-profit"
-                    : "bg-iea-dangerSoft border-iea-dangerBorder text-iea-danger"
-                }`}
-              >
-                <DollarSign className="w-4 h-4" />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="iea-label-caps">ACCOUNT</span>
+                <div
+                  role="tablist"
+                  aria-label="Toggle Account Balance or Equity"
+                  className="inline-flex items-center p-0.5 rounded-[8px] bg-iea-inset border border-iea-borderSubtle text-[10px]"
+                >
+                  {(["BALANCE", "EQUITY"] as const).map((m) => {
+                    const active = accountKpiMode === m;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        data-testid={`account-kpi-toggle-${m.toLowerCase()}`}
+                        onClick={() => handleSelectAccountKpiMode(m)}
+                        className={`px-2 py-0.5 rounded-[6px] font-semibold transition ${
+                          active
+                            ? "bg-iea-accent text-white"
+                            : "text-iea-textMuted hover:text-iea-textPrimary"
+                        }`}
+                      >
+                        {m === "BALANCE" ? "Balance" : "Equity"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="w-8 h-8 rounded-[10px] bg-iea-accentSoft border border-iea-accentBorder text-iea-accent flex items-center justify-center shrink-0">
+                <Wallet className="w-4 h-4" />
               </div>
             </div>
 
             <div
-              className={`text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight mt-3 ${
-                kpiSummary.netPnlValue === null
-                  ? "text-iea-profit"
-                  : kpiSummary.netPnlValue >= 0
-                  ? "text-iea-profit"
-                  : "text-iea-danger"
-              }`}
+              data-testid="kpi-account-primary-value"
+              className="text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight text-iea-textPrimary mt-3"
             >
-              {kpiSummary.netPnlValue !== null
-                ? `${kpiSummary.netPnlValue >= 0 ? "+" : "-"}$${Math.abs(
-                    kpiSummary.netPnlValue
-                  ).toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}`
-                : "$0.00"}
+              {accountKpiMode === "BALANCE"
+                ? formatCurrencyValue(kpis.balance, false)
+                : formatCurrencyValue(kpis.equity, false)}
             </div>
 
             <div className="h-px bg-iea-borderSubtle my-3.5" />
 
             <div className="flex items-center justify-between font-mono text-[11px] tabular-nums">
-              <span className="text-iea-textSecondary truncate">
-                {kpis.todayPnlUsd !== null
-                  ? `Today ${kpis.todayPnlUsd >= 0 ? "+" : "-"}$${Math.abs(
-                      kpis.todayPnlUsd
-                    ).toFixed(2)}${
-                      kpis.todayPnlR !== null
-                        ? ` (${kpis.todayPnlR >= 0 ? "+" : ""}${kpis.todayPnlR.toFixed(2)}R)`
-                        : ""
-                    }`
-                  : `${kpiSummary.closedCount} closed trades`}
-              </span>
               <span
-                className={`px-2 py-0.5 rounded-[6px] text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                  (kpiSummary.netPnlValue ?? 0) >= 0
-                    ? "bg-iea-profitSoft text-iea-profit"
-                    : "bg-iea-dangerSoft text-iea-danger"
-                }`}
+                data-testid="kpi-account-secondary-caption"
+                className="text-iea-textSecondary truncate"
               >
-                {(kpiSummary.netPnlValue ?? 0) >= 0 ? "PROFIT" : "LOSS"}
+                {accountKpiMode === "BALANCE"
+                  ? `Equity: ${formatCurrencyValue(kpis.equity, false)}`
+                  : `Balance: ${formatCurrencyValue(kpis.balance, false)}`}
+              </span>
+              <span className="px-2 py-0.5 rounded-[6px] bg-iea-accentSoft text-iea-accent text-[10px] font-bold uppercase tracking-wider shrink-0">
+                {accountKpiMode}
               </span>
             </div>
           </div>
 
           {/* KPI 2: WIN RATE */}
           <div
+            data-testid="kpi-card-win-rate"
             className="iea-card p-5 flex flex-col justify-between"
             title="Closed trade win rate percentage"
           >
@@ -1250,9 +1313,9 @@ export const DashboardScreen: React.FC<
             </div>
 
             <div className="text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight text-iea-textPrimary mt-3">
-              {kpiSummary.winRatePct !== null
+              {kpiSummary.winRatePct !== null && Number.isFinite(kpiSummary.winRatePct)
                 ? `${kpiSummary.winRatePct.toFixed(1)}%`
-                : "0.0%"}
+                : "-"}
             </div>
 
             <div className="h-px bg-iea-borderSubtle my-3.5" />
@@ -1271,63 +1334,118 @@ export const DashboardScreen: React.FC<
             </div>
           </div>
 
-          {/* KPI 3: PROFIT FACTOR */}
+          {/* KPI 3: TODAY P/L */}
           <div
+            data-testid="kpi-card-today-pnl"
             className="iea-card p-5 flex flex-col justify-between"
-            title={`${UI_COPY.kpis.openExp.tooltip} · Gross Win / Gross Loss`}
+            title={`${UI_COPY.kpis.todayPnl.tooltip} · Realized + floating P/L for the current trading day`}
           >
             <div className="flex items-center justify-between">
-              <span className="iea-label-caps">PROFIT FACTOR</span>
-              <div className="w-8 h-8 rounded-[10px] bg-iea-accentSoft border border-iea-accentBorder text-iea-accent flex items-center justify-center">
-                <BarChart3 className="w-4 h-4" />
+              <span className="iea-label-caps">TODAY P/L</span>
+              <div
+                className={`w-8 h-8 rounded-[10px] flex items-center justify-center border ${
+                  (kpiSummary.todayPnlVal ?? 0) >= 0
+                    ? "bg-iea-profitSoft border-iea-profitBorder text-iea-profit"
+                    : "bg-iea-dangerSoft border-iea-dangerBorder text-iea-danger"
+                }`}
+              >
+                {(kpiSummary.todayPnlVal ?? 0) >= 0 ? (
+                  <TrendingUp className="w-4 h-4" />
+                ) : (
+                  <TrendingDown className="w-4 h-4" />
+                )}
               </div>
             </div>
 
-            <div className="text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight text-iea-textPrimary mt-3">
-              {kpiSummary.profitFactorVal !== null
-                ? kpiSummary.profitFactorVal.toFixed(2)
-                : "0.00"}
+            <div
+              className={`text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight mt-3 ${
+                kpiSummary.todayPnlVal === null
+                  ? "text-iea-textMuted"
+                  : kpiSummary.todayPnlVal >= 0
+                  ? "text-iea-profit"
+                  : "text-iea-danger"
+              }`}
+            >
+              {formatCurrencyValue(kpiSummary.todayPnlVal, true)}
             </div>
 
             <div className="h-px bg-iea-borderSubtle my-3.5" />
 
             <div className="flex items-center justify-between font-mono text-[11px] tabular-nums">
               <span className="text-iea-textSecondary truncate">
-                {activePositions.length} Pos · {kpis.pendingOrdersCount} Ord (Bot {botOpenCount})
+                {kpiSummary.todayTradesCount}{" "}
+                {kpiSummary.todayTradesCount === 1 ? "trade" : "trades"} today
               </span>
-              <span className="px-2 py-0.5 rounded-[6px] bg-iea-profitSoft text-iea-profit text-[10px] font-bold uppercase tracking-wider shrink-0">
-                SL GUARDED
+              <span
+                className={`px-2 py-0.5 rounded-[6px] text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                  kpiSummary.todayPnlVal === null
+                    ? "bg-iea-elevated text-iea-textMuted"
+                    : kpiSummary.todayPnlVal >= 0
+                    ? "bg-iea-profitSoft text-iea-profit"
+                    : "bg-iea-dangerSoft text-iea-danger"
+                }`}
+              >
+                {kpiSummary.todayPnlVal === null
+                  ? "IDLE"
+                  : kpiSummary.todayPnlVal >= 0
+                  ? "PROFIT"
+                  : "LOSS"}
               </span>
             </div>
           </div>
 
-          {/* KPI 4: MAX DRAWDOWN */}
+          {/* KPI 4: TOTAL PROFITS */}
           <div
+            data-testid="kpi-card-total-profits"
             className="iea-card p-5 flex flex-col justify-between"
-            title={`${UI_COPY.kpis.ddCap.tooltip} · ${UI_COPY.kpis.dailyLoss.tooltip}`}
+            title="Cumulative net profit across connected account history"
           >
             <div className="flex items-center justify-between">
-              <span className="iea-label-caps">MAX DRAWDOWN</span>
-              <div className="w-8 h-8 rounded-[10px] bg-iea-dangerSoft border border-iea-dangerBorder text-iea-danger flex items-center justify-center">
-                <TrendingDown className="w-4 h-4" />
+              <span className="iea-label-caps">TOTAL PROFITS</span>
+              <div
+                className={`w-8 h-8 rounded-[10px] flex items-center justify-center border ${
+                  (kpiSummary.totalProfitsVal ?? 0) >= 0
+                    ? "bg-iea-profitSoft border-iea-profitBorder text-iea-profit"
+                    : "bg-iea-dangerSoft border-iea-dangerBorder text-iea-danger"
+                }`}
+              >
+                <DollarSign className="w-4 h-4" />
               </div>
             </div>
 
-            <div className="text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight text-iea-danger mt-3">
-              {kpis.totalDrawdownUsedPct.toFixed(2)}%{" "}
-              <span className="text-xs font-normal text-iea-textMuted">
-                / {kpis.totalDrawdownCapPct.toFixed(1)}%
-              </span>
+            <div
+              className={`text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight mt-3 ${
+                kpiSummary.totalProfitsVal === null
+                  ? "text-iea-textMuted"
+                  : kpiSummary.totalProfitsVal >= 0
+                  ? "text-iea-profit"
+                  : "text-iea-danger"
+              }`}
+            >
+              {formatCurrencyValue(kpiSummary.totalProfitsVal, true)}
             </div>
 
             <div className="h-px bg-iea-borderSubtle my-3.5" />
 
             <div className="flex items-center justify-between font-mono text-[11px] tabular-nums">
               <span className="text-iea-textSecondary truncate">
-                Daily Loss {kpis.dailyLossUsedPct.toFixed(2)}% / {kpis.dailyLossLimitPct.toFixed(1)}%
+                {kpiSummary.closedCount} total{" "}
+                {kpiSummary.closedCount === 1 ? "deal" : "deals"}
               </span>
-              <span className="px-2 py-0.5 rounded-[6px] bg-iea-profitSoft text-iea-profit text-[10px] font-bold uppercase tracking-wider shrink-0">
-                SAFE
+              <span
+                className={`px-2 py-0.5 rounded-[6px] text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                  kpiSummary.totalProfitsVal === null
+                    ? "bg-iea-elevated text-iea-textMuted"
+                    : kpiSummary.totalProfitsVal >= 0
+                    ? "bg-iea-profitSoft text-iea-profit"
+                    : "bg-iea-dangerSoft text-iea-danger"
+                }`}
+              >
+                {kpiSummary.totalProfitsVal === null
+                  ? "IDLE"
+                  : kpiSummary.totalProfitsVal >= 0
+                  ? "PROFIT"
+                  : "LOSS"}
               </span>
             </div>
           </div>
