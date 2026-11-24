@@ -17,10 +17,15 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 const THEME_STORAGE_KEY = "institutional_ea_theme";
 
 function getSystemTheme(): Theme {
-  if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-    return "dark";
+  if (typeof window !== "undefined" && window.matchMedia) {
+    if (window.matchMedia("(prefers-color-scheme: light)").matches) {
+      return "light";
+    }
+    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      return "dark";
+    }
   }
-  return "light";
+  return "dark";
 }
 
 function isValidThemeMode(v: unknown): v is ThemeMode {
@@ -30,20 +35,23 @@ function isValidThemeMode(v: unknown): v is ThemeMode {
 function readSavedThemeMode(): ThemeMode {
   return readVersionedState<ThemeMode>({
     key: THEME_STORAGE_KEY,
-    defaultValue: "dark",
+    defaultValue: "system",
     validate: isValidThemeMode,
     migrate: (legacy) => (isValidThemeMode(legacy) ? legacy : null),
   }).value;
 }
 
 function applyThemeToDocument(t: Theme) {
+  if (typeof document === "undefined") return;
   const root = document.documentElement;
   if (t === "dark") {
+    root.classList.remove("light");
     root.classList.add("dark");
     root.setAttribute("data-theme", "dark");
     root.style.colorScheme = "dark";
   } else {
     root.classList.remove("dark");
+    root.classList.add("light");
     root.setAttribute("data-theme", "light");
     root.style.colorScheme = "light";
   }
@@ -84,22 +92,31 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [mode]);
 
   useEffect(() => {
-    writeVersionedState(THEME_STORAGE_KEY, mode);
+    if (mode === "light" || mode === "dark") {
+      writeVersionedState(THEME_STORAGE_KEY, mode);
+    }
   }, [mode]);
 
   const setMode = useCallback((m: ThemeMode) => {
     setModeState(m);
+    if (m === "light" || m === "dark") {
+      writeVersionedState(THEME_STORAGE_KEY, m);
+    }
   }, []);
 
   const setTheme = useCallback((t: ThemeMode) => {
     setModeState(t);
+    if (t === "light" || t === "dark") {
+      writeVersionedState(THEME_STORAGE_KEY, t);
+    }
   }, []);
 
   const toggleTheme = useCallback(() => {
     setModeState((prev) => {
-      if (prev === "dark") return "light";
-      if (prev === "light") return "system";
-      return "dark";
+      const current = prev === "system" ? getSystemTheme() : prev;
+      const next: Theme = current === "dark" ? "light" : "dark";
+      writeVersionedState(THEME_STORAGE_KEY, next);
+      return next;
     });
   }, []);
 

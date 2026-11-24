@@ -57,15 +57,15 @@ export class PanelErrorBoundary extends React.Component<PanelBoundaryProps, Pane
         <div
           role="alert"
           data-testid={`panel-error-${this.props.panelName.toLowerCase().replace(/\s+/g, "-")}`}
-          className="iea-card border-[#F07178]/35 p-4 flex flex-wrap items-center justify-between gap-3 text-xs"
+          className="iea-card border-iea-dangerBorder p-4 flex flex-wrap items-center justify-between gap-3 text-xs"
         >
           <div className="flex items-center space-x-2.5 min-w-0">
-            <AlertTriangle className="w-4 h-4 text-[#F07178] shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-iea-danger shrink-0" />
             <div className="min-w-0">
-              <div className="font-semibold text-[#F5F5F2]">
+              <div className="font-semibold text-iea-textPrimary">
                 {this.props.panelName} encountered an error
               </div>
-              <div className="text-[#B4B3B0] font-mono text-[11px] truncate">
+              <div className="text-iea-textSecondary font-mono text-[11px] truncate">
                 {this.state.errorMessage || "Unable to render this panel."}
               </div>
             </div>
@@ -145,24 +145,24 @@ export class AppErrorBoundary extends React.Component<AppBoundaryProps, AppBound
         <div
           role="alert"
           data-testid="app-error-boundary"
-          className="min-h-screen w-screen bg-[#0E0D0B] text-[#F5F5F2] flex items-center justify-center p-6 font-sans"
+          className="min-h-screen w-screen bg-iea-canvas text-iea-textPrimary flex items-center justify-center p-6 font-sans"
         >
-          <div className="max-w-md w-full iea-main-panel border-[#F07178]/35 p-7 space-y-4">
+          <div className="max-w-md w-full iea-card border-iea-dangerBorder p-7 space-y-4">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-[#D94854]/15 border border-[#F07178]/35 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5 text-[#F07178]" />
+              <div className="w-10 h-10 rounded-xl bg-iea-dangerSoft border border-iea-dangerBorder flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-iea-danger" />
               </div>
               <div>
-                <h1 className="text-base font-semibold text-[#F5F5F2]">
+                <h1 className="text-base font-semibold text-iea-textPrimary">
                   Institutional EA couldn&apos;t display this view
                 </h1>
-                <p className="text-xs text-[#8A8986]">
+                <p className="text-xs text-iea-textMuted">
                   DEMO lock remains active. Open MT5 positions are unaffected.
                 </p>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-[#100F0D] border border-[rgba(255,255,253,0.08)] text-[11px] font-mono text-[#F5B5B9] break-words">
+            <div className="p-3 rounded-xl bg-iea-inset border border-iea-borderSubtle text-[11px] font-mono text-iea-danger break-words">
               {this.state.errorMessage || "Unexpected UI rendering failure."}
             </div>
 
@@ -186,7 +186,7 @@ export class AppErrorBoundary extends React.Component<AppBoundaryProps, AppBound
               <button
                 type="button"
                 onClick={this.handleOpenLogs}
-                className="px-3.5 py-2 rounded-full bg-transparent hover:bg-[#242320] border border-[rgba(255,255,253,0.11)] text-[#B4B3B0] hover:text-[#F5F5F2] text-xs font-medium inline-flex items-center space-x-1.5 transition"
+                className="px-3.5 py-2 rounded-full bg-transparent hover:bg-iea-elevated border border-iea-borderDefault text-iea-textSecondary hover:text-iea-textPrimary text-xs font-medium inline-flex items-center space-x-1.5 transition"
               >
                 <FolderOpen className="w-3.5 h-3.5" />
                 <span>Open logs</span>

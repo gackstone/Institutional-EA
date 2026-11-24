@@ -155,46 +155,8 @@ export function getNeutralSymbolChipSpec(symbol: string): SymbolAccentSpec {
 }
 
 /**
- * Preserved verbatim for LiveTradingChart.tsx (Chart Protection Rule — DO NOT ALTER).
+ * Theme-token symbol chip styling for chart and terminal selectors.
  */
 export function getSymbolChipSpec(symbol: string): SymbolAccentSpec {
-  const upper = (symbol || "").toUpperCase();
-  if (upper.includes("XAU") || upper.includes("GOLD")) {
-    return {
-      symbol,
-      shortCode: "Au",
-      chipBg: "bg-[#B0F648] text-[#081321]",
-      chipText: "text-[#081321]",
-      chipRing: "ring-2 ring-[#B0F648]/35 shadow-[0_0_14px_rgba(176,246,72,0.38)]",
-      tagLabel: "Gold Spot",
-    };
-  }
-  if (upper.includes("BTC")) {
-    return {
-      symbol,
-      shortCode: "₿",
-      chipBg: "bg-[#C077FA] text-[#091426]",
-      chipText: "text-[#091426]",
-      chipRing: "ring-2 ring-[#C077FA]/35 shadow-[0_0_14px_rgba(192,119,250,0.38)]",
-      tagLabel: "Bitcoin 24/7",
-    };
-  }
-  if (upper.includes("JPY")) {
-    return {
-      symbol,
-      shortCode: "¥",
-      chipBg: "bg-[#5EEAD4] text-[#081321]",
-      chipText: "text-[#081321]",
-      chipRing: "ring-2 ring-[#5EEAD4]/35 shadow-[0_0_14px_rgba(94,234,212,0.35)]",
-      tagLabel: "FX Inverse",
-    };
-  }
-  return {
-    symbol,
-    shortCode: upper.slice(0, 2) || "FX",
-    chipBg: "bg-[#4F8CFF] text-white",
-    chipText: "text-white",
-    chipRing: "ring-2 ring-[#4F8CFF]/35",
-    tagLabel: "Instrument",
-  };
+  return getNeutralSymbolChipSpec(symbol);
 }

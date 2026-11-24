@@ -791,7 +791,7 @@ export const App: React.FC = () => {
                 className={`p-1.5 rounded-[8px] text-xs transition shrink-0 ${
                   isSidebarTouchPinned
                     ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
-                    : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-white/5"
+                    : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-[var(--iea-hover-bg)]"
                 }`}
               >
                 <PanelLeft className="w-4 h-4" />
@@ -824,7 +824,7 @@ export const App: React.FC = () => {
                       ? isSidebarExpanded
                         ? "bg-iea-accentSoft text-iea-accent font-semibold border border-iea-accentBorder"
                         : "text-iea-accent"
-                      : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-white/[0.04] border border-transparent"
+                      : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-[var(--iea-hover-bg)] border border-transparent"
                   }`}
                 >
                   {isSidebarExpanded ? (
@@ -845,7 +845,7 @@ export const App: React.FC = () => {
                       className={`w-9 h-9 rounded-[10px] flex items-center justify-center transition-colors ${
                         active
                           ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
-                          : "text-iea-textSecondary group-hover:text-iea-textPrimary group-hover:bg-white/[0.05]"
+                          : "text-iea-textSecondary group-hover:text-iea-textPrimary group-hover:bg-[var(--iea-hover-bg)]"
                       }`}
                     >
                       <Icon className="w-[17px] h-[17px]" />
@@ -886,7 +886,7 @@ export const App: React.FC = () => {
                             className={`relative w-9 h-9 rounded-[10px] flex items-center justify-center transition-colors ${
                               active
                                 ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
-                                : "text-iea-textSecondary group-hover:text-iea-textPrimary group-hover:bg-white/[0.05]"
+                                : "text-iea-textSecondary group-hover:text-iea-textPrimary group-hover:bg-[var(--iea-hover-bg)]"
                             }`}
                           >
                             <Icon className="w-[17px] h-[17px]" />
@@ -910,7 +910,7 @@ export const App: React.FC = () => {
                     className={`w-full h-10 px-3 rounded-[10px] flex items-center justify-between transition-all duration-200 border ${
                       hasActiveChild
                         ? "text-iea-textPrimary font-semibold border-transparent"
-                        : "text-iea-textMuted hover:text-iea-textPrimary hover:bg-white/[0.03] font-semibold border-transparent"
+                        : "text-iea-textMuted hover:text-iea-textPrimary hover:bg-[var(--iea-hover-bg)] font-semibold border-transparent"
                     }`}
                   >
                     <div className="flex items-center space-x-2.5 min-w-0">
@@ -954,7 +954,7 @@ export const App: React.FC = () => {
                               className={`group w-full h-10 px-3 rounded-[10px] flex items-center justify-between text-[13px] transition-all duration-150 ${
                                 active
                                   ? "bg-iea-accentSoft text-iea-accent font-semibold border border-iea-accentBorder"
-                                  : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-white/[0.04] font-normal border border-transparent"
+                                  : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-[var(--iea-hover-bg)] font-normal border border-transparent"
                               }`}
                             >
                               <div className="flex items-center space-x-3 min-w-0">
@@ -1005,7 +1005,7 @@ export const App: React.FC = () => {
                     ? isSidebarExpanded
                       ? "bg-iea-accentSoft text-iea-accent font-semibold border border-iea-accentBorder"
                       : "text-iea-accent"
-                    : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-white/[0.04] border border-transparent"
+                    : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-[var(--iea-hover-bg)] border border-transparent"
                 }`}
               >
                 {isSidebarExpanded ? (
@@ -1026,7 +1026,7 @@ export const App: React.FC = () => {
                     className={`w-10 h-10 rounded-[11px] flex items-center justify-center transition-colors ${
                       active
                         ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
-                        : "text-iea-textSecondary group-hover:text-iea-textPrimary group-hover:bg-white/[0.05]"
+                        : "text-iea-textSecondary group-hover:text-iea-textPrimary group-hover:bg-[var(--iea-hover-bg)]"
                     }`}
                   >
                     <Icon className="w-[18px] h-[18px]" />
@@ -1182,7 +1182,7 @@ export const App: React.FC = () => {
                 type="button"
                 onClick={() => setActionToast(null)}
                 aria-label="Dismiss notification"
-                className="p-1 rounded-lg text-iea-textSecondary hover:text-iea-textPrimary hover:bg-white/10"
+                className="p-1 rounded-lg text-iea-textSecondary hover:text-iea-textPrimary hover:bg-[var(--iea-hover-bg)]"
               >
                 <X className="w-3.5 h-3.5" />
               </button>

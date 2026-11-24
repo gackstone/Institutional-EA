@@ -970,7 +970,7 @@ export const DashboardScreen: React.FC<
                       <button
                         type="button"
                         onClick={() => setMt5PickerTerminals(null)}
-                        className="text-iea-textSecondary hover:text-white"
+                        className="text-iea-textSecondary hover:text-iea-textPrimary"
                       >
                         Close
                       </button>
@@ -1164,11 +1164,13 @@ export const DashboardScreen: React.FC<
               title={`Theme: ${theme.toUpperCase()} (click to switch)`}
               className="iea-header-icon-btn"
             >
-              {theme === "dark" ? (
-                <Moon className="w-4 h-4" />
-              ) : (
-                <Sun className="w-4 h-4" />
-              )}
+              <span className="inline-flex items-center justify-center transition-transform duration-200">
+                {theme === "dark" ? (
+                  <Moon className="w-4 h-4 transition-opacity duration-200" />
+                ) : (
+                  <Sun className="w-4 h-4 transition-opacity duration-200" />
+                )}
+              </span>
             </button>
           </div>
         </section>
@@ -1912,7 +1914,7 @@ export const DashboardScreen: React.FC<
           role="dialog"
           aria-modal="true"
           aria-labelledby="two-step-confirm-title"
-          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-[var(--overlay-bg)] backdrop-blur-sm flex items-center justify-center p-4"
         >
           <div
             className={`iea-card p-5 max-w-sm w-full space-y-3 shadow-pop ${
@@ -2027,7 +2029,7 @@ export const DashboardScreen: React.FC<
           role="dialog"
           aria-modal="true"
           aria-labelledby="tighten-sl-modal-title"
-          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-[var(--overlay-bg)] backdrop-blur-sm flex items-center justify-center p-4"
         >
           <div className="iea-card p-5 max-w-sm w-full space-y-3 shadow-pop">
             <div className="flex items-center justify-between">
