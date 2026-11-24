@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Activity,
   AlertTriangle,
   Award,
   Bell,
@@ -1457,30 +1456,64 @@ export const DashboardScreen: React.FC<
       ====================================================================== */}
       <section aria-label="Main Trading Chart Card" className="w-full">
         <div className="w-full iea-card p-5 flex flex-col gap-4">
-          {/* PNL Trend Header Row 1: Icon tile + Title + LIVE pill + Subtitle | Big Balance + Synced hh:mm */}
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-[12px] bg-iea-accentSoft border border-iea-accentBorder text-iea-accent flex items-center justify-center shrink-0">
-                <Activity className="w-5 h-5" />
+          {/* Chart Card Header: P&L / Equity Toggle + Range Pills (Left) | Balance Figure + Synced Caption (Right) */}
+          <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-iea-borderSubtle">
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* P&L / Equity Segmented Toggle */}
+              <div
+                role="tablist"
+                aria-label="Toggle P&L or Equity display"
+                className="inline-flex items-center p-1 rounded-[10px] bg-iea-inset border border-iea-borderSubtle text-xs"
+              >
+                {(["PNL", "EQUITY"] as const).map((m) => {
+                  const active = trendMode === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setTrendMode(m)}
+                      className={`px-3 py-1 rounded-[8px] font-semibold transition ${
+                        active
+                          ? "bg-iea-accent text-white"
+                          : "text-iea-textSecondary hover:text-iea-textPrimary"
+                      }`}
+                    >
+                      {m === "PNL" ? "P&L" : "Equity"}
+                    </button>
+                  );
+                })}
               </div>
-              <div>
-                <div className="flex items-center space-x-2.5">
-                  <h2 className="text-base font-bold text-iea-textPrimary tracking-tight">
-                    PNL Trend
-                  </h2>
-                  <span className="px-2 py-0.5 rounded-full bg-iea-profitSoft border border-iea-profitBorder text-iea-profit font-mono text-[10px] font-bold uppercase tracking-wider inline-flex items-center space-x-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-iea-profit" />
-                    <span>LIVE</span>
-                  </span>
-                </div>
-                <p className="text-xs text-iea-textMuted mt-0.5">
-                  Real-time equity curve, institutional order flow &amp; live execution chart
-                </p>
+
+              {/* Range Pill Selector (1 Day, 1 Week, 1 Month, 3 Months, 6 Months, 1 Year, All) */}
+              <div
+                role="group"
+                aria-label="Select trend range"
+                className="flex flex-wrap items-center gap-1"
+              >
+                {TREND_RANGES.map((range) => {
+                  const active = selectedRange === range;
+                  return (
+                    <button
+                      key={range}
+                      type="button"
+                      onClick={() => handleRangeSelect(range)}
+                      className={`px-2.5 py-1 rounded-[8px] text-[11px] font-medium transition ${
+                        active
+                          ? "bg-iea-accent text-white font-semibold"
+                          : "bg-iea-inset hover:bg-iea-elevated text-iea-textSecondary hover:text-iea-textPrimary border border-iea-borderSubtle"
+                      }`}
+                    >
+                      {range}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Big Balance / P&L Figure + Synced hh:mm Caption */}
-            <div className="text-right">
+            {/* Big Balance / P&L Figure + "Bal ... · Synced hh:mm" Caption on the Right */}
+            <div className="text-left sm:text-right sm:ml-auto">
               <div
                 className={`text-2xl md:text-[28px] font-bold font-mono tabular-nums tracking-tight leading-none ${
                   trendMode === "PNL"
@@ -1491,89 +1524,21 @@ export const DashboardScreen: React.FC<
                 }`}
               >
                 {trendMode === "PNL"
-                  ? kpiSummary.netPnlValue !== null
-                    ? `${kpiSummary.netPnlValue >= 0 ? "+" : "-"}$${Math.abs(
-                        kpiSummary.netPnlValue
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}`
-                    : "$0.00"
+                  ? formatCurrencyValue(kpiSummary.netPnlValue, true)
                   : kpis.equity !== null
-                  ? `$${kpis.equity.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}`
+                  ? formatCurrencyValue(kpis.equity, false)
                   : kpis.balance !== null
-                  ? `$${kpis.balance.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}`
-                  : "—"}
+                  ? formatCurrencyValue(kpis.balance, false)
+                  : "-"}
               </div>
-              <div className="text-[11px] font-mono text-iea-textMuted mt-1.5 flex items-center justify-end space-x-2">
+              <div className="text-[11px] font-mono text-iea-textMuted mt-1.5 flex items-center sm:justify-end space-x-2">
                 {kpis.balance !== null && (
                   <span>
-                    Bal ${kpis.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ·
+                    Bal {formatCurrencyValue(kpis.balance, false)} ·
                   </span>
                 )}
                 <span>{syncedTimeLabel}</span>
               </div>
-            </div>
-          </div>
-
-          {/* PNL Trend Header Row 2: P&L / Equity Segmented Toggle + Range Pill Selector */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-2 border-b border-iea-borderSubtle">
-            {/* P&L / Equity Segmented Toggle */}
-            <div
-              role="tablist"
-              aria-label="Toggle P&L or Equity display"
-              className="inline-flex items-center p-1 rounded-[10px] bg-iea-inset border border-iea-borderSubtle text-xs"
-            >
-              {(["PNL", "EQUITY"] as const).map((m) => {
-                const active = trendMode === m;
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setTrendMode(m)}
-                    className={`px-3 py-1 rounded-[8px] font-semibold transition ${
-                      active
-                        ? "bg-iea-accent text-white"
-                        : "text-iea-textSecondary hover:text-iea-textPrimary"
-                    }`}
-                  >
-                    {m === "PNL" ? "P&L" : "Equity"}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Range Pill Selector (1 Day, 1 Week, 1 Month, 3 Months, 6 Months, 1 Year, All) */}
-            <div
-              role="group"
-              aria-label="Select trend range"
-              className="flex flex-wrap items-center gap-1"
-            >
-              {TREND_RANGES.map((range) => {
-                const active = selectedRange === range;
-                return (
-                  <button
-                    key={range}
-                    type="button"
-                    onClick={() => handleRangeSelect(range)}
-                    className={`px-2.5 py-1 rounded-[8px] text-[11px] font-medium transition ${
-                      active
-                        ? "bg-iea-accent text-white font-semibold"
-                        : "bg-iea-inset hover:bg-iea-elevated text-iea-textSecondary hover:text-iea-textPrimary border border-iea-borderSubtle"
-                    }`}
-                  >
-                    {range}
-                  </button>
-                );
-              })}
             </div>
           </div>
 
