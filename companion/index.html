@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark" data-theme="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/institutional-ea-logo.svg" />
@@ -8,9 +8,36 @@
     <script>
       (function() {
         try {
-          document.documentElement.classList.add('dark');
-          document.documentElement.setAttribute('data-theme', 'dark');
-          document.documentElement.style.colorScheme = 'dark';
+          var saved = localStorage.getItem('institutional_ea_theme');
+          var theme = null;
+          if (saved) {
+            try {
+              var parsed = JSON.parse(saved);
+              var data = parsed && typeof parsed === 'object' && 'data' in parsed ? parsed.data : parsed;
+              if (data === 'light' || data === 'dark') {
+                theme = data;
+              }
+            } catch (e) {
+              if (saved === 'light' || saved === 'dark') {
+                theme = saved;
+              }
+            }
+          }
+          if (!theme) {
+            theme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+          }
+          var root = document.documentElement;
+          if (theme === 'light') {
+            root.classList.remove('dark');
+            root.classList.add('light');
+            root.setAttribute('data-theme', 'light');
+            root.style.colorScheme = 'light';
+          } else {
+            root.classList.remove('light');
+            root.classList.add('dark');
+            root.setAttribute('data-theme', 'dark');
+            root.style.colorScheme = 'dark';
+          }
         } catch (e) {}
       })();
     </script>
@@ -19,13 +46,13 @@
     <div id="root">
       <div
         id="iea-boot-splash"
-        style="height:100vh;width:100vw;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0A0A0C;color:#F3F4F6;font-family:system-ui,-apple-system,sans-serif;"
+        style="height:100vh;width:100vw;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:var(--iea-bg-canvas,#0A0A0C);color:var(--iea-text-primary,#F3F4F6);font-family:system-ui,-apple-system,sans-serif;"
       >
-        <div style="width:44px;height:44px;border-radius:12px;background:#3B82F6;border:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#FFFFFF;letter-spacing:-0.02em;">
+        <div style="width:44px;height:44px;border-radius:12px;background:#3B82F6;border:1px solid rgba(59,130,246,0.32);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#FFFFFF;letter-spacing:-0.02em;">
           IEA
         </div>
         <div style="width:22px;height:22px;border-radius:9999px;border:2px solid rgba(59,130,246,0.22);border-top-color:#3B82F6;animation:iea-spin 0.8s linear infinite;"></div>
-        <div style="font-size:12px;color:#9CA3AF;letter-spacing:0.01em;">Starting Institutional EA…</div>
+        <div style="font-size:12px;color:var(--iea-text-secondary,#9CA3AF);letter-spacing:0.01em;">Starting Institutional EA…</div>
         <style>@keyframes iea-spin { to { transform: rotate(360deg); } }</style>
       </div>
     </div>

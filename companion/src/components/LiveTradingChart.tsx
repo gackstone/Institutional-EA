@@ -35,8 +35,9 @@ import {
   SymbolChartBundle,
 } from "../services/dashboardDataAdapter";
 import { getSymbolChipSpec } from "../styles/designTokens";
-import { BEAR_COLOR, BULL_COLOR, CHART_TV_LIGHT_THEME, LUXALGO_SMC_PALETTE } from "../styles/chartTheme";
+import { BEAR_COLOR, BULL_COLOR, getChartThemeTokens, LUXALGO_SMC_PALETTE } from "../styles/chartTheme";
 import { UI_COPY } from "../constants/uiCopy";
+import { useTheme } from "../context/ThemeContext";
 
 const IS_DEV = Boolean((import.meta as any).env?.DEV);
 import {
@@ -48,6 +49,7 @@ import {
 import {
   drawLuxAlgoSmcOverlaysToCanvas,
   drawProjectedOverlaysToCanvas,
+  formatZoneLegend,
   hitTestProjectedDrawings,
   type MtfLevelInput,
   ProjectedDrawing,
@@ -165,6 +167,12 @@ function describeDrawingDetails(item: EngineDrawingItem, digits: number) {
   const title =
     item.type === "TRADE"
       ? `${item.direction === "BULLISH" ? "LONG" : "SHORT"} ${item.subtype}`
+      : item.subtype === "IFVG"
+      ? formatZoneLegend("IFVG")
+      : item.type === "FVG"
+      ? formatZoneLegend("FVG")
+      : item.type === "OB"
+      ? formatZoneLegend("OB")
       : item.meta?.label
       ? String(item.meta.label)
       : `${item.type} · ${item.subtype}`;
@@ -184,6 +192,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
   onSelectTimeframe,
   onCaptureScreenshot,
 }) => {
+  const { theme } = useTheme();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const plotHostRef = useRef<HTMLDivElement | null>(null);
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -410,17 +419,28 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       drawProjectedOverlaysToCanvas(ctx, projected, plotW, plotH, activeHighlightId, {
         clear: false,
         onlyTypes: new Set(["SESS"]),
+        theme,
       });
 
       // 2. LuxAlgo Smart Money Concepts overlays (when enabled for current timeframe)
       if (activeSettings.visibleTimeframes[selectedTimeframe]) {
-        drawLuxAlgoSmcOverlaysToCanvas(ctx, smcResult, mtfLevels, activeSettings, projector, digits);
+        drawLuxAlgoSmcOverlaysToCanvas(ctx, smcResult, mtfLevels, activeSettings, projector, digits, theme);
+      }
+
+      // 2b. Engine-emitted IFVG overlays (when FVG/OB layer is enabled)
+      const projectedIfvgs = projected.filter((p) => p.item.subtype === "IFVG");
+      if (projectedIfvgs.length > 0) {
+        drawProjectedOverlaysToCanvas(ctx, projectedIfvgs, plotW, plotH, activeHighlightId, {
+          clear: false,
+          theme,
+        });
       }
 
       // 3. Trade position templates on top (LONG POSITION / SHORT POSITION)
       drawProjectedOverlaysToCanvas(ctx, projected, plotW, plotH, activeHighlightId, {
         clear: false,
         onlyTypes: new Set(["TRADE"]),
+        theme,
       });
 
       ctx.restore();
@@ -446,6 +466,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     smcResult,
     mtfLevels,
     digits,
+    theme,
     hoveredHit?.item.id,
     pinnedHit?.item.id,
     selectedSymbol,
@@ -466,36 +487,37 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       window.matchMedia &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+    const initialTokens = getChartThemeTokens(theme);
     const chart = createChart(container, {
       width: container.clientWidth || 640,
       height: container.clientHeight || 420,
       layout: {
-        background: { type: ColorType.Solid, color: CHART_TV_LIGHT_THEME.background },
-        textColor: CHART_TV_LIGHT_THEME.axisText,
+        background: { type: ColorType.Solid, color: initialTokens.background },
+        textColor: initialTokens.axisText,
         fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: CHART_TV_LIGHT_THEME.gridLine },
-        horzLines: { color: CHART_TV_LIGHT_THEME.gridLine },
+        vertLines: { color: initialTokens.gridLine },
+        horzLines: { color: initialTokens.gridLine },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          color: CHART_TV_LIGHT_THEME.crosshairLine,
-          labelBackgroundColor: CHART_TV_LIGHT_THEME.crosshairLabelBg,
+          color: initialTokens.crosshairLine,
+          labelBackgroundColor: initialTokens.crosshairLabelBg,
         },
         horzLine: {
-          color: CHART_TV_LIGHT_THEME.crosshairLine,
-          labelBackgroundColor: CHART_TV_LIGHT_THEME.crosshairLabelBg,
+          color: initialTokens.crosshairLine,
+          labelBackgroundColor: initialTokens.crosshairLabelBg,
         },
       },
       rightPriceScale: {
-        borderColor: CHART_TV_LIGHT_THEME.axisBorder,
+        borderColor: initialTokens.axisBorder,
         scaleMargins: { top: 0.08, bottom: 0.08 },
       },
       timeScale: {
-        borderColor: CHART_TV_LIGHT_THEME.axisBorder,
+        borderColor: initialTokens.axisBorder,
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 8,
@@ -587,7 +609,42 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       chartRef.current = null;
       candleSeriesRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Update chart theme colors in-place via applyOptions without reloading data or losing zoom/scroll
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const tokens = getChartThemeTokens(theme);
+    chart.applyOptions({
+      layout: {
+        background: { type: ColorType.Solid, color: tokens.background },
+        textColor: tokens.axisText,
+      },
+      grid: {
+        vertLines: { color: tokens.gridLine },
+        horzLines: { color: tokens.gridLine },
+      },
+      crosshair: {
+        vertLine: {
+          color: tokens.crosshairLine,
+          labelBackgroundColor: tokens.crosshairLabelBg,
+        },
+        horzLine: {
+          color: tokens.crosshairLine,
+          labelBackgroundColor: tokens.crosshairLabelBg,
+        },
+      },
+      rightPriceScale: {
+        borderColor: tokens.axisBorder,
+      },
+      timeScale: {
+        borderColor: tokens.axisBorder,
+      },
+    });
+    redrawRef.current();
+  }, [theme]);
 
   // Update candlestick data & precision when bundle changes
   useEffect(() => {
@@ -931,7 +988,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       key: "fvgOb",
       label: UI_COPY.chart.layers.fvgOb.label,
       count: smcCounts.fvgOb,
-      tooltip: "Fair Value Gaps (FVG) & Internal/Swing Order Blocks (OB)",
+      tooltip: `${formatZoneLegend("FVG")} · ${formatZoneLegend("OB")} · ${formatZoneLegend("IFVG")}`,
       icon: Layers,
     },
     {
@@ -969,36 +1026,36 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       tabIndex={0}
       onKeyDown={handleKeyDown}
       aria-label={`Live Trading Chart for ${selectedSymbol} ${selectedTimeframe}`}
-      className={`iea-glass-card flex flex-col overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648] ${
+      className={`iea-glass-card flex flex-col overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iea-accent ${
         isFullscreen ? "fixed inset-0 z-50 rounded-none h-screen w-screen" : "h-full min-h-[460px]"
       }`}
     >
       {/* Top Toolbar: Symbols, Timeframes, Layer Toggles with Count Badges, Actions */}
-      <div className="px-3.5 py-2 border-b border-[rgba(186,214,255,0.14)] bg-[#0A152B]/80 flex flex-wrap items-center justify-between gap-2 shrink-0">
+      <div className="px-3.5 py-2 border-b border-iea-borderSubtle bg-[var(--iea-chart-toolbar-bg)] flex flex-wrap items-center justify-between gap-2 shrink-0">
         {/* Left: Symbol Tabs + Timeframes */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center rounded-full bg-[#071020]/80 border border-[rgba(186,214,255,0.16)] p-0.5">
+          <div className="inline-flex items-center rounded-full bg-iea-inset border border-iea-borderDefault p-0.5">
             {SYMBOLS.map((sym) => {
               const active = sym === selectedSymbol;
-              const chip = getSymbolChipSpec(sym);
+              getSymbolChipSpec(sym);
               return (
                 <button
                   key={sym}
                   type="button"
                   onClick={() => onSelectSymbol(sym)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648] ${
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iea-accent ${
                     active
-                      ? "bg-[#B0F648] text-[#081321] shadow-sm"
-                      : "text-[#B6C5E0] hover:text-[#F4F7FF]"
+                      ? "bg-iea-accent text-white shadow-sm"
+                      : "text-iea-textSecondary hover:text-iea-textPrimary"
                   }`}
                 >
-                  <span style={active ? undefined : { color: chip.chipText }}>{sym}</span>
+                  <span>{sym}</span>
                 </button>
               );
             })}
           </div>
 
-          <div className="inline-flex items-center rounded-full bg-[#071020]/80 border border-[rgba(186,214,255,0.16)] p-0.5">
+          <div className="inline-flex items-center rounded-full bg-iea-inset border border-iea-borderDefault p-0.5">
             {TIMEFRAMES.map((tf) => {
               const active = tf === selectedTimeframe;
               return (
@@ -1006,10 +1063,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                   key={tf}
                   type="button"
                   onClick={() => onSelectTimeframe(tf)}
-                  className={`px-2 py-1 rounded-full text-[11px] font-mono font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648] ${
+                  className={`px-2 py-1 rounded-full text-[11px] font-mono font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iea-accent ${
                     active
-                      ? "bg-[#2F497C] text-[#F4F7FF] border border-[#5EEAD4]/40"
-                      : "text-[#8496B8] hover:text-[#F4F7FF]"
+                      ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
+                      : "text-iea-textSecondary hover:text-iea-textPrimary"
                   }`}
                 >
                   {tf}
@@ -1031,22 +1088,22 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                 aria-pressed={on}
                 title={`${tooltip} (${count} on ${selectedSymbol} ${selectedTimeframe})`}
                 onClick={() => toggleLayer(key)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-semibold inline-flex items-center space-x-1.5 border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648] ${
+                className={`px-2.5 py-1 rounded-full text-[11px] font-semibold inline-flex items-center space-x-1.5 border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iea-accent ${
                   on
-                    ? "bg-[#B0F648]/16 border-[#B0F648]/45 text-[#F4F7FF]"
-                    : "bg-[#071020]/60 border-[rgba(186,214,255,0.14)] text-[#8496B8] hover:text-[#B6C5E0]"
+                    ? "bg-iea-accentSoft border-iea-accentBorder text-iea-textPrimary"
+                    : "bg-iea-inset border-iea-borderSubtle text-iea-textMuted hover:text-iea-textSecondary"
                 }`}
               >
-                <Icon className={`w-3 h-3 ${on ? "text-[#B0F648]" : "text-[#8496B8]"}`} />
+                <Icon className={`w-3 h-3 ${on ? "text-iea-accent" : "text-iea-textMuted"}`} />
                 <span>{label}</span>
                 <span
                   data-testid={`layer-count-${key}`}
                   className={`px-1.5 py-0 rounded-full text-[10px] font-mono font-bold tabular-nums ${
                     on
                       ? count > 0
-                        ? "bg-[#B0F648]/25 text-[#B0F648]"
-                        : "bg-white/10 text-[#8496B8]"
-                      : "bg-white/5 text-[#64748B]"
+                        ? "bg-iea-accent text-white"
+                        : "bg-iea-elevated text-iea-textSecondary"
+                      : "bg-iea-elevated text-iea-textMuted"
                   }`}
                 >
                   {count}
@@ -1055,7 +1112,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             );
           })}
 
-          <div className="flex items-center space-x-1 pl-1 border-l border-[rgba(186,214,255,0.16)]">
+          <div className="flex items-center space-x-1 pl-1 border-l border-iea-borderDefault">
             <button
               type="button"
               data-testid="btn-smc-settings"
@@ -1063,10 +1120,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               onClick={handleOpenSettings}
               title="Smart Money Concepts Settings"
               aria-label="Smart Money Concepts Settings"
-              className={`p-1.5 rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648] ${
+              className={`p-1.5 rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iea-accent ${
                 showSettingsPopover
-                  ? "bg-[#5EEAD4]/20 text-[#5EEAD4]"
-                  : "text-[#B6C5E0] hover:text-[#F4F7FF] hover:bg-white/10"
+                  ? "bg-iea-accentSoft text-iea-accent"
+                  : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-iea-elevated"
               }`}
             >
               <Settings className="w-3.5 h-3.5" />
@@ -1077,7 +1134,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               onClick={handleResetView}
               title="Reset zoom & auto-fit view (double-click plot or press 0)"
               aria-label="Reset chart view"
-              className="p-1.5 rounded-lg text-[#B6C5E0] hover:text-[#F4F7FF] hover:bg-white/10 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648]"
+              className="p-1.5 rounded-lg text-iea-textSecondary hover:text-iea-textPrimary hover:bg-iea-elevated transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iea-accent"
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
@@ -1088,7 +1145,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                 onClick={handleManualScreenshot}
                 title="Save chart snapshot PNG (includes overlays)"
                 aria-label="Save chart screenshot"
-                className="p-1.5 rounded-lg text-[#B6C5E0] hover:text-[#F4F7FF] hover:bg-white/10 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648]"
+                className="p-1.5 rounded-lg text-iea-textSecondary hover:text-iea-textPrimary hover:bg-iea-elevated transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iea-accent"
               >
                 <Camera className="w-3.5 h-3.5" />
               </button>
@@ -1100,10 +1157,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                 onClick={() => setShowDebugOverlay((v) => !v)}
                 title="Toggle dev drawings parity report (Ctrl+Shift+D)"
                 aria-label="Toggle drawings parity debug overlay"
-                className={`p-1.5 rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648] ${
+                className={`p-1.5 rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iea-accent ${
                   showDebugOverlay
-                    ? "bg-[#5EEAD4]/20 text-[#5EEAD4]"
-                    : "text-[#8496B8] hover:text-[#F4F7FF] hover:bg-white/10"
+                    ? "bg-iea-accentSoft text-iea-accent"
+                    : "text-iea-textMuted hover:text-iea-textPrimary hover:bg-iea-elevated"
                 }`}
               >
                 <Bug className="w-3.5 h-3.5" />
@@ -1115,7 +1172,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               onClick={handleToggleFullscreen}
               title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen chart (F)"}
               aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-              className="p-1.5 rounded-lg text-[#B6C5E0] hover:text-[#F4F7FF] hover:bg-white/10 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648]"
+              className="p-1.5 rounded-lg text-iea-textSecondary hover:text-iea-textPrimary hover:bg-iea-elevated transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iea-accent"
             >
               {isFullscreen ? (
                 <Minimize2 className="w-3.5 h-3.5" />
@@ -1130,29 +1187,29 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       {/* Secondary OHLC + Live Quote Strip ABOVE the plot (never permanent text on plot) */}
       <div
         data-testid="chart-ohlc-strip"
-        className="px-3.5 py-1.5 border-b border-[rgba(186,214,255,0.1)] bg-[#081325]/90 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono shrink-0"
+        className="px-3.5 py-1.5 border-b border-iea-borderSubtle bg-iea-inset flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono shrink-0"
       >
         <div className="flex flex-wrap items-center gap-3 tabular-nums">
-          <span className="font-bold text-[#F4F7FF]">
+          <span className="font-bold text-iea-textPrimary">
             {bundle.brokerSymbol || selectedSymbol} · {selectedTimeframe}
           </span>
           {activeOhlc ? (
             <>
-              <span className="text-[#8496B8]">
-                O <span className="text-[#F4F7FF]">{activeOhlc.open.toFixed(digits)}</span>
+              <span className="text-iea-textMuted">
+                O <span className="text-iea-textPrimary">{activeOhlc.open.toFixed(digits)}</span>
               </span>
-              <span className="text-[#8496B8]">
-                H <span className="text-[#0A997D]">{activeOhlc.high.toFixed(digits)}</span>
+              <span className="text-iea-textMuted">
+                H <span className="text-iea-profit">{activeOhlc.high.toFixed(digits)}</span>
               </span>
-              <span className="text-[#8496B8]">
-                L <span className="text-[#EE3749]">{activeOhlc.low.toFixed(digits)}</span>
+              <span className="text-iea-textMuted">
+                L <span className="text-iea-danger">{activeOhlc.low.toFixed(digits)}</span>
               </span>
-              <span className="text-[#8496B8]">
-                C <span className="text-[#F4F7FF] font-semibold">{activeOhlc.close.toFixed(digits)}</span>
+              <span className="text-iea-textMuted">
+                C <span className="text-iea-textPrimary font-semibold">{activeOhlc.close.toFixed(digits)}</span>
               </span>
               <span
                 className={
-                  activeOhlc.change >= 0 ? "text-[#B0F648] font-semibold" : "text-[#FF5A6E] font-semibold"
+                  activeOhlc.change >= 0 ? "text-iea-profit font-semibold" : "text-iea-danger font-semibold"
                 }
               >
                 {activeOhlc.change >= 0 ? "+" : ""}
@@ -1161,7 +1218,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               </span>
             </>
           ) : (
-            <span className="text-[#8496B8]">Waiting for OHLC bars…</span>
+            <span className="text-iea-textMuted">Waiting for OHLC bars…</span>
           )}
         </div>
 
@@ -1170,7 +1227,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             <span
               data-testid="drawings-feed-warning"
               title={drawingsError || "Malformed drawings payload received"}
-              className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-[#FBBF24]/15 border border-[#FBBF24]/45 text-[#FBBF24] text-[10px]"
+              className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-iea-warningSoft border border-iea-warningBorder text-iea-warning text-[10px]"
             >
               <AlertCircle className="w-3 h-3 shrink-0" />
               <span>Drawings sync issue</span>
@@ -1178,15 +1235,15 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
           )}
 
           {bundle.bid !== null && bundle.ask !== null && bundle.bid > 0 && (
-            <span className="text-[#B6C5E0] tabular-nums">
-              Bid <strong className="text-[#F4F7FF]">{bundle.bid.toFixed(digits)}</strong> · Ask{" "}
-              <strong className="text-[#F4F7FF]">{bundle.ask.toFixed(digits)}</strong> · Spr{" "}
-              <strong className="text-[#5EEAD4]">{bundle.spreadPoints}</strong>
+            <span className="text-iea-textSecondary tabular-nums">
+              Bid <strong className="text-iea-textPrimary">{bundle.bid.toFixed(digits)}</strong> · Ask{" "}
+              <strong className="text-iea-textPrimary">{bundle.ask.toFixed(digits)}</strong> · Spr{" "}
+              <strong className="text-iea-accent">{bundle.spreadPoints}</strong>
             </span>
           )}
 
-          <span className="inline-flex items-center space-x-1 text-[#5EEAD4]">
-            <Radio className="w-3 h-3 text-[#B0F648]" />
+          <span className="inline-flex items-center space-x-1 text-iea-accent">
+            <Radio className="w-3 h-3 text-iea-profit" />
             <span>{feedStatus}</span>
           </span>
         </div>
@@ -1199,7 +1256,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
         onMouseLeave={handlePlotMouseLeave}
         onClick={handlePlotClick}
         onDoubleClick={handleResetView}
-        className="relative flex-1 min-h-0 w-full bg-white select-none overflow-hidden"
+        className="relative flex-1 min-h-0 w-full bg-[var(--iea-chart-bg)] select-none overflow-hidden"
       >
         {/* Lightweight Charts Host */}
         <div ref={chartContainerRef} className="absolute inset-0 z-10" />
@@ -1223,9 +1280,9 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
 
         {/* Waiting / Empty Candles Overlay */}
         {bundle.candles.length === 0 && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/85 backdrop-blur-sm">
-            <div className="px-4 py-3 rounded-2xl bg-[#0A152B] text-[#F4F7FF] text-xs font-medium shadow-lg flex items-center space-x-2">
-              <Eye className="w-4 h-4 text-[#5EEAD4]" />
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-[var(--iea-chart-bg)]/85 backdrop-blur-sm">
+            <div className="px-4 py-3 rounded-2xl bg-iea-card border border-iea-borderDefault text-iea-textPrimary text-xs font-medium shadow-lg flex items-center space-x-2">
+              <Eye className="w-4 h-4 text-iea-accent" />
               <span>{waitingReason || "Waiting for MT5 Candles..."}</span>
             </div>
           </div>
@@ -1241,10 +1298,10 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               handleJumpToLatest();
             }}
             title="Jump to latest candle"
-            className="absolute right-20 bottom-10 z-30 px-3 py-1.5 rounded-full bg-[#0A152B]/90 hover:bg-[#132549] text-[#F4F7FF] border border-[#5EEAD4]/50 shadow-lg text-xs font-semibold inline-flex items-center space-x-1.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0F648]"
+            className="absolute right-20 bottom-10 z-30 px-3 py-1.5 rounded-full bg-iea-card hover:bg-iea-elevated text-iea-textPrimary border border-iea-accentBorder shadow-lg text-xs font-semibold inline-flex items-center space-x-1.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iea-accent"
           >
             <span>Jump to latest</span>
-            <ArrowRight className="w-3.5 h-3.5 text-[#B0F648]" />
+            <ArrowRight className="w-3.5 h-3.5 text-iea-accent" />
           </button>
         )}
 
@@ -1254,15 +1311,15 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             data-testid={pinnedHit ? "pinned-drawing-card" : "hover-drawing-tooltip"}
             style={cardStyle}
             onClick={(e) => e.stopPropagation()}
-            className={`absolute z-30 w-[236px] rounded-xl bg-[#0A152B]/95 text-[#F4F7FF] border shadow-2xl p-2.5 text-[11px] backdrop-blur-md ${
+            className={`absolute z-30 w-[236px] rounded-xl bg-[var(--iea-tooltip-bg)] text-[var(--iea-tooltip-text)] border shadow-2xl p-2.5 text-[11px] backdrop-blur-md ${
               pinnedHit
-                ? "border-[#5EEAD4]/70 pointer-events-auto"
-                : "border-[rgba(186,214,255,0.28)] pointer-events-none"
+                ? "border-iea-accentBorder pointer-events-auto"
+                : "border-[var(--iea-tooltip-border)] pointer-events-none"
             }`}
           >
-            <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-white/10">
+            <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-iea-borderSubtle">
               <div className="flex items-center space-x-1.5 min-w-0">
-                {pinnedHit && <Pin className="w-3 h-3 text-[#5EEAD4] shrink-0" />}
+                {pinnedHit && <Pin className="w-3 h-3 text-iea-accent shrink-0" />}
                 <span className="font-bold truncate">{activeCardDetails.title}</span>
               </div>
               {pinnedHit ? (
@@ -1270,25 +1327,25 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
                   type="button"
                   onClick={() => setPinnedHit(null)}
                   aria-label="Close pinned drawing details"
-                  className="p-0.5 rounded hover:bg-white/15 text-[#B6C5E0] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EEAD4]"
+                  className="p-0.5 rounded hover:bg-iea-elevated text-iea-textSecondary hover:text-iea-textPrimary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iea-accent"
                 >
                   <X className="w-3 h-3" />
                 </button>
               ) : (
-                <span className="text-[9px] text-[#8496B8] font-mono shrink-0">Click to pin</span>
+                <span className="text-[9px] text-iea-textMuted font-mono shrink-0">Click to pin</span>
               )}
             </div>
             <div className="space-y-1 font-mono text-[10.5px]">
               {activeCardDetails.rows.map((r) => (
                 <div key={r.label} className="flex items-center justify-between gap-2">
-                  <span className="text-[#8496B8]">{r.label}</span>
+                  <span className="text-iea-textMuted">{r.label}</span>
                   <span
                     className={`font-semibold text-right truncate ${
                       r.tone === "bull"
-                        ? "text-[#B0F648]"
+                        ? "text-iea-profit"
                         : r.tone === "bear"
-                        ? "text-[#FF7A8A]"
-                        : "text-[#F4F7FF]"
+                        ? "text-iea-danger"
+                        : "text-iea-textPrimary"
                     }`}
                   >
                     {r.value}
@@ -1304,21 +1361,21 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
           <div
             data-testid="parity-debug-overlay"
             onClick={(e) => e.stopPropagation()}
-            className="absolute left-3 top-3 z-40 w-80 max-h-[75%] overflow-y-auto rounded-xl bg-[#071020]/95 border border-[#5EEAD4]/40 text-[#F4F7FF] p-3 text-[10px] font-mono shadow-2xl space-y-2"
+            className="absolute left-3 top-3 z-40 w-80 max-h-[75%] overflow-y-auto rounded-xl bg-iea-card border border-iea-accentBorder text-iea-textPrimary p-3 text-[10px] font-mono shadow-2xl space-y-2"
           >
-            <div className="flex items-center justify-between border-b border-white/10 pb-1">
-              <span className="font-bold text-[#5EEAD4]">
+            <div className="flex items-center justify-between border-b border-iea-borderSubtle pb-1">
+              <span className="font-bold text-iea-accent">
                 Engine Parity ({selectedSymbol} {selectedTimeframe})
               </span>
               <button
                 type="button"
                 onClick={() => setShowDebugOverlay(false)}
-                className="text-[#B6C5E0] hover:text-white"
+                className="text-iea-textSecondary hover:text-iea-textPrimary"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
-            <div className="text-[#B6C5E0]">
+            <div className="text-iea-textSecondary">
               Engine: {validatedDrawings.items.length} · Rendered: {projectedRef.current.length} ·
               Dropped: {validatedDrawings.dropped.length}
             </div>
@@ -1326,12 +1383,12 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
               {debugReport.map((entry) => (
                 <div
                   key={entry.id}
-                  className="flex items-center justify-between gap-2 py-0.5 border-b border-white/5"
+                  className="flex items-center justify-between gap-2 py-0.5 border-b border-iea-borderSubtle"
                 >
                   <span className="truncate">
                     [{entry.type}/{entry.subtype}] {entry.timeframe}
                   </span>
-                  <span className={entry.rendered ? "text-[#B0F648]" : "text-[#FBBF24]"}>
+                  <span className={entry.rendered ? "text-iea-profit" : "text-iea-warning"}>
                     {entry.rendered ? "DRAWN" : "SKIP"}
                   </span>
                 </div>
@@ -1339,6 +1396,36 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Compact Zone Legend Bar (dashboard + fullscreen) */}
+      <div
+        data-testid="chart-zone-legend"
+        className="px-3.5 py-1.5 border-t border-iea-borderSubtle bg-[var(--iea-chart-toolbar-bg)] flex flex-wrap items-center justify-between gap-2 text-[11px] shrink-0"
+      >
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-iea-textSecondary">
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-iea-textMuted">
+            Zones
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-[3px] bg-iea-profitSoft border border-iea-profitBorder shrink-0" />
+            <strong className="font-mono text-iea-textPrimary">FVG</strong>
+            <span>- Fair Value Gap</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-[3px] bg-iea-accentSoft border border-iea-accentBorder shrink-0" />
+            <strong className="font-mono text-iea-textPrimary">OB</strong>
+            <span>- Order Block</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-[3px] bg-iea-dangerSoft border border-iea-dangerBorder shrink-0" />
+            <strong className="font-mono text-iea-textPrimary">IFVG</strong>
+            <span>- Inverse Fair Value Gap</span>
+          </span>
+        </div>
+        <span className="text-[10px] font-mono text-iea-textMuted hidden sm:inline">
+          F Fullscreen · 0 Reset · Scroll Zoom
+        </span>
       </div>
     </div>
   );

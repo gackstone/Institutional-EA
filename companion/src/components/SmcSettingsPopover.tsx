@@ -26,13 +26,13 @@ interface SmcSettingsPopoverProps {
 }
 
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
-  <div className="pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#9BA3B0] border-t border-white/10 first:border-t-0 first:pt-0">
+  <div className="pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-iea-textMuted border-t border-iea-borderSubtle first:border-t-0 first:pt-0">
     {title}
   </div>
 );
 
 const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <div className="flex items-center justify-between gap-2 py-1 text-[11px] text-[#DCE2EC]">
+  <div className="flex items-center justify-between gap-2 py-1 text-[11px] text-iea-textPrimary">
     <span className="truncate">{label}</span>
     <div className="flex items-center gap-1.5 shrink-0">{children}</div>
   </div>
@@ -48,7 +48,7 @@ const ColorAlphaPicker: React.FC<{
   return (
     <div className="inline-flex items-center gap-1">
       <label
-        className="relative w-5 h-5 rounded border border-white/25 overflow-hidden cursor-pointer shrink-0"
+        className="relative w-5 h-5 rounded border border-iea-borderStrong overflow-hidden cursor-pointer shrink-0"
         style={{ backgroundColor: value }}
         title={`${ariaLabel} (${value})`}
       >
@@ -72,7 +72,7 @@ const ColorAlphaPicker: React.FC<{
             const pct = Math.min(100, Math.max(5, Number(e.target.value) || 20));
             onChange(formatCssRgba(hex, pct / 100));
           }}
-          className="w-11 px-1 py-0.5 rounded bg-[#141619] border border-white/15 text-[10px] font-mono text-[#E8ECF2] text-right focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]"
+          className="w-11 px-1 py-0.5 rounded bg-iea-inset border border-iea-borderDefault text-[10px] font-mono text-iea-textPrimary text-right focus:outline-none focus:ring-1 focus:ring-iea-accent"
           title="Opacity (%)"
         />
       )}
@@ -81,10 +81,10 @@ const ColorAlphaPicker: React.FC<{
 };
 
 const selectCls =
-  "px-1.5 py-0.5 rounded bg-[#141619] border border-white/15 text-[11px] text-[#E8ECF2] focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]";
+  "px-1.5 py-0.5 rounded bg-iea-inset border border-iea-borderDefault text-[11px] text-iea-textPrimary focus:outline-none focus:ring-1 focus:ring-iea-accent";
 const numCls =
-  "w-14 px-1.5 py-0.5 rounded bg-[#141619] border border-white/15 text-[11px] font-mono text-[#E8ECF2] text-right focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]";
-const checkCls = "w-3.5 h-3.5 accent-[#5EEAD4] rounded cursor-pointer";
+  "w-14 px-1.5 py-0.5 rounded bg-iea-inset border border-iea-borderDefault text-[11px] font-mono text-iea-textPrimary text-right focus:outline-none focus:ring-1 focus:ring-iea-accent";
+const checkCls = "w-3.5 h-3.5 accent-[var(--iea-accent-primary)] rounded cursor-pointer";
 
 export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
   open,
@@ -135,10 +135,10 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
       data-testid="smc-settings-popover"
       onKeyDown={handleKeyDown}
       onClick={(e) => e.stopPropagation()}
-      className="absolute right-2 top-2 z-50 w-[min(360px,calc(100%-16px))] max-h-[min(78vh,540px)] flex flex-col rounded-xl bg-[#181B20]/98 border border-white/15 text-[#E8ECF2] shadow-2xl backdrop-blur-md focus:outline-none"
+      className="absolute right-2 top-2 z-50 w-[min(360px,calc(100%-16px))] max-h-[min(78vh,540px)] flex flex-col rounded-xl bg-iea-card border border-iea-borderDefault text-iea-textPrimary shadow-2xl backdrop-blur-md focus:outline-none"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-iea-borderSubtle shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs font-bold tracking-tight truncate">
             Smart Money Concepts [LuxAlgo]
@@ -148,14 +148,14 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
           type="button"
           onClick={onCancel}
           aria-label="Close settings"
-          className="p-1 rounded hover:bg-white/10 text-[#9BA3B0] hover:text-white focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]"
+          className="p-1 rounded hover:bg-iea-elevated text-iea-textSecondary hover:text-iea-textPrimary focus:outline-none focus:ring-1 focus:ring-iea-accent"
         >
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {/* Tabs: Inputs | Style | Visibility */}
-      <div className="flex items-center border-b border-white/10 px-3 shrink-0" role="tablist">
+      <div className="flex items-center border-b border-iea-borderSubtle px-3 shrink-0" role="tablist">
         {(["Inputs", "Style", "Visibility"] as const).map((t) => {
           const active = tab === t;
           return (
@@ -167,8 +167,8 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
               onClick={() => setTab(t)}
               className={`px-3 py-1.5 text-[11px] font-semibold border-b-2 transition ${
                 active
-                  ? "border-[#5EEAD4] text-[#F4F7FF]"
-                  : "border-transparent text-[#9BA3B0] hover:text-[#DCE2EC]"
+                  ? "border-iea-accent text-iea-accent"
+                  : "border-transparent text-iea-textSecondary hover:text-iea-textPrimary"
               }`}
             >
               {t}
@@ -366,8 +366,8 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
               />
             </Row>
 
-            <SectionHeader title="Order Blocks" />
-            <Row label="Internal Order Blocks">
+            <SectionHeader title="OB - Order Block" />
+            <Row label="Internal OB (Order Block)">
               <input
                 type="checkbox"
                 aria-label="Show Internal Order Blocks"
@@ -387,7 +387,7 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
                 className={numCls}
               />
             </Row>
-            <Row label="Swing Order Blocks">
+            <Row label="Swing OB (Order Block)">
               <input
                 type="checkbox"
                 aria-label="Show Swing Order Blocks"
@@ -512,8 +512,8 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
               </select>
             </Row>
 
-            <SectionHeader title="Fair Value Gaps" />
-            <Row label="Fair Value Gaps">
+            <SectionHeader title="FVG - Fair Value Gap / IFVG - Inverse Fair Value Gap" />
+            <Row label="FVG (Fair Value Gaps)">
               <input
                 type="checkbox"
                 aria-label="Show Fair Value Gaps"
@@ -756,7 +756,7 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
               />
             </Row>
 
-            <SectionHeader title="Order Block & FVG Fills" />
+            <SectionHeader title="OB (Order Block) & FVG (Fair Value Gap) Fills" />
             <Row label="Internal Bull / Bear OB">
               <ColorAlphaPicker
                 ariaLabel="Internal Bull OB"
@@ -848,12 +848,12 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
       </div>
 
       {/* Footer: Defaults | Cancel | OK */}
-      <div className="flex items-center justify-between px-3 py-2 border-t border-white/10 bg-[#141619]/80 rounded-b-xl shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 border-t border-iea-borderSubtle bg-iea-inset rounded-b-xl shrink-0">
         <button
           type="button"
           onClick={handleResetDefaults}
           data-testid="smc-settings-defaults"
-          className="px-2 py-1 rounded text-[11px] font-medium text-[#9BA3B0] hover:text-white hover:bg-white/10 inline-flex items-center gap-1 transition focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]"
+          className="px-2 py-1 rounded text-[11px] font-medium text-iea-textSecondary hover:text-iea-textPrimary hover:bg-iea-elevated inline-flex items-center gap-1 transition focus:outline-none focus:ring-1 focus:ring-iea-accent"
         >
           <RotateCcw className="w-3 h-3" />
           <span>Defaults</span>
@@ -864,7 +864,7 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
             type="button"
             onClick={onCancel}
             data-testid="smc-settings-cancel"
-            className="px-2.5 py-1 rounded text-[11px] font-medium text-[#DCE2EC] bg-white/5 hover:bg-white/12 border border-white/10 transition focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]"
+            className="px-2.5 py-1 rounded text-[11px] font-medium text-iea-textPrimary bg-iea-card hover:bg-iea-elevated border border-iea-borderDefault transition focus:outline-none focus:ring-1 focus:ring-iea-accent"
           >
             Cancel
           </button>
@@ -872,7 +872,7 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
             type="button"
             onClick={() => onConfirm(draft)}
             data-testid="smc-settings-ok"
-            className="px-3 py-1 rounded text-[11px] font-semibold bg-[#2157f3] hover:bg-[#1b49cf] text-white transition focus:outline-none focus:ring-1 focus:ring-[#5EEAD4]"
+            className="px-3 py-1 rounded text-[11px] font-semibold bg-iea-accent hover:bg-iea-accentHover text-white transition focus:outline-none focus:ring-1 focus:ring-iea-accent"
           >
             OK
           </button>

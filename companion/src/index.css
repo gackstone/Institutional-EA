@@ -4,10 +4,9 @@
 
 :root,
 .dark,
-[data-theme="dark"],
-[data-theme="light"] {
+[data-theme="dark"] {
   /* =========================================================================
-     Institutional EA Companion — BM Forex Hub Global Theme Tokens
+     Institutional EA Companion — BM Forex Hub Dark Theme Tokens
      Near-black canvas (~#0A0A0C), stepped cards (~#101114 to #121317),
      1px subtle border (~rgba(255,255,255,0.06)), vivid blue accent (#3B82F6),
      profit green (#22C55E), loss/drawdown red (#EF4444).
@@ -23,6 +22,8 @@
   --iea-surface-inset: #0D0E11;
   --iea-surface-elevated: #16181D;
   --iea-surface-active: #1D2026;
+  --iea-card-shadow: none;
+  --iea-hover-bg: rgba(255, 255, 255, 0.04);
 
   /* Table Surfaces */
   --iea-table-header: #0E1014;
@@ -82,6 +83,18 @@
   --iea-info-soft: rgba(59, 130, 246, 0.14);
   --iea-info-border: rgba(59, 130, 246, 0.28);
 
+  /* Chart & Tooltip Tokens */
+  --iea-chart-bg: #0D0E11;
+  --iea-chart-toolbar-bg: #111216;
+  --iea-chart-grid: rgba(255, 255, 255, 0.05);
+  --iea-chart-text: #9CA3AF;
+  --iea-chart-axis-border: rgba(255, 255, 255, 0.08);
+  --iea-chart-crosshair: #64748B;
+  --iea-chart-crosshair-label-bg: #1D2026;
+  --iea-tooltip-bg: #16181D;
+  --iea-tooltip-border: rgba(255, 255, 255, 0.12);
+  --iea-tooltip-text: #F3F4F6;
+
   /* Radii & Spacing */
   --iea-radius-panel: 0px;
   --iea-radius-sidebar: 0px;
@@ -127,6 +140,132 @@
   --overlay-bg: rgba(5, 6, 8, 0.80);
 }
 
+.light,
+[data-theme="light"] {
+  /* =========================================================================
+     Institutional EA Companion — Light Theme Override
+     Soft off-white background (~#F5F6F8), white cards (#FFFFFF) with subtle
+     border and light shadow, dark text (#0F172A), same blue accent (#3B82F6).
+  ========================================================================= */
+
+  /* Core Backgrounds & Surfaces */
+  --iea-bg-canvas: #F5F6F8;
+  --iea-bg-titlebar: #FFFFFF;
+  --iea-surface-panel: #F5F6F8;
+  --iea-surface-panel-grad: none;
+  --iea-surface-card: #FFFFFF;
+  --iea-surface-card-alt: #F8FAFC;
+  --iea-surface-inset: #F1F5F9;
+  --iea-surface-elevated: #F1F5F9;
+  --iea-surface-active: #E2E8F0;
+  --iea-card-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --iea-hover-bg: rgba(15, 23, 42, 0.04);
+
+  /* Table Surfaces */
+  --iea-table-header: #F8FAFC;
+  --iea-table-row-hover: #F1F5F9;
+  --iea-table-row-stripe: rgba(15, 23, 42, 0.02);
+
+  /* Borders & Dividers */
+  --iea-border-subtle: rgba(15, 23, 42, 0.08);
+  --iea-border-default: rgba(15, 23, 42, 0.12);
+  --iea-border-strong: rgba(15, 23, 42, 0.20);
+  --iea-border-divider: rgba(15, 23, 42, 0.08);
+
+  /* Sidebar Surface Tokens */
+  --iea-sidebar-bg: #FFFFFF;
+  --iea-sidebar-rail-bg: #FFFFFF;
+  --iea-sidebar-border: rgba(15, 23, 42, 0.08);
+  --iea-sidebar-active: rgba(59, 130, 246, 0.11);
+  --iea-sidebar-rail-active: rgba(59, 130, 246, 0.13);
+  --iea-sidebar-text: #475569;
+  --iea-sidebar-text-active: #2563EB;
+  --iea-sidebar-tree: rgba(15, 23, 42, 0.10);
+  --iea-sidebar-logo-bg: #3B82F6;
+  --iea-badge-mint-bg: rgba(59, 130, 246, 0.12);
+  --iea-badge-mint-text: #2563EB;
+  --iea-badge-peach-bg: rgba(220, 38, 38, 0.12);
+  --iea-badge-peach-text: #DC2626;
+
+  /* Typography Hierarchy (WCAG AA compliant on white & #F5F6F8) */
+  --iea-text-primary: #0F172A;
+  --iea-text-secondary: #475569;
+  --iea-text-muted: #64748B;
+  --iea-text-dim: #94A3B8;
+
+  /* Vivid Blue Primary Accent */
+  --iea-accent-primary: #3B82F6;
+  --iea-accent-primary-hover: #2563EB;
+  --iea-accent-primary-soft: rgba(59, 130, 246, 0.10);
+  --iea-accent-primary-border: rgba(59, 130, 246, 0.28);
+  --iea-accent-on-primary: #FFFFFF;
+
+  /* Semantic Meaning Palette (WCAG AA contrast on white) */
+  --iea-profit: #16A34A;
+  --iea-profit-solid: #16A34A;
+  --iea-profit-soft: rgba(22, 163, 74, 0.11);
+  --iea-profit-border: rgba(22, 163, 74, 0.28);
+
+  --iea-danger: #DC2626;
+  --iea-danger-solid: #DC2626;
+  --iea-danger-soft: rgba(220, 38, 38, 0.10);
+  --iea-danger-border: rgba(220, 38, 38, 0.26);
+
+  --iea-warning: #D97706;
+  --iea-warning-soft: rgba(217, 119, 6, 0.11);
+  --iea-warning-border: rgba(217, 119, 6, 0.28);
+
+  --iea-info: #2563EB;
+  --iea-info-soft: rgba(37, 99, 235, 0.10);
+  --iea-info-border: rgba(37, 99, 235, 0.26);
+
+  /* Chart & Tooltip Tokens */
+  --iea-chart-bg: #FFFFFF;
+  --iea-chart-toolbar-bg: #F8FAFC;
+  --iea-chart-grid: rgba(226, 232, 240, 0.65);
+  --iea-chart-text: #4B5563;
+  --iea-chart-axis-border: #E5E7EB;
+  --iea-chart-crosshair: #787B86;
+  --iea-chart-crosshair-label-bg: #374151;
+  --iea-tooltip-bg: #FFFFFF;
+  --iea-tooltip-border: rgba(15, 23, 42, 0.12);
+  --iea-tooltip-text: #0F172A;
+
+  /* Legacy Variable Mapping (unified for modals & shared components) */
+  --institutional-ea-bg: #F5F6F8;
+  --institutional-ea-card: #FFFFFF;
+  --institutional-ea-surface: #F8FAFC;
+  --institutional-ea-surface-secondary: #F1F5F9;
+  --institutional-ea-surface-tertiary: #E2E8F0;
+  --institutional-ea-surface-hover: #E2E8F0;
+  --institutional-ea-border: rgba(15, 23, 42, 0.12);
+  --institutional-ea-border-subtle: rgba(15, 23, 42, 0.08);
+  --institutional-ea-border-strong: rgba(15, 23, 42, 0.20);
+  --institutional-ea-text: #0F172A;
+  --institutional-ea-text-secondary: #475569;
+  --institutional-ea-text-muted: #64748B;
+  --institutional-ea-primary: #3B82F6;
+  --institutional-ea-primary-hover: #2563EB;
+  --institutional-ea-primary-active: #1D4ED8;
+  --institutional-ea-primary-soft: rgba(59, 130, 246, 0.10);
+  --institutional-ea-profit: #16A34A;
+  --institutional-ea-profit-soft: rgba(22, 163, 74, 0.11);
+  --institutional-ea-loss: #DC2626;
+  --institutional-ea-loss-soft: rgba(220, 38, 38, 0.10);
+  --institutional-ea-error: #DC2626;
+  --institutional-ea-error-soft: rgba(220, 38, 38, 0.10);
+  --institutional-ea-warning: #D97706;
+  --institutional-ea-warning-soft: rgba(217, 119, 6, 0.11);
+  --institutional-ea-info: #2563EB;
+  --institutional-ea-info-soft: rgba(37, 99, 235, 0.10);
+
+  /* Scrollbars & Modal Backdrop */
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(15, 23, 42, 0.16);
+  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.28);
+  --overlay-bg: rgba(15, 23, 42, 0.45);
+}
+
 @layer base {
   html,
   body {
@@ -153,24 +292,19 @@
 }
 
 /* ============================================================================
-   CHART PROTECTION ISOLATION (DO NOT ALTER — preserves LiveTradingChart.tsx)
-   Locks the untouched chart container's exact original surface & inheritance.
+   Live Trading Chart Container (Theme-Aware Dark / Light Surface)
 ============================================================================ */
 [aria-label^="Live Trading Chart"] {
-  color: #F4F7FF;
+  color: var(--iea-text-primary);
   letter-spacing: -0.015em;
   font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .iea-glass-card[aria-label^="Live Trading Chart"] {
-  background: linear-gradient(165deg, rgba(32, 54, 101, 0.44) 0%, rgba(14, 28, 54, 0.66) 100%);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(186, 214, 255, 0.15);
+  background-color: var(--iea-surface-card);
+  border: 1px solid var(--iea-border-subtle);
   border-radius: 18px;
-  box-shadow:
-    0 18px 42px -14px rgba(4, 10, 24, 0.68),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+  box-shadow: var(--iea-card-shadow);
 }
 
 /* ============================================================================
@@ -188,10 +322,11 @@
   background-color: var(--iea-surface-card);
   border: 1px solid var(--iea-border-subtle);
   border-radius: var(--iea-radius-card);
-  box-shadow: none;
+  box-shadow: var(--iea-card-shadow);
   transition:
     border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    background-color 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    background-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .iea-card:hover {

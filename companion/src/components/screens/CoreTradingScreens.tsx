@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Activity,
   AlertTriangle,
   Award,
-  BarChart3,
   Bell,
   Bot,
   ChevronDown,
@@ -15,7 +13,6 @@ import {
   Pause,
   Play,
   Plug,
-  Plus,
   Scissors,
   Search,
   Send,
@@ -26,6 +23,7 @@ import {
   TrendingDown,
   TrendingUp,
   Unplug,
+  Wallet,
   Wifi,
   WifiOff,
   XCircle,
@@ -60,6 +58,7 @@ import {
 import { getNeutralSymbolChipSpec } from "../../styles/designTokens";
 import { UI_COPY } from "../../constants/uiCopy";
 import { useTheme } from "../../context/ThemeContext";
+import { readVersionedState, writeVersionedState } from "../../utils/persistedState";
 import { LiveTradingChart } from "../LiveTradingChart";
 import { PanelErrorBoundary } from "../ErrorBoundary";
 import type { EngineDrawingsFeed } from "../../utils/chartDrawingsSchema";
@@ -68,6 +67,26 @@ import type { EngineDrawingsFeed } from "../../utils/chartDrawingsSchema";
 let sessionStartDemoConfirmed = false;
 
 type TrendMetricMode = "PNL" | "EQUITY";
+type AccountKpiMode = "BALANCE" | "EQUITY";
+const ACCOUNT_KPI_MODE_STORAGE_KEY = "iea_account_kpi_mode_v1";
+
+function isValidAccountKpiMode(v: unknown): v is AccountKpiMode {
+  return v === "BALANCE" || v === "EQUITY";
+}
+
+function formatCurrencyValue(value: number | null | undefined, signed = false): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "-";
+  }
+  const absFormatted = Math.abs(value).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  if (!signed) {
+    return value < 0 ? `-$${absFormatted}` : `$${absFormatted}`;
+  }
+  return `${value >= 0 ? "+" : "-"}$${absFormatted}`;
+}
 type TrendRangeOption =
   | "1 Day"
   | "1 Week"
@@ -85,17 +104,6 @@ const TREND_RANGES: TrendRangeOption[] = [
   "6 Months",
   "1 Year",
   "All",
-];
-
-const WATCHLIST_INSTRUMENTS: Array<{
-  symbol: ChartSymbol;
-  brokerSymbol: string;
-  name: string;
-  digits: number;
-}> = [
-  { symbol: "XAUUSD", brokerSymbol: "XAUUSD.m", name: "Gold Spot / US Dollar", digits: 2 },
-  { symbol: "BTCUSD", brokerSymbol: "BTCUSD.m", name: "Bitcoin / US Dollar", digits: 2 },
-  { symbol: "USDJPY", brokerSymbol: "USDJPY.m", name: "US Dollar / Japanese Yen", digits: 3 },
 ];
 
 function formatHeaderClock(now: Date): string {
@@ -151,9 +159,23 @@ export const DashboardScreen: React.FC<
 
   // Main Card Header states (PNL Trend segmented toggle, range selector, quick search)
   const [trendMode, setTrendMode] = useState<TrendMetricMode>("EQUITY");
+  const [accountKpiMode, setAccountKpiMode] = useState<AccountKpiMode>(
+    () =>
+      readVersionedState<AccountKpiMode>({
+        key: ACCOUNT_KPI_MODE_STORAGE_KEY,
+        defaultValue: "BALANCE",
+        validate: isValidAccountKpiMode,
+        migrate: (legacy) => (isValidAccountKpiMode(legacy) ? legacy : null),
+      }).value
+  );
   const [selectedRange, setSelectedRange] = useState<TrendRangeOption>("1 Month");
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  const handleSelectAccountKpiMode = (nextMode: AccountKpiMode) => {
+    setAccountKpiMode(nextMode);
+    writeVersionedState(ACCOUNT_KPI_MODE_STORAGE_KEY, nextMode);
+  };
 
   // Sync external symbol jump (e.g., clicking a row in Live Signal Grid)
   useEffect(() => {
@@ -289,7 +311,7 @@ export const DashboardScreen: React.FC<
       }`
     : "Waiting for MT5";
 
-  // Derive 4 KPI Metrics: Net Realized P/L, Win Rate, Profit Factor, Max Drawdown
+  // Derive 4 KPI Metrics: Account (Balance/Equity), Win Rate, Today P/L, Total Profits
   const kpiSummary = useMemo(() => {
     const closedTrades = (dash.recentTrades || []).filter(
       (t) =>
@@ -299,40 +321,62 @@ export const DashboardScreen: React.FC<
     );
     const wins = closedTrades.filter((t) => Number(t.profit || 0) > 0);
     const losses = closedTrades.filter((t) => Number(t.profit || 0) < 0);
-    const realizedNetPnl = closedTrades.reduce((sum, t) => sum + Number(t.profit || 0), 0);
-    const grossWin = wins.reduce((sum, t) => sum + Number(t.profit || 0), 0);
-    const grossLoss = Math.abs(losses.reduce((sum, t) => sum + Number(t.profit || 0), 0));
+    const realizedNetPnl = closedTrades.reduce((sum, t) => {
+      const p = Number(t.profit || 0);
+      return Number.isFinite(p) ? sum + p : sum;
+    }, 0);
+
+    const todayUtcDate = new Date().toISOString().slice(0, 10);
+    const closedToday = closedTrades.filter(
+      (t) => t.closed_at && String(t.closed_at).slice(0, 10) === todayUtcDate
+    );
+    const closedPnlToday = closedToday.reduce((sum, t) => {
+      const p = Number(t.profit || 0);
+      return Number.isFinite(p) ? sum + p : sum;
+    }, 0);
+    const todayTradesCount = closedToday.length + activePositions.length;
+
+    const todayPnlVal =
+      kpis.todayPnlUsd !== null && Number.isFinite(kpis.todayPnlUsd)
+        ? kpis.todayPnlUsd
+        : closedToday.length > 0
+        ? Number(closedPnlToday.toFixed(2))
+        : dash.connected
+        ? 0
+        : null;
+
+    const totalProfitsVal =
+      closedTrades.length > 0
+        ? Number(realizedNetPnl.toFixed(2))
+        : dash.connected
+        ? kpis.todayPnlUsd ?? kpis.floatingPnl ?? 0
+        : null;
 
     const netPnlValue =
       closedTrades.length > 0
-        ? realizedNetPnl
-        : kpis.todayPnlUsd !== null
+        ? Number(realizedNetPnl.toFixed(2))
+        : kpis.todayPnlUsd !== null && Number.isFinite(kpis.todayPnlUsd)
         ? kpis.todayPnlUsd
         : kpis.floatingPnl;
 
     const winRatePct =
-      closedTrades.length > 0 ? (wins.length / closedTrades.length) * 100 : null;
-
-    const profitFactorVal =
-      closedTrades.length === 0
-        ? null
-        : grossLoss > 0
-        ? grossWin / grossLoss
-        : grossWin > 0
-        ? 99.9
-        : 0;
+      closedTrades.length > 0
+        ? Number(((wins.length / closedTrades.length) * 100).toFixed(1))
+        : dash.connected
+        ? 0
+        : null;
 
     return {
       closedCount: closedTrades.length,
       winsCount: wins.length,
       lossesCount: losses.length,
+      todayTradesCount,
+      todayPnlVal,
+      totalProfitsVal,
       netPnlValue,
       winRatePct,
-      profitFactorVal,
-      grossWin,
-      grossLoss,
     };
-  }, [dash.recentTrades, kpis.todayPnlUsd, kpis.floatingPnl]);
+  }, [dash.recentTrades, dash.connected, activePositions.length, kpis.todayPnlUsd, kpis.floatingPnl]);
 
   const handleRangeSelect = (range: TrendRangeOption) => {
     setSelectedRange(range);
@@ -610,15 +654,6 @@ export const DashboardScreen: React.FC<
     }
   };
 
-  const filteredWatchlist = useMemo(() => {
-    if (!searchQuery.trim()) return WATCHLIST_INSTRUMENTS;
-    const q = searchQuery.trim().toLowerCase();
-    return WATCHLIST_INSTRUMENTS.filter(
-      (item) =>
-        item.symbol.toLowerCase().includes(q) || item.name.toLowerCase().includes(q)
-    );
-  }, [searchQuery]);
-
   return (
     <div className="max-w-[1920px] mx-auto space-y-[18px] text-iea-textPrimary">
       {/* Compact Connection / Stale / Emergency Banner States */}
@@ -735,9 +770,20 @@ export const DashboardScreen: React.FC<
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter symbol..."
-                  aria-label="Filter watchlist symbol"
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setSearchQuery(next);
+                    const upper = next.trim().toUpperCase();
+                    if (upper === "XAU" || upper === "XAUUSD" || upper === "GOLD") {
+                      setSelectedSymbol("XAUUSD");
+                    } else if (upper === "BTC" || upper === "BTCUSD") {
+                      setSelectedSymbol("BTCUSD");
+                    } else if (upper === "JPY" || upper === "USDJPY") {
+                      setSelectedSymbol("USDJPY");
+                    }
+                  }}
+                  placeholder="Jump symbol..."
+                  aria-label="Quick jump chart symbol"
                   className="bg-transparent text-xs text-iea-textPrimary placeholder:text-iea-textMuted focus:outline-none w-24 font-mono"
                 />
               </div>
@@ -970,7 +1016,7 @@ export const DashboardScreen: React.FC<
                       <button
                         type="button"
                         onClick={() => setMt5PickerTerminals(null)}
-                        className="text-iea-textSecondary hover:text-white"
+                        className="text-iea-textSecondary hover:text-iea-textPrimary"
                       >
                         Close
                       </button>
@@ -1164,11 +1210,13 @@ export const DashboardScreen: React.FC<
               title={`Theme: ${theme.toUpperCase()} (click to switch)`}
               className="iea-header-icon-btn"
             >
-              {theme === "dark" ? (
-                <Moon className="w-4 h-4" />
-              ) : (
-                <Sun className="w-4 h-4" />
-              )}
+              <span className="inline-flex items-center justify-center transition-transform duration-200">
+                {theme === "dark" ? (
+                  <Moon className="w-4 h-4 transition-opacity duration-200" />
+                ) : (
+                  <Sun className="w-4 h-4 transition-opacity duration-200" />
+                )}
+              </span>
             </button>
           </div>
         </section>
@@ -1176,78 +1224,83 @@ export const DashboardScreen: React.FC<
 
       {/* =====================================================================
           ROW 2: 4 EQUAL KPI CARDS IN A RESPONSIVE GRID
-          (Net Realized P/L, Win Rate, Profit Factor, Max Drawdown)
+          (Account [Balance | Equity], Win Rate, Today P/L, Total Profits)
       ====================================================================== */}
       <PanelErrorBoundary panelName="KPI Summary">
         <section
           aria-label="Account and Risk Key Performance Indicators"
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[18px]"
         >
-          {/* KPI 1: NET REALIZED P/L */}
+          {/* KPI 1: ACCOUNT (Balance / Equity Switch) */}
           <div
+            data-testid="kpi-card-account"
             className="iea-card p-5 flex flex-col justify-between"
-            title={`${UI_COPY.kpis.todayPnl.tooltip} · ${syncedTimeLabel}`}
+            title={`Live MT5 Account ${accountKpiMode === "BALANCE" ? "Balance" : "Equity"} · ${syncedTimeLabel}`}
           >
-            <div className="flex items-center justify-between">
-              <span className="iea-label-caps">NET REALIZED P/L</span>
-              <div
-                className={`w-8 h-8 rounded-[10px] flex items-center justify-center border ${
-                  (kpiSummary.netPnlValue ?? 0) >= 0
-                    ? "bg-iea-profitSoft border-iea-profitBorder text-iea-profit"
-                    : "bg-iea-dangerSoft border-iea-dangerBorder text-iea-danger"
-                }`}
-              >
-                <DollarSign className="w-4 h-4" />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="iea-label-caps">ACCOUNT</span>
+                <div
+                  role="tablist"
+                  aria-label="Toggle Account Balance or Equity"
+                  className="inline-flex items-center p-0.5 rounded-[8px] bg-iea-inset border border-iea-borderSubtle text-[10px]"
+                >
+                  {(["BALANCE", "EQUITY"] as const).map((m) => {
+                    const active = accountKpiMode === m;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        data-testid={`account-kpi-toggle-${m.toLowerCase()}`}
+                        onClick={() => handleSelectAccountKpiMode(m)}
+                        className={`px-2 py-0.5 rounded-[6px] font-semibold transition ${
+                          active
+                            ? "bg-iea-accent text-white"
+                            : "text-iea-textMuted hover:text-iea-textPrimary"
+                        }`}
+                      >
+                        {m === "BALANCE" ? "Balance" : "Equity"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="w-8 h-8 rounded-[10px] bg-iea-accentSoft border border-iea-accentBorder text-iea-accent flex items-center justify-center shrink-0">
+                <Wallet className="w-4 h-4" />
               </div>
             </div>
 
             <div
-              className={`text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight mt-3 ${
-                kpiSummary.netPnlValue === null
-                  ? "text-iea-profit"
-                  : kpiSummary.netPnlValue >= 0
-                  ? "text-iea-profit"
-                  : "text-iea-danger"
-              }`}
+              data-testid="kpi-account-primary-value"
+              className="text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight text-iea-textPrimary mt-3"
             >
-              {kpiSummary.netPnlValue !== null
-                ? `${kpiSummary.netPnlValue >= 0 ? "+" : "-"}$${Math.abs(
-                    kpiSummary.netPnlValue
-                  ).toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}`
-                : "$0.00"}
+              {accountKpiMode === "BALANCE"
+                ? formatCurrencyValue(kpis.balance, false)
+                : formatCurrencyValue(kpis.equity, false)}
             </div>
 
             <div className="h-px bg-iea-borderSubtle my-3.5" />
 
             <div className="flex items-center justify-between font-mono text-[11px] tabular-nums">
-              <span className="text-iea-textSecondary truncate">
-                {kpis.todayPnlUsd !== null
-                  ? `Today ${kpis.todayPnlUsd >= 0 ? "+" : "-"}$${Math.abs(
-                      kpis.todayPnlUsd
-                    ).toFixed(2)}${
-                      kpis.todayPnlR !== null
-                        ? ` (${kpis.todayPnlR >= 0 ? "+" : ""}${kpis.todayPnlR.toFixed(2)}R)`
-                        : ""
-                    }`
-                  : `${kpiSummary.closedCount} closed trades`}
-              </span>
               <span
-                className={`px-2 py-0.5 rounded-[6px] text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                  (kpiSummary.netPnlValue ?? 0) >= 0
-                    ? "bg-iea-profitSoft text-iea-profit"
-                    : "bg-iea-dangerSoft text-iea-danger"
-                }`}
+                data-testid="kpi-account-secondary-caption"
+                className="text-iea-textSecondary truncate"
               >
-                {(kpiSummary.netPnlValue ?? 0) >= 0 ? "PROFIT" : "LOSS"}
+                {accountKpiMode === "BALANCE"
+                  ? `Equity: ${formatCurrencyValue(kpis.equity, false)}`
+                  : `Balance: ${formatCurrencyValue(kpis.balance, false)}`}
+              </span>
+              <span className="px-2 py-0.5 rounded-[6px] bg-iea-accentSoft text-iea-accent text-[10px] font-bold uppercase tracking-wider shrink-0">
+                {accountKpiMode}
               </span>
             </div>
           </div>
 
           {/* KPI 2: WIN RATE */}
           <div
+            data-testid="kpi-card-win-rate"
             className="iea-card p-5 flex flex-col justify-between"
             title="Closed trade win rate percentage"
           >
@@ -1259,9 +1312,9 @@ export const DashboardScreen: React.FC<
             </div>
 
             <div className="text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight text-iea-textPrimary mt-3">
-              {kpiSummary.winRatePct !== null
+              {kpiSummary.winRatePct !== null && Number.isFinite(kpiSummary.winRatePct)
                 ? `${kpiSummary.winRatePct.toFixed(1)}%`
-                : "0.0%"}
+                : "-"}
             </div>
 
             <div className="h-px bg-iea-borderSubtle my-3.5" />
@@ -1280,63 +1333,118 @@ export const DashboardScreen: React.FC<
             </div>
           </div>
 
-          {/* KPI 3: PROFIT FACTOR */}
+          {/* KPI 3: TODAY P/L */}
           <div
+            data-testid="kpi-card-today-pnl"
             className="iea-card p-5 flex flex-col justify-between"
-            title={`${UI_COPY.kpis.openExp.tooltip} · Gross Win / Gross Loss`}
+            title={`${UI_COPY.kpis.todayPnl.tooltip} · Realized + floating P/L for the current trading day`}
           >
             <div className="flex items-center justify-between">
-              <span className="iea-label-caps">PROFIT FACTOR</span>
-              <div className="w-8 h-8 rounded-[10px] bg-iea-accentSoft border border-iea-accentBorder text-iea-accent flex items-center justify-center">
-                <BarChart3 className="w-4 h-4" />
+              <span className="iea-label-caps">TODAY P/L</span>
+              <div
+                className={`w-8 h-8 rounded-[10px] flex items-center justify-center border ${
+                  (kpiSummary.todayPnlVal ?? 0) >= 0
+                    ? "bg-iea-profitSoft border-iea-profitBorder text-iea-profit"
+                    : "bg-iea-dangerSoft border-iea-dangerBorder text-iea-danger"
+                }`}
+              >
+                {(kpiSummary.todayPnlVal ?? 0) >= 0 ? (
+                  <TrendingUp className="w-4 h-4" />
+                ) : (
+                  <TrendingDown className="w-4 h-4" />
+                )}
               </div>
             </div>
 
-            <div className="text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight text-iea-textPrimary mt-3">
-              {kpiSummary.profitFactorVal !== null
-                ? kpiSummary.profitFactorVal.toFixed(2)
-                : "0.00"}
+            <div
+              className={`text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight mt-3 ${
+                kpiSummary.todayPnlVal === null
+                  ? "text-iea-textMuted"
+                  : kpiSummary.todayPnlVal >= 0
+                  ? "text-iea-profit"
+                  : "text-iea-danger"
+              }`}
+            >
+              {formatCurrencyValue(kpiSummary.todayPnlVal, true)}
             </div>
 
             <div className="h-px bg-iea-borderSubtle my-3.5" />
 
             <div className="flex items-center justify-between font-mono text-[11px] tabular-nums">
               <span className="text-iea-textSecondary truncate">
-                {activePositions.length} Pos · {kpis.pendingOrdersCount} Ord (Bot {botOpenCount})
+                {kpiSummary.todayTradesCount}{" "}
+                {kpiSummary.todayTradesCount === 1 ? "trade" : "trades"} today
               </span>
-              <span className="px-2 py-0.5 rounded-[6px] bg-iea-profitSoft text-iea-profit text-[10px] font-bold uppercase tracking-wider shrink-0">
-                SL GUARDED
+              <span
+                className={`px-2 py-0.5 rounded-[6px] text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                  kpiSummary.todayPnlVal === null
+                    ? "bg-iea-elevated text-iea-textMuted"
+                    : kpiSummary.todayPnlVal >= 0
+                    ? "bg-iea-profitSoft text-iea-profit"
+                    : "bg-iea-dangerSoft text-iea-danger"
+                }`}
+              >
+                {kpiSummary.todayPnlVal === null
+                  ? "IDLE"
+                  : kpiSummary.todayPnlVal >= 0
+                  ? "PROFIT"
+                  : "LOSS"}
               </span>
             </div>
           </div>
 
-          {/* KPI 4: MAX DRAWDOWN */}
+          {/* KPI 4: TOTAL PROFITS */}
           <div
+            data-testid="kpi-card-total-profits"
             className="iea-card p-5 flex flex-col justify-between"
-            title={`${UI_COPY.kpis.ddCap.tooltip} · ${UI_COPY.kpis.dailyLoss.tooltip}`}
+            title="Cumulative net profit across connected account history"
           >
             <div className="flex items-center justify-between">
-              <span className="iea-label-caps">MAX DRAWDOWN</span>
-              <div className="w-8 h-8 rounded-[10px] bg-iea-dangerSoft border border-iea-dangerBorder text-iea-danger flex items-center justify-center">
-                <TrendingDown className="w-4 h-4" />
+              <span className="iea-label-caps">TOTAL PROFITS</span>
+              <div
+                className={`w-8 h-8 rounded-[10px] flex items-center justify-center border ${
+                  (kpiSummary.totalProfitsVal ?? 0) >= 0
+                    ? "bg-iea-profitSoft border-iea-profitBorder text-iea-profit"
+                    : "bg-iea-dangerSoft border-iea-dangerBorder text-iea-danger"
+                }`}
+              >
+                <DollarSign className="w-4 h-4" />
               </div>
             </div>
 
-            <div className="text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight text-iea-danger mt-3">
-              {kpis.totalDrawdownUsedPct.toFixed(2)}%{" "}
-              <span className="text-xs font-normal text-iea-textMuted">
-                / {kpis.totalDrawdownCapPct.toFixed(1)}%
-              </span>
+            <div
+              className={`text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight mt-3 ${
+                kpiSummary.totalProfitsVal === null
+                  ? "text-iea-textMuted"
+                  : kpiSummary.totalProfitsVal >= 0
+                  ? "text-iea-profit"
+                  : "text-iea-danger"
+              }`}
+            >
+              {formatCurrencyValue(kpiSummary.totalProfitsVal, true)}
             </div>
 
             <div className="h-px bg-iea-borderSubtle my-3.5" />
 
             <div className="flex items-center justify-between font-mono text-[11px] tabular-nums">
               <span className="text-iea-textSecondary truncate">
-                Daily Loss {kpis.dailyLossUsedPct.toFixed(2)}% / {kpis.dailyLossLimitPct.toFixed(1)}%
+                {kpiSummary.closedCount} total{" "}
+                {kpiSummary.closedCount === 1 ? "deal" : "deals"}
               </span>
-              <span className="px-2 py-0.5 rounded-[6px] bg-iea-profitSoft text-iea-profit text-[10px] font-bold uppercase tracking-wider shrink-0">
-                SAFE
+              <span
+                className={`px-2 py-0.5 rounded-[6px] text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                  kpiSummary.totalProfitsVal === null
+                    ? "bg-iea-elevated text-iea-textMuted"
+                    : kpiSummary.totalProfitsVal >= 0
+                    ? "bg-iea-profitSoft text-iea-profit"
+                    : "bg-iea-dangerSoft text-iea-danger"
+                }`}
+              >
+                {kpiSummary.totalProfitsVal === null
+                  ? "IDLE"
+                  : kpiSummary.totalProfitsVal >= 0
+                  ? "PROFIT"
+                  : "LOSS"}
               </span>
             </div>
           </div>
@@ -1344,38 +1452,68 @@ export const DashboardScreen: React.FC<
       </PanelErrorBoundary>
 
       {/* =====================================================================
-          ROW 3: MAIN CARDS — PNL TREND (LEFT, 8 COLS) + WATCHLIST (RIGHT, 4 COLS)
+          ROW 3: FULL-WIDTH MAIN CHART CARD
       ====================================================================== */}
-      <section
-        aria-label="Main Trading Cards"
-        className="grid grid-cols-1 xl:grid-cols-12 gap-[18px]"
-      >
-        {/* LEFT CARD: PNL Trend Wrapper + Untouched LiveTradingChart */}
-        <div className="xl:col-span-8 iea-card p-5 flex flex-col gap-4">
-          {/* PNL Trend Header Row 1: Icon tile + Title + LIVE pill + Subtitle | Big Balance + Synced hh:mm */}
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-center space-x-3.5">
-              <div className="w-11 h-11 rounded-[12px] bg-iea-accentSoft border border-iea-accentBorder text-iea-accent flex items-center justify-center shrink-0">
-                <Activity className="w-5 h-5" />
+      <section aria-label="Main Trading Chart Card" className="w-full">
+        <div className="w-full iea-card p-5 flex flex-col gap-4">
+          {/* Chart Card Header: P&L / Equity Toggle + Range Pills (Left) | Balance Figure + Synced Caption (Right) */}
+          <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-iea-borderSubtle">
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* P&L / Equity Segmented Toggle */}
+              <div
+                role="tablist"
+                aria-label="Toggle P&L or Equity display"
+                className="inline-flex items-center p-1 rounded-[10px] bg-iea-inset border border-iea-borderSubtle text-xs"
+              >
+                {(["PNL", "EQUITY"] as const).map((m) => {
+                  const active = trendMode === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setTrendMode(m)}
+                      className={`px-3 py-1 rounded-[8px] font-semibold transition ${
+                        active
+                          ? "bg-iea-accent text-white"
+                          : "text-iea-textSecondary hover:text-iea-textPrimary"
+                      }`}
+                    >
+                      {m === "PNL" ? "P&L" : "Equity"}
+                    </button>
+                  );
+                })}
               </div>
-              <div>
-                <div className="flex items-center space-x-2.5">
-                  <h2 className="text-base font-bold text-iea-textPrimary tracking-tight">
-                    PNL Trend
-                  </h2>
-                  <span className="px-2 py-0.5 rounded-full bg-iea-profitSoft border border-iea-profitBorder text-iea-profit font-mono text-[10px] font-bold uppercase tracking-wider inline-flex items-center space-x-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-iea-profit" />
-                    <span>LIVE</span>
-                  </span>
-                </div>
-                <p className="text-xs text-iea-textMuted mt-0.5">
-                  Real-time equity curve, institutional order flow &amp; live execution chart
-                </p>
+
+              {/* Range Pill Selector (1 Day, 1 Week, 1 Month, 3 Months, 6 Months, 1 Year, All) */}
+              <div
+                role="group"
+                aria-label="Select trend range"
+                className="flex flex-wrap items-center gap-1"
+              >
+                {TREND_RANGES.map((range) => {
+                  const active = selectedRange === range;
+                  return (
+                    <button
+                      key={range}
+                      type="button"
+                      onClick={() => handleRangeSelect(range)}
+                      className={`px-2.5 py-1 rounded-[8px] text-[11px] font-medium transition ${
+                        active
+                          ? "bg-iea-accent text-white font-semibold"
+                          : "bg-iea-inset hover:bg-iea-elevated text-iea-textSecondary hover:text-iea-textPrimary border border-iea-borderSubtle"
+                      }`}
+                    >
+                      {range}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Big Balance / P&L Figure + Synced hh:mm Caption */}
-            <div className="text-right">
+            {/* Big Balance / P&L Figure + "Bal ... · Synced hh:mm" Caption on the Right */}
+            <div className="text-left sm:text-right sm:ml-auto">
               <div
                 className={`text-2xl md:text-[28px] font-bold font-mono tabular-nums tracking-tight leading-none ${
                   trendMode === "PNL"
@@ -1386,30 +1524,17 @@ export const DashboardScreen: React.FC<
                 }`}
               >
                 {trendMode === "PNL"
-                  ? kpiSummary.netPnlValue !== null
-                    ? `${kpiSummary.netPnlValue >= 0 ? "+" : "-"}$${Math.abs(
-                        kpiSummary.netPnlValue
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}`
-                    : "$0.00"
+                  ? formatCurrencyValue(kpiSummary.netPnlValue, true)
                   : kpis.equity !== null
-                  ? `$${kpis.equity.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}`
+                  ? formatCurrencyValue(kpis.equity, false)
                   : kpis.balance !== null
-                  ? `$${kpis.balance.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}`
-                  : "—"}
+                  ? formatCurrencyValue(kpis.balance, false)
+                  : "-"}
               </div>
-              <div className="text-[11px] font-mono text-iea-textMuted mt-1.5 flex items-center justify-end space-x-2">
+              <div className="text-[11px] font-mono text-iea-textMuted mt-1.5 flex items-center sm:justify-end space-x-2">
                 {kpis.balance !== null && (
                   <span>
-                    Bal ${kpis.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ·
+                    Bal {formatCurrencyValue(kpis.balance, false)} ·
                   </span>
                 )}
                 <span>{syncedTimeLabel}</span>
@@ -1417,62 +1542,7 @@ export const DashboardScreen: React.FC<
             </div>
           </div>
 
-          {/* PNL Trend Header Row 2: P&L / Equity Segmented Toggle + Range Pill Selector */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-2 border-b border-iea-borderSubtle">
-            {/* P&L / Equity Segmented Toggle */}
-            <div
-              role="tablist"
-              aria-label="Toggle P&L or Equity display"
-              className="inline-flex items-center p-1 rounded-[10px] bg-iea-inset border border-iea-borderSubtle text-xs"
-            >
-              {(["PNL", "EQUITY"] as const).map((m) => {
-                const active = trendMode === m;
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setTrendMode(m)}
-                    className={`px-3 py-1 rounded-[8px] font-semibold transition ${
-                      active
-                        ? "bg-iea-accent text-white"
-                        : "text-iea-textSecondary hover:text-iea-textPrimary"
-                    }`}
-                  >
-                    {m === "PNL" ? "P&L" : "Equity"}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Range Pill Selector (1 Day, 1 Week, 1 Month, 3 Months, 6 Months, 1 Year, All) */}
-            <div
-              role="group"
-              aria-label="Select trend range"
-              className="flex flex-wrap items-center gap-1"
-            >
-              {TREND_RANGES.map((range) => {
-                const active = selectedRange === range;
-                return (
-                  <button
-                    key={range}
-                    type="button"
-                    onClick={() => handleRangeSelect(range)}
-                    className={`px-2.5 py-1 rounded-[8px] text-[11px] font-medium transition ${
-                      active
-                        ? "bg-iea-accent text-white font-semibold"
-                        : "bg-iea-inset hover:bg-iea-elevated text-iea-textSecondary hover:text-iea-textPrimary border border-iea-borderSubtle"
-                    }`}
-                  >
-                    {range}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Untouched LiveTradingChart Container */}
+          {/* LiveTradingChart Container */}
           <PanelErrorBoundary panelName="Live Chart">
             <div
               className="w-full flex flex-col"
@@ -1492,194 +1562,6 @@ export const DashboardScreen: React.FC<
               />
             </div>
           </PanelErrorBoundary>
-        </div>
-
-        {/* RIGHT CARD: Watchlist Style Card */}
-        <div className="xl:col-span-4 iea-card p-5 flex flex-col justify-between gap-4">
-          <div className="space-y-4">
-            {/* Watchlist Header: Title + "+" Button */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold text-iea-textPrimary tracking-tight">
-                  Watchlist
-                </h2>
-                <p className="text-xs text-iea-textMuted mt-0.5">
-                  Live MT5 Market Watch &amp; active exposure
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onNavigate("signals")}
-                aria-label="Add or inspect live symbol signals"
-                title="View Live Signal Grid"
-                className="w-8 h-8 rounded-[10px] bg-iea-elevated hover:bg-iea-active border border-iea-borderSubtle text-iea-textPrimary flex items-center justify-center transition"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Watchlist Rows with Thin Dividers */}
-            <div className="divide-y divide-iea-borderSubtle border-t border-b border-iea-borderSubtle">
-              {filteredWatchlist.map((item) => {
-                const liveSpecs = effectiveStatus.mt5.symbols || {};
-                const spec: ControlSymbolSpec | undefined =
-                  (selectedSymbol === item.symbol && liveQuote) ||
-                  liveSpecs[item.brokerSymbol] ||
-                  liveSpecs[item.symbol] ||
-                  Object.values(liveSpecs).find(
-                    (s) => normalizeCanonicalSymbol(s.symbol) === item.symbol
-                  );
-
-                const chip = getNeutralSymbolChipSpec(item.symbol);
-                const isSelected = selectedSymbol === item.symbol;
-                const bidPrice = spec && spec.bid > 0 ? spec.bid : null;
-                const askPrice = spec && spec.ask > 0 ? spec.ask : null;
-                const spreadPts = spec?.spread_points ?? null;
-
-                // Open positions on this symbol
-                const symPositions = activePositions.filter(
-                  (p) => normalizeCanonicalSymbol(p.symbol) === item.symbol
-                );
-                const symPnl = symPositions.reduce((s, p) => s + p.profit, 0);
-
-                // Compute latest bar % change if selectedSymbol has candles
-                let pctChange: number | null = null;
-                if (isSelected && realCandles.length >= 2) {
-                  const first = realCandles[0].open;
-                  const last = realCandles[realCandles.length - 1].close;
-                  if (first > 0) {
-                    pctChange = ((last - first) / first) * 100;
-                  }
-                }
-
-                const isPositive =
-                  symPositions.length > 0
-                    ? symPnl >= 0
-                    : pctChange !== null
-                    ? pctChange >= 0
-                    : true;
-
-                return (
-                  <button
-                    key={item.symbol}
-                    type="button"
-                    onClick={() => setSelectedSymbol(item.symbol)}
-                    className={`w-full py-3.5 px-2.5 text-left flex items-center justify-between gap-3 transition rounded-[10px] ${
-                      isSelected
-                        ? "bg-iea-accentSoft/60"
-                        : "hover:bg-iea-elevated/60"
-                    }`}
-                  >
-                    {/* Left: Circular Symbol Badge + Symbol & Name */}
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <span
-                        className={`w-10 h-10 rounded-full text-xs font-mono font-bold inline-flex items-center justify-center shrink-0 ${chip.chipBg} ${chip.chipRing}`}
-                      >
-                        {chip.shortCode}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-bold text-iea-textPrimary truncate">
-                            {item.symbol}
-                          </span>
-                          {isSelected && (
-                            <span className="px-1.5 py-0.5 rounded-[5px] bg-iea-accent text-white font-mono text-[9px] font-bold uppercase">
-                              ACTIVE
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-iea-textMuted truncate mt-0.5">
-                          {item.name}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Price & Change/P&L (Green/Red) */}
-                    <div className="text-right font-mono tabular-nums shrink-0">
-                      <div className="text-sm font-bold text-iea-textPrimary">
-                        {bidPrice !== null
-                          ? bidPrice.toLocaleString(undefined, {
-                              minimumFractionDigits: item.digits,
-                              maximumFractionDigits: item.digits,
-                            })
-                          : "—"}
-                      </div>
-                      <div
-                        className={`text-[11px] font-semibold mt-0.5 inline-flex items-center space-x-1 ${
-                          symPositions.length > 0
-                            ? isPositive
-                              ? "text-iea-profit"
-                              : "text-iea-danger"
-                            : pctChange !== null
-                            ? isPositive
-                              ? "text-iea-profit"
-                              : "text-iea-danger"
-                            : "text-iea-textMuted"
-                        }`}
-                      >
-                        {symPositions.length > 0 ? (
-                          <span>
-                            {symPnl >= 0 ? "+" : "-"}${Math.abs(symPnl).toFixed(2)} ({symPositions.length}P)
-                          </span>
-                        ) : pctChange !== null ? (
-                          <>
-                            {isPositive ? (
-                              <TrendingUp className="w-3 h-3" />
-                            ) : (
-                              <TrendingDown className="w-3 h-3" />
-                            )}
-                            <span>
-                              {pctChange >= 0 ? "+" : ""}
-                              {pctChange.toFixed(2)}%
-                            </span>
-                          </>
-                        ) : spreadPts !== null && askPrice !== null ? (
-                          <span className="text-iea-profit">Spr {spreadPts} pts</span>
-                        ) : (
-                          <span>Waiting</span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Account & Execution Telemetry Footer inside Watchlist Card */}
-          <div className="iea-inset p-4 space-y-2.5 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="iea-label-caps">ACCOUNT TELEMETRY</span>
-              <span className="font-mono text-[10px] font-bold text-iea-accent">
-                {dash.connected
-                  ? `1:${effectiveStatus.mt5.account.leverage} · ${effectiveStatus.mt5.account.margin_mode_str}`
-                  : "DEMO MODE"}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-1 font-mono">
-              <div className="p-2.5 rounded-[10px] bg-iea-card border border-iea-borderSubtle">
-                <div className="text-[10px] text-iea-textMuted uppercase">Balance</div>
-                <div className="text-xs font-bold text-iea-textPrimary mt-0.5">
-                  {kpis.balance !== null
-                    ? `$${kpis.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : "—"}
-                </div>
-              </div>
-              <div className="p-2.5 rounded-[10px] bg-iea-card border border-iea-borderSubtle">
-                <div className="text-[10px] text-iea-textMuted uppercase">Floating P/L</div>
-                <div
-                  className={`text-xs font-bold mt-0.5 ${
-                    (kpis.floatingPnl ?? 0) >= 0 ? "text-iea-profit" : "text-iea-danger"
-                  }`}
-                >
-                  {kpis.floatingPnl !== null
-                    ? `${kpis.floatingPnl >= 0 ? "+" : "-"}$${Math.abs(kpis.floatingPnl).toFixed(2)}`
-                    : "$0.00"}
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -1912,7 +1794,7 @@ export const DashboardScreen: React.FC<
           role="dialog"
           aria-modal="true"
           aria-labelledby="two-step-confirm-title"
-          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-[var(--overlay-bg)] backdrop-blur-sm flex items-center justify-center p-4"
         >
           <div
             className={`iea-card p-5 max-w-sm w-full space-y-3 shadow-pop ${
@@ -2027,7 +1909,7 @@ export const DashboardScreen: React.FC<
           role="dialog"
           aria-modal="true"
           aria-labelledby="tighten-sl-modal-title"
-          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-[var(--overlay-bg)] backdrop-blur-sm flex items-center justify-center p-4"
         >
           <div className="iea-card p-5 max-w-sm w-full space-y-3 shadow-pop">
             <div className="flex items-center justify-between">

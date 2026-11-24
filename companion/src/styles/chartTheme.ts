@@ -53,6 +53,59 @@ export const LUXALGO_SMC_PALETTE = {
   },
 } as const;
 
+export const CHART_DARK_THEME = {
+  background: "#0D0E11",
+  gridLine: "rgba(255, 255, 255, 0.05)",
+  axisText: "#9CA3AF",
+  axisBorder: "rgba(255, 255, 255, 0.08)",
+  crosshairLine: "#64748B",
+  crosshairLabelBg: "#1D2026",
+
+  candles: {
+    bull: BULL_COLOR,
+    bear: BEAR_COLOR,
+  },
+
+  position: {
+    profitFillPrimary: "rgba(10, 153, 125, 0.30)",
+    profitFillExtension: "rgba(10, 153, 125, 0.17)",
+    lossFill: "rgba(238, 55, 73, 0.18)",
+    secondaryOpacityScale: 0.55,
+    pendingOpacityScale: 0.5,
+    tpEdge: "rgba(10, 153, 125, 0.65)",
+    tp1InnerDashed: "rgba(10, 153, 125, 0.55)",
+    slEdge: "rgba(238, 55, 73, 0.60)",
+    entryLine: "#9CA3AF",
+    pathDashedLine: "rgba(148, 163, 184, 0.65)",
+  },
+
+  fvgOb: {
+    fill: "rgba(34, 197, 94, 0.24)",
+    mitigatedFill: "rgba(34, 197, 94, 0.12)",
+  },
+
+  layers: {
+    liquidityLine: "rgba(148, 163, 184, 0.42)",
+    structureLine: "rgba(148, 163, 184, 0.48)",
+    structureDot: "rgba(148, 163, 184, 0.65)",
+    sessionBand: "rgba(148, 163, 184, 0.07)",
+  },
+
+  typography: {
+    fontFamily: '"Plus Jakarta Sans Variable", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    axisFontFamily: '"JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace',
+    labelColor: "#F3F4F6",
+    positionLabelSize: "clamp(10px, 0.78vw, 12px)",
+    boxLabelSize: "clamp(10px, 0.72vw, 11px)",
+  },
+} as const;
+
+export type ChartThemeTokens = typeof CHART_TV_LIGHT_THEME | typeof CHART_DARK_THEME;
+
+export function getChartThemeTokens(theme: "light" | "dark"): ChartThemeTokens {
+  return theme === "dark" ? CHART_DARK_THEME : CHART_TV_LIGHT_THEME;
+}
+
 export const CHART_TV_LIGHT_THEME = {
   background: "#FFFFFF",
   gridLine: "rgba(226, 232, 240, 0.45)", // Barely visible 1px light-gray grid

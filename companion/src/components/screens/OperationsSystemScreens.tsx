@@ -81,18 +81,18 @@ export const MT5ConnectionScreen: React.FC<{
     <div className="space-y-4">
       <div className="iea-card p-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-light text-[#F5F5F2] flex items-center space-x-2">
-            <Link2 className="w-5 h-5 text-[#6EE7B7]" />
+          <h2 className="text-lg font-bold text-iea-textPrimary flex items-center space-x-2">
+            <Link2 className="w-5 h-5 text-iea-accent" />
             <span>MT5 Terminals</span>
           </h2>
-          <p className="text-xs text-[#B4B3B0] mt-1">
-            Conn: <strong className="text-[#6EE7B7]">{status?.mt5.connection_status || "DISCONNECTED"}</strong> · Mode:{" "}
-            <strong className="text-[#F5F5F2]">{acct?.trade_mode || "DEMO"}</strong> · Margin:{" "}
-            <strong className="text-[#5EC2C6]">{acct?.margin_mode_str || "HEDGING"}</strong>
+          <p className="text-xs text-iea-textSecondary mt-1">
+            Conn: <strong className="text-iea-profit">{status?.mt5.connection_status || "DISCONNECTED"}</strong> · Mode:{" "}
+            <strong className="text-iea-textPrimary">{acct?.trade_mode || "DEMO"}</strong> · Margin:{" "}
+            <strong className="text-iea-accent">{acct?.margin_mode_str || "HEDGING"}</strong>
             {status?.mt5.zmq_bridge && (
               <>
                 {" "}· ZMQ 5555:{" "}
-                <strong className={status.mt5.zmq_bridge.port_5555 ? "text-[#6EE7B7]" : "text-[#8A8986]"}>
+                <strong className={status.mt5.zmq_bridge.port_5555 ? "text-iea-profit" : "text-iea-textMuted"}>
                   {status.mt5.zmq_bridge.port_5555 ? "UP" : "IDLE"}
                 </strong>
               </>
@@ -100,13 +100,13 @@ export const MT5ConnectionScreen: React.FC<{
           </p>
         </div>
         <div className="flex space-x-2.5">
-          <button onClick={scan} className="iea-pill-control px-4 py-1.5 text-xs text-[#F5F5F2] font-semibold">
+          <button onClick={scan} className="iea-pill-control px-4 py-1.5 text-xs text-iea-textPrimary font-semibold">
             Scan
           </button>
           <button
             disabled={busy}
             onClick={() => handleConnect()}
-            className="px-4 py-1.5 bg-[#36B37E] hover:bg-[#3FC48B] disabled:opacity-50 text-xs text-[#121110] font-extrabold rounded-full shadow-[0_0_16px_rgba(176,246,72,0.28)]"
+            className="px-4 py-1.5 bg-iea-accent hover:bg-iea-accentHover disabled:opacity-50 text-xs text-white font-extrabold rounded-full transition"
           >
             {busy ? "Syncing..." : "Sync MT5"}
           </button>
@@ -114,36 +114,36 @@ export const MT5ConnectionScreen: React.FC<{
       </div>
 
       <div className="iea-card p-5 space-y-3">
-        <h3 className="text-sm font-semibold text-[#F5F5F2]">Terminals ({terminals.length})</h3>
+        <h3 className="text-sm font-bold text-iea-textPrimary">Terminals ({terminals.length})</h3>
         {terminals.length === 0 ? (
-          <div className="text-xs text-[#8A8986] py-4">0 terminals detected.</div>
+          <div className="text-xs text-iea-textMuted py-4">0 terminals detected.</div>
         ) : (
           terminals.map((t) => (
             <div key={t.id} className="iea-inset flex flex-wrap items-center justify-between gap-3 p-4 text-xs">
               <div>
-                <div className="font-bold text-[#F5F5F2]">
+                <div className="font-bold text-iea-textPrimary">
                   {t.name}{" "}
                   {t.isRunning ? (
-                    <span className="text-[#6EE7B7] font-mono">(PID {t.pid})</span>
+                    <span className="text-iea-profit font-mono">(PID {t.pid})</span>
                   ) : (
-                    <span className="text-[#8A8986]">(Stopped)</span>
+                    <span className="text-iea-textMuted">(Stopped)</span>
                   )}
                 </div>
-                <div className="font-mono text-[11px] text-[#B4B3B0] mt-0.5">{t.executablePath}</div>
+                <div className="font-mono text-[11px] text-iea-textSecondary mt-0.5">{t.executablePath}</div>
                 {t.dataFolder && (
-                  <div className="font-mono text-[10px] text-[#8A8986] mt-0.5 truncate max-w-[520px]">
+                  <div className="font-mono text-[10px] text-iea-textMuted mt-0.5 truncate max-w-[520px]">
                     Data: {t.dataFolder}
                   </div>
                 )}
-                <div className="text-[11px] text-[#8A8986] mt-0.5">
-                  EA: <strong className="text-[#5EC2C6]">{t.eaInstalled ? `v${t.eaVersion || "3.10"}` : "None"}</strong>
+                <div className="text-[11px] text-iea-textMuted mt-0.5">
+                  EA: <strong className="text-iea-accent">{t.eaInstalled ? `v${t.eaVersion || "3.10"}` : "None"}</strong>
                 </div>
               </div>
               <div className="flex space-x-2">
                 <button
                   disabled={deployingId !== null}
                   onClick={() => handleDeployEA(t)}
-                  className="iea-pill-control px-3.5 py-1.5 text-[#F5F5F2] font-semibold disabled:opacity-50"
+                  className="iea-pill-control px-3.5 py-1.5 text-iea-textPrimary font-semibold disabled:opacity-50"
                 >
                   {deployingId === t.id ? "Deploying..." : "Deploy EA"}
                 </button>
@@ -153,7 +153,7 @@ export const MT5ConnectionScreen: React.FC<{
                     onActionMessage(r.message, !r.success);
                     scan();
                   }}
-                  className="px-3.5 py-1.5 bg-[#36B37E] hover:bg-[#3FC48B] text-[#121110] font-extrabold rounded-full"
+                  className="px-3.5 py-1.5 bg-iea-accent hover:bg-iea-accentHover text-white font-extrabold rounded-full transition"
                 >
                   Launch
                 </button>
@@ -166,15 +166,15 @@ export const MT5ConnectionScreen: React.FC<{
       {deployReport && (
         <div className="iea-card p-5 space-y-2.5 text-xs">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-[#F5F5F2]">
+            <h3 className="text-sm font-bold text-iea-textPrimary">
               EA Deployment Report —{" "}
-              <span className={deployReport.success ? "text-[#6EE7B7]" : "text-[#F07178]"}>
+              <span className={deployReport.success ? "text-iea-profit" : "text-iea-danger"}>
                 {deployReport.success ? "VERIFIED" : "FAILED"}
               </span>
             </h3>
             <button
               onClick={() => setDeployReport(null)}
-              className="text-[11px] text-[#8A8986] hover:text-white"
+              className="text-[11px] text-iea-textMuted hover:text-iea-textPrimary"
             >
               Dismiss
             </button>
@@ -183,14 +183,14 @@ export const MT5ConnectionScreen: React.FC<{
             <div className="space-y-1.5">
               {deployReport.steps.map((s, idx) => (
                 <div key={`${s.step}-${idx}`} className="iea-inset px-3 py-2 flex items-start justify-between gap-2">
-                  <span className="font-mono text-[#B4B3B0]">{s.step}</span>
-                  <span className={`text-right ${s.ok ? "text-[#6EE7B7]" : "text-[#F07178]"}`}>{s.detail}</span>
+                  <span className="font-mono text-iea-textSecondary">{s.step}</span>
+                  <span className={`text-right ${s.ok ? "text-iea-profit" : "text-iea-danger"}`}>{s.detail}</span>
                 </div>
               ))}
             </div>
           )}
           {deployReport.chart_attachment?.note && (
-            <div className="text-[11px] text-[#B4B3B0] bg-[#100F0D]/70 border border-[rgba(255,255,253,0.08)] rounded-xl p-3">
+            <div className="text-[11px] text-iea-textSecondary bg-iea-inset border border-iea-borderSubtle rounded-xl p-3">
               {deployReport.chart_attachment.note}
             </div>
           )}
@@ -253,11 +253,11 @@ export const OperationsCentreScreen: React.FC<{
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="iea-card p-5 space-y-3.5">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-light text-[#F5F5F2] flex items-center space-x-2">
-            <Terminal className="w-5 h-5 text-[#6EE7B7]" />
+          <h2 className="text-lg font-bold text-iea-textPrimary flex items-center space-x-2">
+            <Terminal className="w-5 h-5 text-iea-accent" />
             <span>Ops Runner</span>
           </h2>
-          <button onClick={loadOps} className="iea-pill-control p-1.5 text-[#B4B3B0] hover:text-white">
+          <button onClick={loadOps} className="iea-pill-control p-1.5 text-iea-textSecondary hover:text-iea-textPrimary">
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -266,13 +266,13 @@ export const OperationsCentreScreen: React.FC<{
           {ops.map((op) => (
             <div key={op.op_id} className="iea-inset flex items-center justify-between px-4 py-3 text-xs">
               <div>
-                <div className="font-semibold text-[#F5F5F2]">{op.name}</div>
-                <div className="text-[11px] text-[#B4B3B0] mt-0.5">{op.description}</div>
+                <div className="font-semibold text-iea-textPrimary">{op.name}</div>
+                <div className="text-[11px] text-iea-textSecondary mt-0.5">{op.description}</div>
               </div>
               <button
                 disabled={runningOp !== null}
                 onClick={() => handleRun(op.op_id)}
-                className="px-3.5 py-1.5 bg-[#36B37E] hover:bg-[#3FC48B] disabled:opacity-40 text-[#121110] font-extrabold rounded-full inline-flex items-center space-x-1 shrink-0 ml-3"
+                className="px-3.5 py-1.5 bg-iea-accent hover:bg-iea-accentHover disabled:opacity-40 text-white font-extrabold rounded-full inline-flex items-center space-x-1 shrink-0 ml-3 transition"
               >
                 <Play className="w-3 h-3" />
                 <span>{runningOp === op.op_id ? "..." : "Run"}</span>
@@ -283,16 +283,16 @@ export const OperationsCentreScreen: React.FC<{
       </div>
 
       <div className="iea-card p-5 space-y-3.5">
-        <h3 className="text-sm font-semibold text-[#F5F5F2]">Output &amp; Audit</h3>
+        <h3 className="text-sm font-bold text-iea-textPrimary">Output &amp; Audit</h3>
         {selectedOutput && (
-          <div className="bg-[#100F0D]/85 border border-[rgba(255,255,253,0.10)] rounded-2xl p-3.5 text-xs space-y-1.5">
+          <div className="bg-iea-inset border border-iea-borderSubtle rounded-2xl p-3.5 text-xs space-y-1.5">
             <div className="flex justify-between font-mono">
-              <span className="text-[#5EC2C6]">{selectedOutput.op_id}</span>
-              <span className={selectedOutput.status === "SUCCESS" ? "text-[#6EE7B7]" : "text-[#F07178]"}>
+              <span className="text-iea-accent">{selectedOutput.op_id}</span>
+              <span className={selectedOutput.status === "SUCCESS" ? "text-iea-profit" : "text-iea-danger"}>
                 {selectedOutput.status || "OK"} ({selectedOutput.duration_ms ?? 120}ms)
               </span>
             </div>
-            <pre className="text-[11px] text-[#B4B3B0] font-mono whitespace-pre-wrap max-h-44 overflow-y-auto">
+            <pre className="text-[11px] text-iea-textSecondary font-mono whitespace-pre-wrap max-h-44 overflow-y-auto">
               {selectedOutput.stdout || selectedOutput.stderr || "Exit 0"}
             </pre>
           </div>
@@ -300,16 +300,16 @@ export const OperationsCentreScreen: React.FC<{
 
         <div className="space-y-2 max-h-[260px] overflow-y-auto text-xs">
           {audits.length === 0 ? (
-            <div className="text-xs text-[#8A8986] py-4">0 runs recorded.</div>
+            <div className="text-xs text-iea-textMuted py-4">0 runs recorded.</div>
           ) : (
             audits.map((a) => (
               <button
                 key={a.id}
                 onClick={() => setSelectedOutput(a)}
-                className="iea-inset w-full text-left flex items-center justify-between px-3.5 py-2 hover:border-[rgba(186,214,255,0.28)]"
+                className="iea-inset w-full text-left flex items-center justify-between px-3.5 py-2 hover:border-iea-borderDefault transition"
               >
-                <span className="font-mono text-[#F5F5F2]">{a.op_id}</span>
-                <span className={`font-mono font-bold ${a.status === "SUCCESS" ? "text-[#6EE7B7]" : "text-[#F07178]"}`}>
+                <span className="font-mono text-iea-textPrimary">{a.op_id}</span>
+                <span className={`font-mono font-bold ${a.status === "SUCCESS" ? "text-iea-profit" : "text-iea-danger"}`}>
                   {a.status}
                 </span>
               </button>

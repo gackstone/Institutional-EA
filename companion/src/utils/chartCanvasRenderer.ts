@@ -36,6 +36,99 @@ const SMC_RENDER_PALETTE = {
   },
 } as const;
 
+// ============================================================================
+// Shared centered zone label (FVG / OB / IFVG) — used by BOTH the engine
+// drawings renderer and the LuxAlgo SMC renderer (dashboard + fullscreen).
+// ============================================================================
+export type ZoneLabelCode = "FVG" | "OB" | "IFVG";
+export type ChartThemeMode = "light" | "dark";
+
+export const ZONE_LABEL_FULL_NAMES: Record<ZoneLabelCode, string> = {
+  FVG: "Fair Value Gap",
+  OB: "Order Block",
+  IFVG: "Inverse Fair Value Gap",
+};
+
+/** "FVG - Fair Value Gap" style legend text. */
+export function formatZoneLegend(code: ZoneLabelCode): string {
+  return `${code} - ${ZONE_LABEL_FULL_NAMES[code]}`;
+}
+
+export const ZONE_LABEL_FONT_PX = 10;
+const ZONE_LABEL_PAD_X = 4;
+const ZONE_LABEL_PAD_Y = 2;
+
+export const ZONE_LABEL_THEME: Record<ChartThemeMode, { text: string; halo: string }> = {
+  light: { text: "rgba(15, 23, 42, 0.86)", halo: "rgba(255, 255, 255, 0.70)" },
+  dark: { text: "rgba(243, 244, 246, 0.94)", halo: "rgba(10, 10, 12, 0.65)" },
+};
+
+/**
+ * Pure placement math: clips the zone rectangle to the visible plot area and returns
+ * the label center, or null when the visible part is too small to fit the text.
+ */
+export function computeZoneLabelPlacement(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  plotWidth: number,
+  plotHeight: number,
+  textWidth: number,
+  fontPx: number = ZONE_LABEL_FONT_PX
+): { x: number; y: number } | null {
+  if (![x1, y1, x2, y2, plotWidth, plotHeight, textWidth].every(Number.isFinite)) return null;
+  const left = Math.max(0, Math.min(x1, x2));
+  const right = Math.min(plotWidth, Math.max(x1, x2));
+  const top = Math.max(0, Math.min(y1, y2));
+  const bottom = Math.min(plotHeight, Math.max(y1, y2));
+  const w = right - left;
+  const h = bottom - top;
+  if (w < textWidth + ZONE_LABEL_PAD_X * 2 || h < fontPx + ZONE_LABEL_PAD_Y * 2) return null;
+  return { x: left + w / 2, y: top + h / 2 };
+}
+
+/**
+ * Draws a small bold label centered inside the visible portion of a zone rectangle.
+ * Non-interactive (canvas is pointer-events-none). Returns true if drawn.
+ */
+export function drawCenteredZoneLabel(
+  ctx: CanvasRenderingContext2D,
+  label: ZoneLabelCode,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  plotWidth: number,
+  plotHeight: number,
+  theme: ChartThemeMode = "light"
+): boolean {
+  ctx.save();
+  ctx.font = `700 ${ZONE_LABEL_FONT_PX}px 'Plus Jakarta Sans', system-ui, sans-serif`;
+  const textWidth = ctx.measureText(label).width;
+  const pos = computeZoneLabelPlacement(x1, y1, x2, y2, plotWidth, plotHeight, textWidth);
+  if (!pos) {
+    ctx.restore();
+    return false;
+  }
+  const colors = ZONE_LABEL_THEME[theme] ?? ZONE_LABEL_THEME.light;
+  ctx.beginPath();
+  ctx.rect(0, 0, plotWidth, plotHeight);
+  ctx.clip();
+  ctx.globalAlpha = 1;
+  ctx.setLineDash([]);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = colors.halo;
+  ctx.strokeText(label, pos.x, pos.y);
+  ctx.fillStyle = colors.text;
+  ctx.fillText(label, pos.x, pos.y);
+  ctx.restore();
+  return true;
+}
+
 function deriveBorderColorLocal(fillColor: string, borderAlpha = 0.85): string {
   const c = fillColor.trim();
   const m = c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
@@ -384,8 +477,9 @@ export function drawProjectedOverlaysToCanvas(
   plotWidth: number,
   plotHeight: number,
   highlightedId: string | null,
-  options?: { clear?: boolean; onlyTypes?: Set<string> }
+  options?: { clear?: boolean; onlyTypes?: Set<string>; theme?: ChartThemeMode }
 ): void {
+  const labelTheme: ChartThemeMode = options?.theme ?? "light";
   if (options?.clear !== false) {
     ctx.clearRect(0, 0, plotWidth, plotHeight);
   }
@@ -467,15 +561,10 @@ export function drawProjectedOverlaysToCanvas(
       );
       ctx.setLineDash([]);
 
-      // Allowed permanent text inside FVG/OB box ONLY
-      if (h >= 12 && w >= 24) {
-        const boxText = item.subtype === "IFVG" ? "IFVG" : item.type === "OB" ? "OB" : "FVG";
-        ctx.font = "700 10px 'Plus Jakarta Sans', system-ui, sans-serif";
-        ctx.fillStyle = isBear ? "#B91C1C" : CANVAS_THEME.fvgText;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(boxText, p.x1 + w / 2, p.y1 + h / 2);
-      }
+      // Allowed permanent text inside FVG/OB box ONLY (shared centered, clipped label)
+      const boxText: ZoneLabelCode =
+        item.subtype === "IFVG" ? "IFVG" : item.type === "OB" ? "OB" : "FVG";
+      drawCenteredZoneLabel(ctx, boxText, p.x1, p.y1, p.x1 + w, p.y1 + h, plotWidth, plotHeight, labelTheme);
       ctx.restore();
       continue;
     }
@@ -697,7 +786,8 @@ export function drawLuxAlgoSmcOverlaysToCanvas(
   mtfLevels: MtfLevelInput[],
   settings: SmcChartSettings,
   projector: CoordinateProjector,
-  digits = 2
+  digits = 2,
+  theme: ChartThemeMode = "light"
 ): void {
   const { plotWidth, plotHeight, candles } = projector;
   if (plotWidth <= 0 || plotHeight <= 0 || candles.length === 0) return;
@@ -823,6 +913,7 @@ export function drawLuxAlgoSmcOverlaysToCanvas(
           Math.max(1, Math.round(h) - 1)
         );
       }
+      drawCenteredZoneLabel(ctx, "OB", x1, top, x2, top + h, plotWidth, plotHeight, theme);
       ctx.restore();
     }
   };
@@ -880,6 +971,7 @@ export function drawLuxAlgoSmcOverlaysToCanvas(
       ctx.moveTo(x1, Math.round(midY) + 0.5);
       ctx.lineTo(x2, Math.round(midY) + 0.5);
       ctx.stroke();
+      drawCenteredZoneLabel(ctx, "FVG", x1, topY, x1 + w, botY, plotWidth, plotHeight, theme);
       ctx.restore();
     }
   }

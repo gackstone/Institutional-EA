@@ -48,7 +48,10 @@ export const UI_COPY = {
   chart: {
     layers: {
       liquidity: { label: "Liq", tooltip: "Liquidity Pools (PDH, PDL, PWH, PWL, EQH, EQL)" },
-      fvgOb: { label: "FVG/OB", tooltip: "Fair Value Gaps, Inverse FVGs & Order Blocks" },
+      fvgOb: {
+        label: "FVG/OB",
+        tooltip: "FVG - Fair Value Gap · OB - Order Block · IFVG - Inverse Fair Value Gap",
+      },
       structure: { label: "Struct", tooltip: "Market Structure Breaks (MSS, CHoCH, BOS)" },
       sessions: { label: "Sess", tooltip: "Session & Killzone Ranges (Asia, London, NY, Overlap)" },
       tradeLabels: { label: "Trades", tooltip: "Bot Trade Levels (Entry, SL, TP1, TP2, Risk/Reward Zones & Signals)" },
@@ -82,8 +85,9 @@ export const SHORT_FORM_GLOSSARY: GlossaryItem[] = [
   { short: "PDH / PDL", full: "Previous Day High / Previous Day Low liquidity level", category: "Chart & SMC" },
   { short: "PWH / PWL", full: "Previous Week High / Previous Week Low liquidity level", category: "Chart & SMC" },
   { short: "EQH / EQL", full: "Equal Highs / Equal Lows liquidity magnet (Rule R4)", category: "Chart & SMC" },
-  { short: "FVG / IFVG", full: "Fair Value Gap / Inverse Fair Value Gap imbalance (Rule R6)", category: "Chart & SMC" },
-  { short: "OB", full: "Institutional Order Block demand/supply zone (Rule R5)", category: "Chart & SMC" },
+  { short: "FVG", full: "Fair Value Gap imbalance (Rule R6)", category: "Chart & SMC" },
+  { short: "OB", full: "Order Block demand/supply zone (Rule R5)", category: "Chart & SMC" },
+  { short: "IFVG", full: "Inverse Fair Value Gap reclaimed imbalance (Rule R6)", category: "Chart & SMC" },
   { short: "BOS", full: "Break of Structure body-close trend continuation (Rule R2)", category: "Chart & SMC" },
   { short: "CHoCH", full: "Change of Character early structural shift warning (Rule R3)", category: "Chart & SMC" },
   { short: "MSS", full: "Market Structure Shift with displacement impulse", category: "Chart & SMC" },

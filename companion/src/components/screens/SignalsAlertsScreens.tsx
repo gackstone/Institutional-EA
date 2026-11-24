@@ -73,11 +73,11 @@ export const SignalsGridScreen: React.FC<{
     <div className="iea-card p-5 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-lg font-light text-[#F5F5F2] flex items-center space-x-2">
-            <Zap className="w-5 h-5 text-[#6EE7B7]" />
+          <h2 className="text-lg font-bold text-iea-textPrimary flex items-center space-x-2">
+            <Zap className="w-5 h-5 text-iea-accent" />
             <span>Live Signal Grid ({combinedRows.length})</span>
           </h2>
-          <p className="text-[11px] font-mono text-[#8A8986] mt-0.5">
+          <p className="text-[11px] font-mono text-iea-textMuted mt-0.5">
             Source: BOT · {fetchedAt ? `Updated ${new Date(fetchedAt).toLocaleTimeString()}` : "Waiting for bot"}
           </p>
         </div>
@@ -87,31 +87,31 @@ export const SignalsGridScreen: React.FC<{
             value={symbolFilter}
             onChange={(e) => setSymbolFilter(e.target.value)}
             aria-label="Filter signals by symbol"
-            className="iea-pill-control px-3 py-1.5 text-[#F5F5F2] focus:outline-none"
+            className="iea-pill-control px-3 py-1.5 text-iea-textPrimary focus:outline-none"
           >
-            <option value="ALL" className="bg-[#161513]">All Symbols</option>
-            <option value="XAU" className="bg-[#161513]">XAUUSD</option>
-            <option value="JPY" className="bg-[#161513]">USDJPY</option>
-            <option value="BTC" className="bg-[#161513]">BTCUSD</option>
+            <option value="ALL" className="bg-iea-card">All Symbols</option>
+            <option value="XAU" className="bg-iea-card">XAUUSD</option>
+            <option value="JPY" className="bg-iea-card">USDJPY</option>
+            <option value="BTC" className="bg-iea-card">BTCUSD</option>
           </select>
 
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             aria-label="Filter signals by status"
-            className="iea-pill-control px-3 py-1.5 text-[#F5F5F2] focus:outline-none"
+            className="iea-pill-control px-3 py-1.5 text-iea-textPrimary focus:outline-none"
           >
-            <option value="ALL" className="bg-[#161513]">All Status</option>
-            <option value="WATCHING" className="bg-[#161513]">Watching</option>
-            <option value="TAKEN" className="bg-[#161513]">Taken</option>
-            <option value="REJECTED" className="bg-[#161513]">Rejected</option>
+            <option value="ALL" className="bg-iea-card">All Status</option>
+            <option value="WATCHING" className="bg-iea-card">Watching</option>
+            <option value="TAKEN" className="bg-iea-card">Taken</option>
+            <option value="REJECTED" className="bg-iea-card">Rejected</option>
           </select>
 
           <button
             type="button"
             disabled={loading}
             onClick={reload}
-            className="iea-pill-control px-3.5 py-1.5 text-[#F5F5F2] font-semibold inline-flex items-center space-x-1.5"
+            className="iea-pill-control px-3.5 py-1.5 text-iea-textPrimary font-semibold inline-flex items-center space-x-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             <span>Refresh</span>
@@ -119,7 +119,7 @@ export const SignalsGridScreen: React.FC<{
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-[rgba(255,255,253,0.07)]">
+      <div className="overflow-x-auto rounded-2xl border border-iea-borderSubtle">
         <table className="w-full text-left text-xs iea-table">
           <thead>
             <tr>
@@ -136,7 +136,7 @@ export const SignalsGridScreen: React.FC<{
           <tbody className="font-mono tabular-nums">
             {combinedRows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-10 text-center text-[#8A8986] font-sans">
+                <td colSpan={8} className="py-10 text-center text-iea-textMuted font-sans">
                   No signals yet. Real bot setups will appear here as MT5 candles close.
                 </td>
               </tr>
@@ -145,10 +145,10 @@ export const SignalsGridScreen: React.FC<{
                 const chip = getNeutralSymbolChipSpec(s.symbol);
                 const statusClass =
                   s.status === "TAKEN"
-                    ? "bg-[#6EE7B7]/20 text-[#6EE7B7] border border-[#6EE7B7]/40"
+                    ? "bg-iea-profitSoft text-iea-profit border border-iea-profitBorder"
                     : s.status === "WATCHING"
-                    ? "bg-[#5EC2C6]/20 text-[#5EC2C6] border border-[#5EC2C6]/40"
-                    : "bg-[#F07178]/20 text-[#F5989E] border border-[#F07178]/40";
+                    ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
+                    : "bg-iea-dangerSoft text-iea-danger border border-iea-dangerBorder";
                 return (
                   <tr
                     key={`${s.id}-${s.signal_id}`}
@@ -156,7 +156,7 @@ export const SignalsGridScreen: React.FC<{
                     className="cursor-pointer"
                     title="Click to jump to this symbol on the Dashboard chart"
                   >
-                    <td className="py-2.5 pl-4 pr-3 text-[#8A8986]">
+                    <td className="py-2.5 pl-4 pr-3 text-iea-textMuted">
                       {s.created_at ? new Date(s.created_at).toISOString().slice(11, 19) : "—"}
                     </td>
                     <td className="py-2.5 pr-3">
@@ -164,23 +164,23 @@ export const SignalsGridScreen: React.FC<{
                         <span className={`w-6 h-6 rounded-full text-[10px] font-extrabold inline-flex items-center justify-center ${chip.chipBg}`}>
                           {chip.shortCode}
                         </span>
-                        <span className="font-bold text-[#F5F5F2]">{s.symbol}</span>
+                        <span className="font-bold text-iea-textPrimary">{s.symbol}</span>
                       </div>
                     </td>
-                    <td className={`py-2.5 pr-3 font-bold ${s.direction === "BUY" ? "text-[#6EE7B7]" : "text-[#F07178]"}`}>
+                    <td className={`py-2.5 pr-3 font-bold ${s.direction === "BUY" ? "text-iea-profit" : "text-iea-danger"}`}>
                       {s.direction || "—"}
                     </td>
-                    <td className="py-2.5 pr-3 text-[#F5F5F2]">{s.score > 0 ? s.score.toFixed(0) : "—"}</td>
-                    <td className="py-2.5 pr-3 text-[#B4B3B0]">
+                    <td className="py-2.5 pr-3 text-iea-textPrimary">{s.score > 0 ? s.score.toFixed(0) : "—"}</td>
+                    <td className="py-2.5 pr-3 text-iea-textSecondary">
                       {s.entry_price > 0 ? `${s.entry_price} / ${s.stop_loss || "—"} / ${s.take_profit || "—"}` : "—"}
                     </td>
-                    <td className="py-2.5 pr-3 text-[#5EC2C6]">{s.rr > 0 ? `${s.rr.toFixed(2)}R` : "—"}</td>
+                    <td className="py-2.5 pr-3 text-iea-accent">{s.rr > 0 ? `${s.rr.toFixed(2)}R` : "—"}</td>
                     <td className="py-2.5 pr-3 font-sans">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusClass}`}>
                         {s.status}
                       </span>
                     </td>
-                    <td className="py-2.5 pr-4 font-sans text-[#B4B3B0]">{s.rejection_reason || "—"}</td>
+                    <td className="py-2.5 pr-4 font-sans text-iea-textSecondary">{s.rejection_reason || "—"}</td>
                   </tr>
                 );
               })
@@ -267,11 +267,11 @@ export const AlertCentreScreen: React.FC<{
       <div className="lg:col-span-7 iea-card p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-lg font-light text-[#F5F5F2] flex items-center space-x-2">
-              <Bell className="w-5 h-5 text-[#6EE7B7]" />
+            <h2 className="text-lg font-bold text-iea-textPrimary flex items-center space-x-2">
+              <Bell className="w-5 h-5 text-iea-accent" />
               <span>Alert Centre ({alerts.length})</span>
             </h2>
-            <p className="text-[11px] font-mono text-[#8A8986] mt-0.5">
+            <p className="text-[11px] font-mono text-iea-textMuted mt-0.5">
               Source: BOT Event Log &amp; Telegram Delivery Status
             </p>
           </div>
@@ -280,7 +280,7 @@ export const AlertCentreScreen: React.FC<{
             <button
               type="button"
               onClick={loadAll}
-              className="iea-pill-control px-3 py-1.5 text-xs text-[#F5F5F2]"
+              className="iea-pill-control px-3 py-1.5 text-xs text-iea-textPrimary"
             >
               Refresh
             </button>
@@ -288,7 +288,7 @@ export const AlertCentreScreen: React.FC<{
               type="button"
               disabled={busy}
               onClick={handleSendTest}
-              className="px-3.5 py-1.5 rounded-full bg-[#36B37E] hover:bg-[#3FC48B] text-[#121110] text-xs font-extrabold inline-flex items-center space-x-1.5"
+              className="px-3.5 py-1.5 rounded-full bg-iea-accent hover:bg-iea-accentHover text-white text-xs font-extrabold inline-flex items-center space-x-1.5 transition"
             >
               <Send className="w-3.5 h-3.5" />
               <span>Send Test Message</span>
@@ -298,7 +298,7 @@ export const AlertCentreScreen: React.FC<{
 
         <div className="space-y-2 max-h-[500px] overflow-y-auto">
           {alerts.length === 0 ? (
-            <div className="iea-inset py-10 text-center text-xs text-[#8A8986]">
+            <div className="iea-inset py-10 text-center text-xs text-iea-textMuted">
               No alerts recorded yet. Real bot and MT5 freshness alerts will appear here.
             </div>
           ) : (
@@ -306,27 +306,27 @@ export const AlertCentreScreen: React.FC<{
               <div key={al.id} className="iea-inset p-3.5 text-xs space-y-1">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2 font-mono">
-                    <span className="px-2 py-0.5 rounded-full bg-[#6EE7B7]/18 text-[#6EE7B7] text-[10px] font-bold">
+                    <span className="px-2 py-0.5 rounded-full bg-iea-accentSoft text-iea-accent text-[10px] font-bold">
                       {al.alert_type.toUpperCase()}
                     </span>
-                    {al.symbol && <span className="text-[#5EC2C6] font-bold">{al.symbol}</span>}
+                    {al.symbol && <span className="text-iea-accent font-bold">{al.symbol}</span>}
                   </div>
                   <div className="flex items-center space-x-2 font-mono text-[10px]">
                     <span
                       className={`px-2 py-0.5 rounded-full font-bold ${
                         al.telegram_status === "DELIVERED"
-                          ? "bg-[#6EE7B7]/18 text-[#6EE7B7]"
+                          ? "bg-iea-profitSoft text-iea-profit"
                           : al.telegram_status === "FAILED"
-                          ? "bg-[#F07178]/20 text-[#F5989E]"
-                          : "bg-white/10 text-[#8A8986]"
+                          ? "bg-iea-dangerSoft text-iea-danger"
+                          : "bg-iea-elevated text-iea-textMuted"
                       }`}
                     >
                       TG: {al.telegram_status}
                     </span>
-                    <span className="text-[#8A8986]">{new Date(al.created_at).toLocaleTimeString()}</span>
+                    <span className="text-iea-textMuted">{new Date(al.created_at).toLocaleTimeString()}</span>
                   </div>
                 </div>
-                <div className="text-[#F5F5F2]">{al.message}</div>
+                <div className="text-iea-textPrimary">{al.message}</div>
               </div>
             ))
           )}
@@ -335,29 +335,29 @@ export const AlertCentreScreen: React.FC<{
 
       {/* Right: Per-Type Toggles, Quiet Hours & Rate-Limit Settings (5 cols) */}
       <div className="lg:col-span-5 iea-card p-5 space-y-4">
-        <h3 className="text-sm font-semibold text-[#F5F5F2] flex items-center space-x-2">
-          <CheckCircle2 className="w-4 h-4 text-[#6EE7B7]" />
+        <h3 className="text-sm font-bold text-iea-textPrimary flex items-center space-x-2">
+          <CheckCircle2 className="w-4 h-4 text-iea-profit" />
           <span>Notification Rules &amp; Telegram Delivery</span>
         </h3>
 
         {!settings ? (
-          <div className="text-xs text-[#8A8986]">Waiting for Control Service alert settings...</div>
+          <div className="text-xs text-iea-textMuted">Waiting for Control Service alert settings...</div>
         ) : (
           <div className="space-y-4 text-xs">
             <div className="space-y-1.5">
-              <div className="text-[11px] font-semibold text-[#B4B3B0]">Event Toggles</div>
+              <div className="text-[11px] font-semibold text-iea-textSecondary">Event Toggles</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 {ALERT_TYPE_LABELS.map((t) => (
                   <label
                     key={t.key}
                     className="iea-inset px-3 py-2 flex items-center justify-between cursor-pointer"
                   >
-                    <span className="text-[#F5F5F2]">{t.label}</span>
+                    <span className="text-iea-textPrimary">{t.label}</span>
                     <input
                       type="checkbox"
                       checked={Boolean(settings.enabled_types[t.key])}
                       onChange={() => toggleAlertType(t.key)}
-                      className="accent-[#6EE7B7]"
+                      className="accent-[var(--iea-accent-primary)]"
                     />
                   </label>
                 ))}
@@ -366,12 +366,12 @@ export const AlertCentreScreen: React.FC<{
 
             <div className="iea-inset p-3 space-y-2.5">
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="font-semibold text-[#F5F5F2]">Quiet Hours (UTC)</span>
+                <span className="font-semibold text-iea-textPrimary">Quiet Hours (UTC)</span>
                 <input
                   type="checkbox"
                   checked={settings.quiet_hours_enabled}
                   onChange={(e) => updateSettings({ quiet_hours_enabled: e.target.checked })}
-                  className="accent-[#6EE7B7]"
+                  className="accent-[var(--iea-accent-primary)]"
                 />
               </label>
               <div className="grid grid-cols-2 gap-2 font-mono">
@@ -379,38 +379,38 @@ export const AlertCentreScreen: React.FC<{
                   type="time"
                   value={settings.quiet_start_utc}
                   onChange={(e) => updateSettings({ quiet_start_utc: e.target.value })}
-                  className="bg-[#0E0D0B]/80 border border-[rgba(255,255,253,0.11)] rounded-xl px-2.5 py-1.5 text-[#F5F5F2]"
+                  className="iea-input px-2.5 py-1.5"
                 />
                 <input
                   type="time"
                   value={settings.quiet_end_utc}
                   onChange={(e) => updateSettings({ quiet_end_utc: e.target.value })}
-                  className="bg-[#0E0D0B]/80 border border-[rgba(255,255,253,0.11)] rounded-xl px-2.5 py-1.5 text-[#F5F5F2]"
+                  className="iea-input px-2.5 py-1.5"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
               <label className="iea-inset p-3 block">
-                <span className="text-[11px] text-[#B4B3B0]">Rate Limit / Min</span>
+                <span className="text-[11px] text-iea-textSecondary">Rate Limit / Min</span>
                 <input
                   type="number"
                   min={1}
                   max={60}
                   value={settings.rate_limit_per_min}
                   onChange={(e) => updateSettings({ rate_limit_per_min: Number(e.target.value) })}
-                  className="w-full mt-1 bg-[#0E0D0B]/80 border border-[rgba(255,255,253,0.11)] rounded-xl px-2.5 py-1 text-[#F5F5F2] font-mono"
+                  className="w-full mt-1 iea-input px-2.5 py-1 font-mono"
                 />
               </label>
               <label className="iea-inset p-3 block">
-                <span className="text-[11px] text-[#B4B3B0]">Dedup Window (s)</span>
+                <span className="text-[11px] text-iea-textSecondary">Dedup Window (s)</span>
                 <input
                   type="number"
                   min={10}
                   max={3600}
                   value={settings.dedup_window_sec}
                   onChange={(e) => updateSettings({ dedup_window_sec: Number(e.target.value) })}
-                  className="w-full mt-1 bg-[#0E0D0B]/80 border border-[rgba(255,255,253,0.11)] rounded-xl px-2.5 py-1 text-[#F5F5F2] font-mono"
+                  className="w-full mt-1 iea-input px-2.5 py-1 font-mono"
                 />
               </label>
             </div>
