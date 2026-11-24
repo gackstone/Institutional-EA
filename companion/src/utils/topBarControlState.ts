@@ -177,19 +177,20 @@ export function deriveTopBarControlState(params: {
 
   // 2. Start button
   let startDisabledReason = "";
-  if (!serviceOnline) startDisabledReason = "Control service offline";
+  if (!serviceOnline) startDisabledReason = "Control service offline. Click Reconnect.";
   else if (busy) startDisabledReason = "Action in progress";
   else if (isLiveModeBlocked) startDisabledReason = "Live trading is locked (DEMO only)";
-  else if (stopFlag || engineState === "EMERGENCY_STOP") startDisabledReason = "Clear STOP.flag first";
-  else if (!mt5Connected) startDisabledReason = "Connect MT5 first";
-  else if (!demoVerified) startDisabledReason = "Non-demo MT5 account blocked";
+  else if (stopFlag || engineState === "EMERGENCY_STOP") startDisabledReason = "STOP.flag is active. Clear STOP.flag first.";
+  else if (!mt5Connected) startDisabledReason = "MT5 not connected. Click Connect MT5 first.";
+  else if (!demoVerified) startDisabledReason = "Non-demo MT5 account blocked. Switch to a DEMO account.";
   else if (engineState === "RUNNING") startDisabledReason = "Engine is already running";
   else if (engineState === "PAUSED") startDisabledReason = "Engine is paused — use Resume";
   else if (engineState === "STARTING") startDisabledReason = "Engine is starting";
 
+  const isStartingNow = engineState === "STARTING" || busyAction === "Start";
   const startBtn: TopBarButtonState = {
     enabled: startDisabledReason === "",
-    label: "Start",
+    label: isStartingNow ? "Starting..." : "Start",
     tooltip: startDisabledReason || `Start engine in ${operatingMode} mode (DEMO)`,
     tone: "lime",
   };

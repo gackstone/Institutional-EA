@@ -2064,11 +2064,11 @@ function createWindow() {
     minHeight: 720,
     titleBarStyle: "hidden",
     titleBarOverlay: {
-      color: "#12110F",
-      symbolColor: "#F5F5F2",
+      color: "#0A0A0C",
+      symbolColor: "#F3F4F6",
       height: 36
     },
-    backgroundColor: "#0E0D0B",
+    backgroundColor: "#0A0A0C",
     title: "Institutional EA",
     icon: path.join(__dirname, "icon.png"),
     webPreferences: {
@@ -2906,7 +2906,10 @@ async function startControlService() {
           ...process.env,
           MT5_COMPANION_TOKEN: token,
           MT5_PROJECT_ROOT: PROJECT_ROOT,
+          PROJECT_ROOT: PROJECT_ROOT,
           MT5_DATA_DIR: INSTITUTIONAL_EA_DATA_DIR,
+          MT5_APP_DATA_DIR: INSTITUTIONAL_EA_DATA_DIR,
+          INSTITUTIONAL_EA_APP_DATA_DIR: INSTITUTIONAL_EA_DATA_DIR,
           PYTHONPATH: PROJECT_ROOT,
           PYTHONUNBUFFERED: "1",
         },
@@ -3026,7 +3029,7 @@ function stopControlService(stopWatchdog = true) {
   }
 }
 
-function httpControlRequest(method, apiPath, bodyObj = null) {
+function httpControlRequestOnce(method, apiPath, bodyObj = null) {
   return new Promise((resolve, reject) => {
     const token = ensureControlToken();
     const payload = bodyObj ? JSON.stringify(bodyObj) : null;
@@ -3063,23 +3066,56 @@ function httpControlRequest(method, apiPath, bodyObj = null) {
       }
     );
     req.on("error", (err) => {
-      if (err && (err.code === "ECONNREFUSED" || err.code === "ECONNRESET" || err.code === "ETIMEDOUT")) {
-        broadcastControlServiceState({ status: "OFFLINE", lastError: "Service offline" });
-        if (!controlServiceProcess && !controlStartInFlight && !isQuitting) {
-          startControlService();
-        }
-        reject(new Error("Service offline. Retrying connection..."));
-      } else {
-        reject(err);
-      }
+      reject(err);
     });
     req.on("timeout", () => {
       req.destroy();
-      reject(new Error("Service request timed out"));
+      const timeoutErr = new Error("Service request timed out");
+      timeoutErr.code = "ETIMEDOUT";
+      reject(timeoutErr);
     });
     if (payload) req.write(payload);
     req.end();
   });
+}
+
+async function httpControlRequest(method, apiPath, bodyObj = null) {
+  if (controlStartInFlight) {
+    try {
+      await controlStartInFlight;
+    } catch (e) {}
+  }
+
+  const maxAttempts = method === "POST" ? 3 : 2;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await httpControlRequestOnce(method, apiPath, bodyObj);
+    } catch (err) {
+      const isConnErr =
+        err &&
+        (err.code === "ECONNREFUSED" ||
+          err.code === "ECONNRESET" ||
+          err.code === "ETIMEDOUT");
+      if (isConnErr) {
+        broadcastControlServiceState({ status: "OFFLINE", lastError: "Service offline" });
+        if (!isQuitting && attempt < maxAttempts) {
+          if (!controlServiceProcess && !controlStartInFlight) {
+            await startControlService();
+          } else if (controlStartInFlight) {
+            await controlStartInFlight;
+          } else {
+            await new Promise((r) => setTimeout(r, 350 * attempt));
+          }
+          continue;
+        }
+        if (!controlServiceProcess && !controlStartInFlight && !isQuitting) {
+          startControlService();
+        }
+        throw new Error("Service offline. Retrying connection...");
+      }
+      throw err;
+    }
+  }
 }
 
 ipcMain.handle("control-request", async (_e, method, apiPath, body) => {

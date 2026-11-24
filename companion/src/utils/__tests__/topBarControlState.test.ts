@@ -244,6 +244,28 @@ test("In-flight busyAction disables all buttons to prevent double clicks", () =>
   assert.equal(busy.closeAllBtn.enabled, false);
 });
 
+test("STARTING state and Start in-flight busyAction show Starting... label and block duplicate Start", () => {
+  const startingBackend = deriveTopBarControlState({
+    status: makeStatus({ mt5Status: "CONNECTED", engineState: "STARTING" }),
+    serviceStatus: ONLINE_SVC,
+    busyAction: null,
+  });
+  assert.equal(startingBackend.engineState, "STARTING");
+  assert.equal(startingBackend.engineStateLabel, "Starting");
+  assert.equal(startingBackend.engineChipTone, "amber");
+  assert.equal(startingBackend.startBtn.enabled, false);
+  assert.equal(startingBackend.startBtn.label, "Starting...");
+  assert.equal(startingBackend.stopBtn.enabled, true);
+
+  const startingInFlight = deriveTopBarControlState({
+    status: makeStatus({ mt5Status: "CONNECTED", engineState: "STOPPED" }),
+    serviceStatus: ONLINE_SVC,
+    busyAction: "Start",
+  });
+  assert.equal(startingInFlight.startBtn.enabled, false);
+  assert.equal(startingInFlight.startBtn.label, "Starting...");
+});
+
 test("Helper functions formatShortMode, isOrderPlacingDemoMode, sanitizeControlError", () => {
   assert.equal(formatShortMode("OBSERVE"), "OBS");
   assert.equal(formatShortMode("DEMO_FAST"), "FAST");

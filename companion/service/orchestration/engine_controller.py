@@ -1,8 +1,9 @@
 """
 Central Bot Engine Controller for the Institutional EA Companion Control Centre.
-Manages the lifecycle of the single authoritative Python trading engine (scripts/start_bot.py)
-and bridge server (scripts/run_bridge_server.py), respecting STOP.flag and state/PAUSE,
-preventing duplicate engines, and exposing controlled trade/risk operations.
+Manages the lifecycle of the single authoritative Python trading engine (scripts/start_bot.py
+or packaged mt5_trading_engine.exe) and bridge server (scripts/run_bridge_server.py or
+packaged mt5_bridge_server.exe), respecting STOP.flag and state/PAUSE, preventing duplicate
+engines, and exposing controlled trade/risk operations.
 """
 
 from __future__ import annotations
@@ -43,20 +44,29 @@ class EngineController:
         events: EventBus,
         config_service: ConfigurationService,
         mt5_sync: MT5SyncService,
-        python_executable: Optional[str] = None,
+        python_executable: Optional[Any] = None,
+        data_dir: Optional[str | Path] = None,
     ):
-        self.project_root = Path(project_root)
+        self.project_root = Path(project_root).resolve()
+        self.data_dir = Path(data_dir).resolve() if data_dir else self.project_root
         self.repo = repo
         self.events = events
         self.config_service = config_service
         self.mt5_sync = mt5_sync
-        self.python_exe = python_executable or sys.executable
+
+        explicit_py = (
+            str(python_executable)
+            if isinstance(python_executable, (str, Path))
+            else None
+        )
+        self.python_exe = self._resolve_python_executable(explicit_py)
 
         self._lock = threading.RLock()
         self.bridge_proc: Optional[subprocess.Popen] = None
         self.engine_proc: Optional[subprocess.Popen] = None
         self.adopted_engine_pid: Optional[int] = None
         self._user_requested_stop: bool = False
+        self._recent_engine_errors: List[str] = []
 
         self.engine_state: str = "STOPPED"  # STOPPED | STARTING | RUNNING | PAUSED | EMERGENCY_STOP | ERROR
         self.started_at: Optional[str] = None
@@ -65,33 +75,142 @@ class EngineController:
         self.last_trade: Optional[Dict[str, Any]] = None
         self.last_execution_error: Optional[str] = None
 
-        self.stop_flag_path = self.project_root / "STOP.flag"
-        self.pause_flag_path = self.project_root / "state" / "PAUSE"
+        self.stop_flag_path = self.data_dir / "STOP.flag"
+        self.legacy_stop_flag_path = self.project_root / "STOP.flag"
+        self.pause_flag_path = self.data_dir / "state" / "PAUSE"
+        self.legacy_pause_flag_path = self.project_root / "state" / "PAUSE"
 
         # Authoritative Risk Engine snapshot (mirrors src/risk/portfolio_risk.py)
-        app_cfg = AppConfig.load_from_dir(str(self.config_service.config_dir))
-        self.risk_engine = PortfolioRiskEngine(app_cfg)
+        if isinstance(python_executable, PortfolioRiskEngine):
+            self.risk_engine = python_executable
+        else:
+            app_cfg = AppConfig.load_from_dir(str(self.config_service.config_dir))
+            self.risk_engine = PortfolioRiskEngine(app_cfg)
         self.risk_engine.kill_switch_flag_path = str(self.stop_flag_path)
+
+    def _resolve_python_executable(self, explicit_py: Optional[str] = None) -> str:
+        """Resolves a valid Python interpreter (avoiding frozen sidecars like mt5_control_service.exe)."""
+        if explicit_py and "mt5_control_service" not in Path(explicit_py).name.lower():
+            return explicit_py
+
+        is_win = os.name == "nt"
+        venv_candidates = [
+            self.project_root / ".venv" / ("Scripts" if is_win else "bin") / ("python.exe" if is_win else "python"),
+            self.project_root.parent / ".venv" / ("Scripts" if is_win else "bin") / ("python.exe" if is_win else "python"),
+        ]
+        for cand in venv_candidates:
+            if cand.exists():
+                return str(cand)
+
+        if not getattr(sys, "frozen", False):
+            exe_name = Path(sys.executable).name.lower()
+            if "python" in exe_name and Path(sys.executable).exists():
+                return sys.executable
+
+        found = shutil.which("python") or shutil.which("python3")
+        return found or ("python" if is_win else "python3")
+
+    def _resolve_component_command(
+        self,
+        sidecar_name: str,
+        script_rel_path: str,
+        extra_args: Optional[List[str]] = None,
+    ) -> Optional[List[str]]:
+        """
+        Resolves either the Python script command (in dev mode) or the standalone frozen
+        sidecar binary (in packaged installer mode). Never invokes mt5_control_service.exe as python.
+        """
+        args = list(extra_args or [])
+        is_win = os.name == "nt"
+        exe_name = f"{sidecar_name}.exe" if is_win else sidecar_name
+
+        script_candidates = [
+            self.project_root / script_rel_path,
+            self.project_root.parent / script_rel_path,
+        ]
+        script_path = next((p for p in script_candidates if p.exists()), None)
+
+        bin_candidates = [
+            self.project_root / "bin" / exe_name,
+            Path(sys.executable).resolve().parent / exe_name,
+            self.project_root / "companion" / "resources" / "bin" / exe_name,
+            self.project_root / "resources" / "bin" / exe_name,
+        ]
+        bin_path = next((p for p in bin_candidates if p.exists()), None)
+
+        is_frozen = bool(getattr(sys, "frozen", False)) or (
+            "mt5_control_service" in Path(sys.executable).name.lower()
+        )
+
+        # 1. In packaged / frozen mode (or if script isn't shipped in resources/), prefer sidecar binary
+        if (is_frozen or script_path is None) and bin_path is not None:
+            return [str(bin_path), *args]
+
+        # 2. In development mode with source scripts present, run via resolved Python interpreter
+        if script_path is not None and not is_frozen:
+            return [self.python_exe, str(script_path), *args]
+
+        # 3. Fallback to binary if present
+        if bin_path is not None:
+            return [str(bin_path), *args]
+
+        return None
+
+    def _build_child_env(self) -> Dict[str, str]:
+        env = os.environ.copy()
+        env["PROJECT_ROOT"] = str(self.project_root)
+        env["MT5_PROJECT_ROOT"] = str(self.project_root)
+        env["MT5_DATA_DIR"] = str(self.data_dir)
+        env["MT5_APP_DATA_DIR"] = str(self.data_dir)
+        env["INSTITUTIONAL_EA_APP_DATA_DIR"] = str(self.data_dir)
+        env["PYTHONPATH"] = str(self.project_root)
+        env["PYTHONUNBUFFERED"] = "1"
+        return env
+
+    def _state_dirs(self) -> List[Path]:
+        dirs: List[Path] = []
+        candidates = [self.data_dir / "state", self.project_root / "state"]
+        if self.data_dir == self.project_root:
+            candidates.append(get_state_dir())
+        for d in candidates:
+            try:
+                resolved = d.resolve()
+            except Exception:
+                resolved = d
+            if resolved not in dirs:
+                dirs.append(resolved)
+        return dirs
+
+    def _is_stop_flag_present(self) -> bool:
+        return (
+            self.stop_flag_path.exists()
+            or self.legacy_stop_flag_path.exists()
+            or self.risk_engine.is_kill_switch_active()
+        )
+
+    def _is_pause_flag_present(self) -> bool:
+        return self.pause_flag_path.exists() or self.legacy_pause_flag_path.exists()
 
     def _is_proc_alive(self, proc: Optional[subprocess.Popen]) -> bool:
         return proc is not None and proc.poll() is None
 
     def _discover_existing_engine_pid(self) -> Optional[int]:
-        """Discover an already-running healthy engine PID from lock metadata or heartbeat."""
+        """Discover an already-running healthy engine PID from child handle, lock metadata, or heartbeat."""
         if self._is_proc_alive(self.engine_proc):
             return self.engine_proc.pid
         if self.adopted_engine_pid and verify_process_identity(self.adopted_engine_pid):
             return self.adopted_engine_pid
-        meta = read_lock_metadata("mt5_trading_engine")
-        if meta and isinstance(meta.get("pid"), int):
-            pid = int(meta["pid"])
-            if verify_process_identity(pid):
-                return pid
-        hb = read_engine_heartbeat()
-        if hb and isinstance(hb.get("pid"), int):
-            pid = int(hb["pid"])
-            if verify_process_identity(pid):
-                return pid
+        for sdir in self._state_dirs():
+            meta = read_lock_metadata("mt5_trading_engine", state_dir=sdir)
+            if meta and isinstance(meta.get("pid"), int):
+                pid = int(meta["pid"])
+                if verify_process_identity(pid):
+                    return pid
+            hb = read_engine_heartbeat(state_dir=sdir)
+            if hb and isinstance(hb.get("pid"), int):
+                pid = int(hb["pid"])
+                if verify_process_identity(pid):
+                    return pid
         self.adopted_engine_pid = None
         return None
 
@@ -99,11 +218,11 @@ class EngineController:
         return self._discover_existing_engine_pid()
 
     def _refresh_state_flags(self) -> None:
-        if self.stop_flag_path.exists() or self.risk_engine.is_kill_switch_active():
+        if self._is_stop_flag_present():
             self.engine_state = "EMERGENCY_STOP"
             return
         if self._get_active_engine_pid() is not None:
-            if self.pause_flag_path.exists():
+            if self._is_pause_flag_present():
                 self.engine_state = "PAUSED"
             else:
                 self.engine_state = "RUNNING"
@@ -111,10 +230,11 @@ class EngineController:
             self.engine_state = "STOPPED"
 
     def start_engine(self, dry_run: Optional[bool] = None) -> Dict[str, Any]:
-        """Starts the Bridge Server and single Trading Engine process safely."""
+        """Starts the Bridge Server and single Trading Engine process safely and idempotently."""
         with self._lock:
-            if self.stop_flag_path.exists():
-                msg = "Cannot start trading engine while STOP.flag kill switch is present."
+            self.events.log("ENGINE", "INFO", "[START_TRACE] Hop 1: Checking safety locks and MT5 connection readiness.")
+            if self._is_stop_flag_present():
+                msg = "Cannot start trading engine while STOP.flag kill switch is active. Click Clear Stop first."
                 self.engine_state = "EMERGENCY_STOP"
                 self.repo.record_error(
                     category="RISK",
@@ -123,7 +243,7 @@ class EngineController:
                     message=msg,
                     trading_affected=True,
                     entries_blocked=True,
-                    recommended_recovery="Inspect MT5 terminal, then explicitly clear STOP.flag from Operations or Risk Manager.",
+                    recommended_recovery="Inspect MT5 terminal, then explicitly clear STOP.flag from Dashboard or Operations.",
                     user_action_required=True,
                 )
                 return {"success": False, "message": msg, "state": self.engine_state}
@@ -136,26 +256,29 @@ class EngineController:
 
             snap = self.mt5_sync.get_snapshot()
             if snap.get("connection_status") != "CONNECTED":
-                msg = "Connect MT5 first before starting the engine."
+                msg = "MT5 not connected. Click Connect MT5 first."
                 return {"success": False, "message": msg, "state": self.engine_state}
 
             use_dry_run = (op_mode in ("DRY_RUN", "OBSERVE")) if dry_run is None else dry_run
+            acc = snap.get("account", {})
 
-            if op_mode in ("DEMO_SCALPING", "DEMO_FAST", "DEMO_MANUAL_ASSIST") and not use_dry_run:
-                acc = snap.get("account", {})
+            if op_mode in ("DEMO_SCALPING", "DEMO_FAST", "DEMO_MANUAL_ASSIST", "BTCUSD_DEMO_SAMPLE_MODE") and not use_dry_run:
                 if acc.get("account_number") and not acc.get("demo_verified", False):
-                    msg = "Safety Lock: Connected MT5 account is not verified as DEMO. Refusing to start automated execution."
+                    msg = "Safety Lock: Connected MT5 account is not verified as DEMO. Switch to a DEMO account."
                     return {"success": False, "message": msg, "state": self.engine_state}
                 if acc.get("netting_observe_only", False):
                     use_dry_run = True
                     self.events.log("ENGINE", "WARNING", "Netting account detected: forcing OBSERVE/DRY-RUN safety mode.")
 
+            self.events.log("ENGINE", "INFO", "[START_TRACE] Hop 2: Checking for existing active engine instance.")
             existing_pid = self._discover_existing_engine_pid()
             if existing_pid is not None:
                 self.adopted_engine_pid = existing_pid
                 self._user_requested_stop = False
+                self.last_execution_error = None
                 self._refresh_state_flags()
                 self.events.log("ENGINE", "INFO", f"ENGINE_ALREADY_RUNNING: Adopting healthy engine (PID {existing_pid}).")
+                self.events.publish_event("engine_state", self.get_status())
                 return {
                     "success": True,
                     "message": f"Trading engine already running (PID {existing_pid}).",
@@ -164,40 +287,114 @@ class EngineController:
                     "adopted": True,
                 }
 
+            engine_cmd = self._resolve_component_command(
+                "mt5_trading_engine",
+                "scripts/start_bot.py",
+                ["--dry-run"] if use_dry_run else [],
+            )
+            if not engine_cmd:
+                msg = "Trading engine executable (mt5_trading_engine) or scripts/start_bot.py not found."
+                self.engine_state = "ERROR"
+                self.last_execution_error = msg
+                self.events.log("ENGINE", "ERROR", msg)
+                self.events.publish_event("engine_state", self.get_status())
+                return {"success": False, "message": msg, "state": self.engine_state}
+
             self._user_requested_stop = False
+            self.last_execution_error = None
+            self._recent_engine_errors.clear()
             self.engine_state = "STARTING"
-            # 1. Start Bridge Server if not already running
-            if not self._is_proc_alive(self.bridge_proc):
-                bridge_script = self.project_root / "scripts" / "run_bridge_server.py"
-                if bridge_script.exists():
-                    self.bridge_proc = subprocess.Popen(
-                        [self.python_exe, str(bridge_script)],
-                        cwd=str(self.project_root),
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        creationflags=CREATE_NO_WINDOW,
-                    )
-                    self._stream_process_logs("BRIDGE", self.bridge_proc)
+            self.events.publish_event("engine_state", self.get_status())
+
+            # Clear any leftover stop flag file before spawning
+            for sdir in self._state_dirs():
+                try:
+                    (sdir / "engine_stop.flag").unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+            child_env = self._build_child_env()
+            child_cwd = str(self.project_root if self.project_root.exists() else self.data_dir)
+
+            # 1. Start Bridge Server if not already running on port 5556
+            self.events.log("ENGINE", "INFO", "[START_TRACE] Hop 3: Verifying ZMQ/TCP Bridge on ports 5555/5556.")
+            zmq_now = self.mt5_sync.check_zmq_bridge()
+            if not self._is_proc_alive(self.bridge_proc) and not zmq_now.get("port_5556"):
+                bridge_cmd = self._resolve_component_command(
+                    "mt5_bridge_server",
+                    "scripts/run_bridge_server.py",
+                )
+                if bridge_cmd:
+                    try:
+                        self.bridge_proc = subprocess.Popen(
+                            bridge_cmd,
+                            cwd=child_cwd,
+                            env=child_env,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                            creationflags=CREATE_NO_WINDOW,
+                        )
+                        self._stream_process_logs("BRIDGE", self.bridge_proc)
+                    except Exception as br_exc:
+                        self.events.log("BRIDGE", "WARNING", f"Bridge spawn notice: {br_exc}")
 
             # 2. Start Trading Engine (single instance enforced by start_bot.py)
-            bot_script = self.project_root / "scripts" / "start_bot.py"
-            cmd = [self.python_exe, str(bot_script)]
-            if use_dry_run:
-                cmd.append("--dry-run")
+            self.events.log("ENGINE", "INFO", "[START_TRACE] Hop 4: Spawning Trading Engine process.")
+            try:
+                self.engine_proc = subprocess.Popen(
+                    engine_cmd,
+                    cwd=child_cwd,
+                    env=child_env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    creationflags=CREATE_NO_WINDOW,
+                )
+            except Exception as spawn_exc:
+                msg = f"Failed to start trading engine process: {spawn_exc}"
+                self.engine_state = "ERROR"
+                self.last_execution_error = msg
+                self.events.log("ENGINE", "ERROR", msg)
+                self.events.publish_event("engine_state", self.get_status())
+                return {"success": False, "message": msg, "state": self.engine_state}
 
-            self.engine_proc = subprocess.Popen(
-                cmd,
-                cwd=str(self.project_root),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                creationflags=CREATE_NO_WINDOW,
-            )
             self.started_at = datetime.now(timezone.utc).isoformat()
             self.last_heartbeat = self.started_at
-            self.engine_state = "PAUSED" if self.pause_flag_path.exists() else "RUNNING"
             self._stream_process_logs("ENGINE", self.engine_proc)
+
+            # Wait briefly (up to 0.9s) to verify the process did not crash immediately on startup
+            verify_deadline = time.time() + 0.9
+            while time.time() < verify_deadline:
+                if self.engine_proc.poll() is not None:
+                    break
+                time.sleep(0.1)
+
+            rc = self.engine_proc.poll()
+            if rc is not None:
+                # Check if it exited 0 because an existing instance already held the single-instance lock
+                adopted_pid = self._discover_existing_engine_pid()
+                if rc == 0 and adopted_pid is not None:
+                    self.adopted_engine_pid = adopted_pid
+                    self._refresh_state_flags()
+                    self.events.publish_event("engine_state", self.get_status())
+                    return {
+                        "success": True,
+                        "message": f"Trading engine running (adopted PID {adopted_pid}).",
+                        "state": self.engine_state,
+                        "pid": adopted_pid,
+                        "adopted": True,
+                    }
+                detail = self._recent_engine_errors[-1] if self._recent_engine_errors else f"exit code {rc}"
+                msg = f"Trading engine failed to start ({detail}). Check Event Logs."
+                self.engine_state = "ERROR"
+                self.last_execution_error = msg
+                self.events.log("ENGINE", "ERROR", msg)
+                self.events.publish_event("engine_state", self.get_status())
+                return {"success": False, "message": msg, "state": self.engine_state}
+
+            self.engine_state = "PAUSED" if self._is_pause_flag_present() else "RUNNING"
+            self.mt5_sync.check_zmq_bridge()
 
             self.repo.record_audit(
                 actor="operator",
@@ -205,81 +402,166 @@ class EngineController:
                 component="EngineController",
                 details=f"Started engine PID={self.engine_proc.pid}, mode={op_mode}, dry_run={use_dry_run}",
             )
-            self.events.log("ENGINE", "INFO", f"Trading Engine started (PID {self.engine_proc.pid}, mode={op_mode}, dry_run={use_dry_run})")
+            self.events.log(
+                "ENGINE",
+                "INFO",
+                f"Trading Engine started (PID {self.engine_proc.pid}, mode={op_mode}, dry_run={use_dry_run})",
+            )
             self.events.publish_event("engine_state", self.get_status())
-            return {"success": True, "message": "Trading engine started.", "state": self.engine_state, "pid": self.engine_proc.pid}
+
+            start_msg = "Trading engine started."
+            if not use_dry_run and acc.get("autotrading_enabled") is False:
+                start_msg = (
+                    "Trading engine started (Notice: Enable 'Algo Trading' in MT5 toolbar for order execution)."
+                )
+            return {
+                "success": True,
+                "message": start_msg,
+                "state": self.engine_state,
+                "pid": self.engine_proc.pid,
+            }
 
     def _stream_process_logs(self, component: str, proc: subprocess.Popen) -> None:
         def _reader():
             if not proc.stdout:
                 return
             saw_duplicate_guard = False
-            for line in iter(proc.stdout.readline, ""):
-                txt = line.strip()
-                if txt:
-                    if "[SINGLE_INSTANCE]" in txt or "ENGINE_DUPLICATE_START_BLOCKED" in txt:
-                        saw_duplicate_guard = True
-                    sev = "ERROR" if ("[ERROR]" in txt or "Traceback" in txt) else ("WARNING" if "[WARNING]" in txt else "INFO")
-                    self.events.log(component, sev, redact_secrets(txt))
-                    self.last_heartbeat = datetime.now(timezone.utc).isoformat()
-            rc = proc.poll()
+            last_error_line = ""
+            try:
+                for line in iter(proc.stdout.readline, ""):
+                    txt = line.strip()
+                    if txt:
+                        if "[SINGLE_INSTANCE]" in txt or "ENGINE_DUPLICATE_START_BLOCKED" in txt:
+                            saw_duplicate_guard = True
+                        sev = (
+                            "ERROR"
+                            if ("[ERROR]" in txt or "Traceback" in txt or "error:" in txt.lower())
+                            else ("WARNING" if "[WARNING]" in txt else "INFO")
+                        )
+                        safe_txt = redact_secrets(txt)
+                        if sev == "ERROR":
+                            last_error_line = safe_txt
+                            if component == "ENGINE":
+                                self._recent_engine_errors.append(safe_txt)
+                                if len(self._recent_engine_errors) > 10:
+                                    self._recent_engine_errors.pop(0)
+                        self.events.log(component, sev, safe_txt)
+                        self.last_heartbeat = datetime.now(timezone.utc).isoformat()
+            finally:
+                try:
+                    proc.stdout.close()
+                except Exception:
+                    pass
+            try:
+                rc = proc.wait(timeout=2.0)
+            except Exception:
+                rc = proc.poll()
+
             if component == "ENGINE" and rc == 0 and saw_duplicate_guard:
                 existing_pid = self._discover_existing_engine_pid()
                 if existing_pid is not None:
                     self.adopted_engine_pid = existing_pid
                     self._refresh_state_flags()
-                    self.events.log("ENGINE", "INFO", f"ENGINE_DUPLICATE_START_BLOCKED: Adopted active engine PID {existing_pid}.")
+                    self.events.log(
+                        "ENGINE",
+                        "INFO",
+                        f"ENGINE_DUPLICATE_START_BLOCKED: Adopted active engine PID {existing_pid}.",
+                    )
+                    self.events.publish_event("engine_state", self.get_status())
                     return
+
             if rc not in (None, 0) and not self._user_requested_stop:
-                self.events.log(component, "ERROR", f"{component} process exited with code {rc}")
+                err_summary = (
+                    f"{component} process exited with code {rc}"
+                    + (f" ({last_error_line})" if last_error_line else "")
+                )
+                self.events.log(component, "ERROR", err_summary)
+                if component == "ENGINE":
+                    self.engine_state = "ERROR"
+                    self.last_execution_error = err_summary
                 self.repo.record_error(
                     category="EXECUTION",
                     severity="CRITICAL",
                     component=component,
-                    message=f"{component} process exited unexpectedly with code {rc}",
+                    message=err_summary,
                     trading_affected=(component == "ENGINE"),
                     entries_blocked=(component == "ENGINE"),
-                    recommended_recovery="Inspect logs and restart the engine cleanly.",
+                    recommended_recovery="Inspect Event Logs and restart the engine cleanly.",
                     user_action_required=False,
                 )
+                self.events.publish_event("engine_state", self.get_status())
 
         t = threading.Thread(target=_reader, daemon=True)
         t.start()
 
     def pause_entries(self) -> Dict[str, Any]:
         with self._lock:
-            self.pause_flag_path.parent.mkdir(parents=True, exist_ok=True)
-            self.pause_flag_path.write_text(f"PAUSED_AT={datetime.now(timezone.utc).isoformat()}\n", encoding="utf-8")
+            ts = f"PAUSED_AT={datetime.now(timezone.utc).isoformat()}\n"
+            for p_flag in (self.pause_flag_path, self.legacy_pause_flag_path):
+                try:
+                    p_flag.parent.mkdir(parents=True, exist_ok=True)
+                    p_flag.write_text(ts, encoding="utf-8")
+                except Exception:
+                    pass
             self.risk_engine.pause_trading("Paused by operator via Companion Control Centre")
             self._refresh_state_flags()
-            self.repo.record_audit("operator", "PAUSE_ENTRIES", "EngineController", "New entries paused; position protection remains active.")
-            self.events.log("ENGINE", "WARNING", "New trade entries PAUSED. Existing position protection remains active.")
+            self.repo.record_audit(
+                "operator",
+                "PAUSE_ENTRIES",
+                "EngineController",
+                "New entries paused; position protection remains active.",
+            )
+            self.events.log(
+                "ENGINE",
+                "WARNING",
+                "New trade entries PAUSED. Existing position protection remains active.",
+            )
             self.events.publish_event("engine_state", self.get_status())
-            return {"success": True, "message": "New entries paused (position management active).", "state": self.engine_state}
+            return {
+                "success": True,
+                "message": "New entries paused (position management active).",
+                "state": self.engine_state,
+            }
 
     def resume_entries(self) -> Dict[str, Any]:
         with self._lock:
-            if self.stop_flag_path.exists():
-                return {"success": False, "message": "Cannot resume while STOP.flag emergency kill switch is active.", "state": "EMERGENCY_STOP"}
-            if self.pause_flag_path.exists():
-                self.pause_flag_path.unlink()
+            if self._is_stop_flag_present():
+                return {
+                    "success": False,
+                    "message": "Cannot resume while STOP.flag emergency kill switch is active.",
+                    "state": "EMERGENCY_STOP",
+                }
+            for p_flag in (self.pause_flag_path, self.legacy_pause_flag_path):
+                try:
+                    if p_flag.exists():
+                        p_flag.unlink()
+                except Exception:
+                    pass
             self.risk_engine.resume_trading()
             self._refresh_state_flags()
-            self.repo.record_audit("operator", "RESUME_ENTRIES", "EngineController", "Trade entries resumed.")
+            self.repo.record_audit(
+                "operator", "RESUME_ENTRIES", "EngineController", "Trade entries resumed."
+            )
             self.events.log("ENGINE", "INFO", "Trade entries RESUMED.")
             self.events.publish_event("engine_state", self.get_status())
-            return {"success": True, "message": "Trade entries resumed.", "state": self.engine_state}
+            return {
+                "success": True,
+                "message": "Trade entries resumed.",
+                "state": self.engine_state,
+            }
 
     def stop_engine(self) -> Dict[str, Any]:
         """Gracefully stops the Trading Engine (spawned or adopted) and Bridge Server."""
         with self._lock:
             self._user_requested_stop = True
-            stop_flag = get_state_dir() / "engine_stop.flag"
-            try:
-                stop_flag.parent.mkdir(parents=True, exist_ok=True)
-                stop_flag.write_text(f"STOP_REQUESTED={datetime.now(timezone.utc).isoformat()}\n", encoding="utf-8")
-            except Exception:
-                pass
+            stop_req_ts = f"STOP_REQUESTED={datetime.now(timezone.utc).isoformat()}\n"
+            stop_flags = [sdir / "engine_stop.flag" for sdir in self._state_dirs()]
+            for sf in stop_flags:
+                try:
+                    sf.parent.mkdir(parents=True, exist_ok=True)
+                    sf.write_text(stop_req_ts, encoding="utf-8")
+                except Exception:
+                    pass
 
             active_pid = self._discover_existing_engine_pid()
             if active_pid is not None:
@@ -306,7 +588,11 @@ class EngineController:
                         )
                     except Exception:
                         pass
-                self.events.log("ENGINE", "INFO", f"ENGINE_STOPPED: Engine process (PID {active_pid}) stopped cleanly.")
+                self.events.log(
+                    "ENGINE",
+                    "INFO",
+                    f"ENGINE_STOPPED: Engine process (PID {active_pid}) stopped cleanly.",
+                )
 
             if self._is_proc_alive(self.bridge_proc):
                 try:
@@ -319,31 +605,47 @@ class EngineController:
                         pass
                 self.events.log("BRIDGE", "INFO", "BRIDGE process stopped cleanly.")
 
-            try:
-                stop_flag.unlink(missing_ok=True)
-            except Exception:
-                pass
+            for sf in stop_flags:
+                try:
+                    sf.unlink(missing_ok=True)
+                except Exception:
+                    pass
             self.engine_proc = None
             self.adopted_engine_pid = None
             self.bridge_proc = None
-            self.engine_state = "EMERGENCY_STOP" if self.stop_flag_path.exists() else "STOPPED"
-            self.repo.record_audit("operator", "ENGINE_STOP", "EngineController", "Engine stopped cleanly.")
+            self.last_execution_error = None
+            self.engine_state = (
+                "EMERGENCY_STOP" if self._is_stop_flag_present() else "STOPPED"
+            )
+            self.repo.record_audit(
+                "operator", "ENGINE_STOP", "EngineController", "Engine stopped cleanly."
+            )
             self.events.publish_event("engine_state", self.get_status())
-            return {"success": True, "message": "Trading engine stopped cleanly.", "state": self.engine_state}
+            return {
+                "success": True,
+                "message": "Trading engine stopped cleanly.",
+                "state": self.engine_state,
+            }
 
     def restart_engine(self) -> Dict[str, Any]:
         self.stop_engine()
         time.sleep(0.5)
         return self.start_engine()
 
-    def emergency_stop(self, close_bot_positions: bool = False, confirmed: bool = False) -> Dict[str, Any]:
+    def emergency_stop(
+        self, close_bot_positions: bool = False, confirmed: bool = False
+    ) -> Dict[str, Any]:
         """Immediately engages STOP.flag kill switch, pauses risk engine, and optionally closes bot-owned positions if confirmed."""
         with self._lock:
-            self.stop_flag_path.write_text(
-                f"EMERGENCY_STOP={datetime.now(timezone.utc).isoformat()}\n",
-                encoding="utf-8",
+            ts = f"EMERGENCY_STOP={datetime.now(timezone.utc).isoformat()}\n"
+            for s_flag in (self.stop_flag_path, self.legacy_stop_flag_path):
+                try:
+                    s_flag.write_text(ts, encoding="utf-8")
+                except Exception:
+                    pass
+            self.risk_engine.trigger_kill_switch(
+                "Emergency Stop triggered from Companion Control Centre"
             )
-            self.risk_engine.trigger_kill_switch("Emergency Stop triggered from Companion Control Centre")
             self.engine_state = "EMERGENCY_STOP"
             closed_count = 0
             if close_bot_positions and confirmed:
@@ -356,7 +658,11 @@ class EngineController:
                 "EngineController",
                 f"STOP.flag engaged; close_bot_positions={close_bot_positions}, closed_count={closed_count}",
             )
-            self.events.log("RISK", "CRITICAL", f"EMERGENCY STOP ENGAGED (STOP.flag written, closed_bot_positions={closed_count}).")
+            self.events.log(
+                "RISK",
+                "CRITICAL",
+                f"EMERGENCY STOP ENGAGED (STOP.flag written, closed_bot_positions={closed_count}).",
+            )
             self.events.publish_event("engine_state", self.get_status())
             return {
                 "success": True,
@@ -367,23 +673,47 @@ class EngineController:
 
     def clear_emergency_stop(self, confirmed: bool = False) -> Dict[str, Any]:
         if not confirmed:
-            return {"success": False, "message": "Explicit confirmation required to clear STOP.flag."}
+            return {
+                "success": False,
+                "message": "Explicit confirmation required to clear STOP.flag.",
+            }
         with self._lock:
-            if self.stop_flag_path.exists():
-                self.stop_flag_path.unlink()
+            for s_flag in (self.stop_flag_path, self.legacy_stop_flag_path):
+                try:
+                    if s_flag.exists():
+                        s_flag.unlink()
+                except Exception:
+                    pass
             self.risk_engine.clear_kill_switch()
-            self.repo.resolve_component_errors("EngineController", "Emergency STOP.flag cleared by operator")
+            self.repo.resolve_component_errors(
+                "EngineController", "Emergency STOP.flag cleared by operator"
+            )
             self._refresh_state_flags()
-            self.repo.record_audit("operator", "CLEAR_EMERGENCY_STOP", "EngineController", "STOP.flag cleared.")
+            self.repo.record_audit(
+                "operator",
+                "CLEAR_EMERGENCY_STOP",
+                "EngineController",
+                "STOP.flag cleared.",
+            )
             self.events.log("RISK", "INFO", "Emergency STOP.flag cleared by operator.")
             self.events.publish_event("engine_state", self.get_status())
-            return {"success": True, "message": "Emergency stop cleared.", "state": self.engine_state}
+            return {
+                "success": True,
+                "message": "Emergency stop cleared.",
+                "state": self.engine_state,
+            }
 
     def close_all_bot_positions(self, confirmed: bool = False) -> Dict[str, Any]:
         if not confirmed:
-            return {"success": False, "message": "Confirmation required before closing bot-owned positions.", "closed_count": 0}
+            return {
+                "success": False,
+                "message": "Confirmation required before closing bot-owned positions.",
+                "closed_count": 0,
+            }
         snap = self.mt5_sync.get_snapshot()
-        bot_positions = [p for p in snap.get("positions", []) if p.get("ownership") == "BOT"]
+        bot_positions = [
+            p for p in snap.get("positions", []) if p.get("ownership") == "BOT"
+        ]
         closed = 0
         for p in bot_positions:
             if self.mt5_sync.bridge.is_connected():
@@ -394,7 +724,9 @@ class EngineController:
         # Reconcile with real MT5 positions before reporting success
         reconciled_snap = self.mt5_sync.sync_all()
         remaining_bot = [
-            p for p in reconciled_snap.get("positions", []) if p.get("ownership") == "BOT"
+            p
+            for p in reconciled_snap.get("positions", [])
+            if p.get("ownership") == "BOT"
         ]
         reconciled_ok = len(remaining_bot) == 0
         msg = (
@@ -420,34 +752,75 @@ class EngineController:
     def modify_position_sl_tp(self, ticket: int, sl: float, tp: float) -> Dict[str, Any]:
         if not self.mt5_sync.bridge.is_connected():
             return {"success": False, "message": "MT5 Bridge not connected."}
-        res = self.mt5_sync.bridge.modify_order(ticket=int(ticket), sl=float(sl), tp=float(tp))
+        res = self.mt5_sync.bridge.modify_order(
+            ticket=int(ticket), sl=float(sl), tp=float(tp)
+        )
         ok = isinstance(res, dict) and res.get("status") == "SUCCESS"
-        self.repo.record_audit("operator", "MODIFY_POSITION", "EngineController", f"Ticket #{ticket} SL={sl} TP={tp} ok={ok}")
-        return {"success": ok, "message": (res or {}).get("message", "Modify dispatched"), "response": res}
+        self.repo.record_audit(
+            "operator",
+            "MODIFY_POSITION",
+            "EngineController",
+            f"Ticket #{ticket} SL={sl} TP={tp} ok={ok}",
+        )
+        return {
+            "success": ok,
+            "message": (res or {}).get("message", "Modify dispatched"),
+            "response": res,
+        }
 
     def close_position(self, ticket: int, confirmed: bool = False) -> Dict[str, Any]:
         if not confirmed:
-            return {"success": False, "message": "Explicit confirmation required to close position."}
+            return {
+                "success": False,
+                "message": "Explicit confirmation required to close position.",
+            }
         snap = self.mt5_sync.get_snapshot()
-        target = next((p for p in snap.get("positions", []) if int(p["ticket"]) == int(ticket)), None)
+        target = next(
+            (p for p in snap.get("positions", []) if int(p["ticket"]) == int(ticket)),
+            None,
+        )
         if target and target.get("ownership") in ("MANUAL", "OTHER_EA"):
-            self.events.log("ENGINE", "WARNING", f"Closing non-bot position #{ticket} ({target.get('ownership')}) per explicit user confirmation.")
+            self.events.log(
+                "ENGINE",
+                "WARNING",
+                f"Closing non-bot position #{ticket} ({target.get('ownership')}) per explicit user confirmation.",
+            )
         if not self.mt5_sync.bridge.is_connected():
             return {"success": False, "message": "MT5 Bridge not connected."}
         res = self.mt5_sync.bridge.close_order(ticket=int(ticket))
         ok = isinstance(res, dict) and res.get("status") == "SUCCESS"
-        self.repo.record_audit("operator", "CLOSE_POSITION", "EngineController", f"Closed #{ticket} ok={ok}")
-        return {"success": ok, "message": (res or {}).get("message", "Close dispatched"), "response": res}
+        self.repo.record_audit(
+            "operator", "CLOSE_POSITION", "EngineController", f"Closed #{ticket} ok={ok}"
+        )
+        return {
+            "success": ok,
+            "message": (res or {}).get("message", "Close dispatched"),
+            "response": res,
+        }
 
     def cancel_pending_order(self, ticket: int, confirmed: bool = False) -> Dict[str, Any]:
         if not confirmed:
-            return {"success": False, "message": "Explicit confirmation required to cancel pending order."}
+            return {
+                "success": False,
+                "message": "Explicit confirmation required to cancel pending order.",
+            }
         if not self.mt5_sync.bridge.is_connected():
             return {"success": False, "message": "MT5 Bridge not connected."}
-        res = self.mt5_sync.bridge.send_request({"action": "CANCEL_ORDER", "ticket": int(ticket)})
+        res = self.mt5_sync.bridge.send_request(
+            {"action": "CANCEL_ORDER", "ticket": int(ticket)}
+        )
         ok = isinstance(res, dict) and res.get("status") == "SUCCESS"
-        self.repo.record_audit("operator", "CANCEL_PENDING_ORDER", "EngineController", f"Cancel #{ticket} ok={ok}")
-        return {"success": ok, "message": (res or {}).get("message", "Cancel dispatched"), "response": res}
+        self.repo.record_audit(
+            "operator",
+            "CANCEL_PENDING_ORDER",
+            "EngineController",
+            f"Cancel #{ticket} ok={ok}",
+        )
+        return {
+            "success": ok,
+            "message": (res or {}).get("message", "Cancel dispatched"),
+            "response": res,
+        }
 
     def get_status(self) -> Dict[str, Any]:
         with self._lock:
@@ -459,6 +832,7 @@ class EngineController:
             try:
                 from src.core.symbol_universe import get_symbol_universe
                 from src.core.trading_schedule import get_trading_schedule
+
                 universe = get_symbol_universe()
                 schedule = get_trading_schedule()
                 sched_status = schedule.get_status()
@@ -471,16 +845,25 @@ class EngineController:
             try:
                 from src.risk.portfolio_capacity import DynamicPortfolioCapacityEngine
                 from src.core.contracts import AccountInfo, Position, OrderType
+
                 snap = self.mt5_sync.get_snapshot()
                 acc_d = snap.get("account", {})
                 pos_list = snap.get("positions", [])
                 ord_list = snap.get("orders", [])
                 risk_cfg = cfg.get("risk", {})
                 cap_eng = DynamicPortfolioCapacityEngine(
-                    max_aggregate_open_risk_percent=float(risk_cfg.get("max_aggregate_open_risk_percent", 6.0)),
-                    max_symbol_risk_percent=float(risk_cfg.get("max_symbol_risk_percent", 4.0)),
-                    min_margin_level_percent=float(risk_cfg.get("min_margin_level_percent", 150.0)),
-                    max_margin_utilization_percent=float(risk_cfg.get("max_margin_utilization_percent", 80.0)),
+                    max_aggregate_open_risk_percent=float(
+                        risk_cfg.get("max_aggregate_open_risk_percent", 6.0)
+                    ),
+                    max_symbol_risk_percent=float(
+                        risk_cfg.get("max_symbol_risk_percent", 4.0)
+                    ),
+                    min_margin_level_percent=float(
+                        risk_cfg.get("min_margin_level_percent", 150.0)
+                    ),
+                    max_margin_utilization_percent=float(
+                        risk_cfg.get("max_margin_utilization_percent", 80.0)
+                    ),
                 )
                 acc_obj = AccountInfo(
                     balance=float(acc_d.get("balance", 0.0) or 0.0),
@@ -492,7 +875,9 @@ class EngineController:
                     Position(
                         ticket=int(p.get("ticket", 0) or 0),
                         symbol=str(p.get("symbol", "")),
-                        order_type=OrderType.BUY if str(p.get("type", "BUY")).upper() == "BUY" else OrderType.SELL,
+                        order_type=OrderType.BUY
+                        if str(p.get("type", "BUY")).upper() == "BUY"
+                        else OrderType.SELL,
                         volume=float(p.get("volume", 0.0) or 0.0),
                         open_price=float(p.get("open_price", 0.0) or 0.0),
                         current_price=float(p.get("current_price", 0.0) or 0.0),
@@ -511,10 +896,12 @@ class EngineController:
                 pass
 
             active_pid = self._get_active_engine_pid()
-            bridge_pid = self.bridge_proc.pid if self._is_proc_alive(self.bridge_proc) else None
+            bridge_pid = (
+                self.bridge_proc.pid if self._is_proc_alive(self.bridge_proc) else None
+            )
             op_mode = cfg.get("operating_mode", "DRY_RUN")
-            stop_active = self.stop_flag_path.exists()
-            pause_active = self.pause_flag_path.exists()
+            stop_active = self._is_stop_flag_present()
+            pause_active = self._is_pause_flag_present()
 
             return {
                 "state": self.engine_state,
@@ -543,7 +930,9 @@ class EngineController:
                 "resolved_universe": resolved_universe,
                 "schedule_mode": sched_status.get("mode", "WEEKDAY_GOLD_MODE"),
                 "operating_day": sched_status.get("weekday_name", ""),
-                "symbol_priorities": sched_status.get("priority_order", ["XAUUSD", "BTCUSD"]),
+                "symbol_priorities": sched_status.get(
+                    "priority_order", ["XAUUSD", "BTCUSD"]
+                ),
             }
 
     def get_health(self) -> Dict[str, Any]:
@@ -556,7 +945,7 @@ class EngineController:
             "mt5_connection": mt5_snap["connection_status"],
             "mt5_last_sync": mt5_snap["last_sync_at"],
             "database": db_health,
-            "disk_free_gb": round(usage.free / (1024 ** 3), 2),
-            "disk_total_gb": round(usage.total / (1024 ** 3), 2),
+            "disk_free_gb": round(usage.free / (1024**3), 2),
+            "disk_total_gb": round(usage.total / (1024**3), 2),
             "active_errors_count": len(self.repo.get_errors(status="ACTIVE")),
         }

@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   Link2,
   Lock,
+  LogOut,
   PanelLeft,
   Radio,
   RefreshCw,
@@ -293,13 +294,21 @@ export const App: React.FC = () => {
     return () => clearTimeout(t);
   }, [actionToast]);
 
+  const consecutivePollErrorsRef = useRef<number>(0);
+
   const refreshStatus = useCallback(async () => {
     try {
       const st = await controlClient.getStatus();
+      consecutivePollErrorsRef.current = 0;
       setRawStatus(st);
       setFeedStatus((prev) => (prev === "LIVE_SSE" ? "LIVE_SSE" : "POLLING"));
     } catch {
-      setFeedStatus((prev) => (prev === "LIVE_SSE" ? "LIVE_SSE" : "POLLING"));
+      consecutivePollErrorsRef.current += 1;
+      if (consecutivePollErrorsRef.current >= 2) {
+        setFeedStatus("DISCONNECTED");
+      } else {
+        setFeedStatus((prev) => (prev === "LIVE_SSE" ? "LIVE_SSE" : "POLLING"));
+      }
     }
   }, []);
 
@@ -364,7 +373,9 @@ export const App: React.FC = () => {
     const unsub = IPC.onControlServiceStatus((next) => {
       setServiceStatus((prev) => {
         if (prev?.status !== "ONLINE" && next.status === "ONLINE") {
-          setActionToast((toast) => (toast && /offline|retrying/i.test(toast.message) ? null : toast));
+          setActionToast((toast) =>
+            toast && /offline|retrying/i.test(toast.message) ? null : toast
+          );
           refreshStatus();
         }
         return next;
@@ -383,9 +394,32 @@ export const App: React.FC = () => {
     IPC.getPairingStatus().then(setPairing).catch(() => {});
 
     let es: EventSource | null = null;
+    let sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let sseBackoffMs = 2500;
     let cancelled = false;
 
+    const scheduleSseReconnect = () => {
+      if (cancelled || sseReconnectTimer) return;
+      const delay = sseBackoffMs;
+      sseBackoffMs = Math.min(15000, Math.round(sseBackoffMs * 1.6));
+      sseReconnectTimer = setTimeout(() => {
+        sseReconnectTimer = null;
+        if (!cancelled) {
+          connectSse();
+        }
+      }, delay);
+    };
+
     const connectSse = async () => {
+      if (cancelled) return;
+      if (es) {
+        try {
+          es.close();
+        } catch {
+          // ignore
+        }
+        es = null;
+      }
       try {
         let baseUrl = "http://127.0.0.1:8765";
         let token = "";
@@ -401,7 +435,11 @@ export const App: React.FC = () => {
         es = new EventSource(sseUrl);
 
         es.onopen = () => {
-          if (!cancelled) setFeedStatus("LIVE_SSE");
+          if (!cancelled) {
+            sseBackoffMs = 2500;
+            consecutivePollErrorsRef.current = 0;
+            setFeedStatus("LIVE_SSE");
+          }
         };
 
         es.onmessage = (evt) => {
@@ -433,12 +471,24 @@ export const App: React.FC = () => {
         };
 
         es.onerror = () => {
+          if (es) {
+            try {
+              es.close();
+            } catch {
+              // ignore
+            }
+            es = null;
+          }
           if (!cancelled) {
-            setFeedStatus("POLLING");
+            setFeedStatus((prev) => (prev === "DISCONNECTED" ? "DISCONNECTED" : "POLLING"));
+            scheduleSseReconnect();
           }
         };
       } catch {
-        if (!cancelled) setFeedStatus("POLLING");
+        if (!cancelled) {
+          setFeedStatus((prev) => (prev === "DISCONNECTED" ? "DISCONNECTED" : "POLLING"));
+          scheduleSseReconnect();
+        }
       }
     };
 
@@ -450,6 +500,7 @@ export const App: React.FC = () => {
     return () => {
       cancelled = true;
       clearInterval(interval);
+      if (sseReconnectTimer) clearTimeout(sseReconnectTimer);
       if (es) es.close();
     };
   }, [refreshStatus, reloadTrades, reloadLogs, reloadAudits]);
@@ -473,7 +524,7 @@ export const App: React.FC = () => {
     [controlLogs]
   );
 
-  // IMAGE 2 Sidebar Structure: Dashboard top-level, collapsible MONITOR / CONTROL / DIAGNOSE groups, Settings at bottom
+  // Sidebar Structure: Dashboard top-level, collapsible MONITOR / CONTROL / DIAGNOSE groups, Settings + Sign Out pinned at bottom
   const dashboardItem: NavScreenItem = useMemo(
     () => ({
       id: "dashboard",
@@ -567,8 +618,7 @@ export const App: React.FC = () => {
 
   const isElectron = useMemo(() => IPC.isElectron(), []);
   const titlebarHeightPx = isElectron ? 36 : 0;
-  const sidebarInsetPx = 8;
-  const mainLeftOffsetPx = DESIGN_TOKENS.sidebar.collapsedWidthPx + sidebarInsetPx * 2;
+  const mainLeftOffsetPx = DESIGN_TOKENS.sidebar.collapsedWidthPx;
 
   const handleJumpToChart = useCallback(
     (sym: ChartSymbol) => {
@@ -589,15 +639,32 @@ export const App: React.FC = () => {
     [setActiveScreen, isSidebarTouchPinned]
   );
 
+  const handleSignOutClick = useCallback(async () => {
+    if (pairing.isPaired) {
+      const res = await IPC.disconnectPairing().catch(() => ({
+        success: false,
+        message: "Unable to disconnect cloud pairing",
+      }));
+      if (res.success) {
+        setPairing((p) => ({ ...p, isPaired: false, instanceId: null, deviceTokenMasked: null }));
+        handleActionMessage("Signed out of Institutional EA Cloud pairing.", false);
+      } else {
+        handleActionMessage(res.message || "Sign out failed", true);
+      }
+    } else {
+      setIsPairingOpen(true);
+    }
+  }, [pairing.isPaired, handleActionMessage]);
+
   const renderBadgePill = (badge?: number, tone: "mint" | "peach" = "mint") => {
     if (badge === undefined) return null;
     return (
       <span
         data-testid={`sidebar-badge-${tone}`}
-        className={`min-w-[24px] h-[22px] px-1.5 rounded-[7px] text-[11px] font-mono font-bold tabular-nums inline-flex items-center justify-center shrink-0 ${
+        className={`min-w-[22px] h-[20px] px-1.5 rounded-[6px] text-[10px] font-mono font-bold tabular-nums inline-flex items-center justify-center shrink-0 ${
           tone === "peach"
-            ? "bg-[#F5C59F] text-[#1F140B]"
-            : "bg-[#A9ECDA] text-[#0E1A16]"
+            ? "bg-iea-dangerSoft text-iea-danger border border-iea-dangerBorder"
+            : "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
         }`}
       >
         {badge}
@@ -610,8 +677,8 @@ export const App: React.FC = () => {
     return (
       <span
         aria-hidden="true"
-        className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-[#17181A] ${
-          tone === "peach" ? "bg-[#F5C59F]" : "bg-[#A9ECDA]"
+        className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-[var(--iea-sidebar-rail-bg)] ${
+          tone === "peach" ? "bg-iea-danger" : "bg-iea-accent"
         }`}
       />
     );
@@ -620,7 +687,7 @@ export const App: React.FC = () => {
   return (
     <div
       style={{ "--iea-titlebar-h": `${titlebarHeightPx}px` } as React.CSSProperties}
-      className="relative flex h-screen w-screen overflow-hidden iea-shell-bg text-[#F5F5F2] antialiased font-sans select-none"
+      className="relative flex h-screen w-screen overflow-hidden iea-shell-bg text-iea-textPrimary antialiased font-sans select-none"
     >
       {/* Electron-Only Native Title Bar Drag Strip (36px) paired with Windows titleBarOverlay */}
       {isElectron && (
@@ -630,29 +697,30 @@ export const App: React.FC = () => {
             height: "36px",
             paddingRight: "max(144px, calc(100% - env(titlebar-area-width, 100%)))",
           }}
-          className="iea-drag-region fixed top-0 left-0 right-0 z-50 bg-[#12110F] border-b border-[rgba(255,255,253,0.06)] flex items-center justify-between px-3.5"
+          className="iea-drag-region fixed top-0 left-0 right-0 z-50 bg-iea-titlebar border-b border-iea-borderSubtle flex items-center justify-between px-3.5"
         >
           <div className="flex items-center space-x-2 min-w-0">
-            <div className="w-5 h-5 rounded-[6px] bg-[#F8F8FA] flex items-center justify-center shrink-0">
-              <span className="w-2.5 h-2.5 rounded-full border-[2.5px] border-[#191D20] flex items-center justify-center">
-                <span className="w-1 h-1 rounded-full bg-[#191D20]" />
+            <div className="w-5 h-5 rounded-[6px] bg-iea-accent flex items-center justify-center shrink-0">
+              <span className="w-2.5 h-2.5 rounded-full border-[2px] border-white flex items-center justify-center">
+                <span className="w-1 h-1 rounded-full bg-white" />
               </span>
             </div>
-            <span className="text-[11px] font-semibold tracking-tight text-[#F5F5F2] truncate">
-              {UI_COPY.brand.title}
+            <span className="text-[11px] font-bold tracking-tight text-iea-textPrimary truncate">
+              INSTITUTIONAL <span className="text-iea-accent">EA</span>
             </span>
-            <span className="text-[10px] font-mono text-[#8A8986]">
+            <span className="text-[10px] font-mono text-iea-textMuted">
               {UI_COPY.brand.subtitle}
             </span>
           </div>
-          <span className="text-[10px] font-mono text-[#8A8986] hidden sm:inline">
+          <span className="text-[10px] font-mono text-iea-textMuted hidden sm:inline">
             DEMO · LIVE_TRADING_ENABLED=false
           </span>
         </div>
       )}
 
       {/* =====================================================================
-          IMAGE 2 HOVER-EXPAND OVERLAY SIDEBAR (11 SCREENS, COLLAPSIBLE GROUPS)
+          BM FOREX HUB DOCKED FULL-HEIGHT OVERLAY SIDEBAR
+          Collapsed: ~72px icon rail | Expanded: ~256px overlay with labels
       ====================================================================== */}
       <aside
         ref={sidebarRef}
@@ -664,9 +732,9 @@ export const App: React.FC = () => {
         onFocusCapture={handleSidebarFocusIn}
         onBlurCapture={handleSidebarFocusOut}
         style={{
-          top: `${titlebarHeightPx + sidebarInsetPx}px`,
-          bottom: `${sidebarInsetPx}px`,
-          left: `${sidebarInsetPx}px`,
+          top: `${titlebarHeightPx}px`,
+          bottom: 0,
+          left: 0,
           width: isSidebarExpanded
             ? `${DESIGN_TOKENS.sidebar.expandedWidthPx}px`
             : `${DESIGN_TOKENS.sidebar.collapsedWidthPx}px`,
@@ -675,30 +743,36 @@ export const App: React.FC = () => {
       >
         {/* Top Brand Block + Navigation */}
         <div className="flex flex-col min-h-0 flex-1">
-          {/* Brand Logo Tile (White Rounded-Square Mark per IMAGE 2) */}
-          <div className="h-[72px] px-4 flex items-center justify-between gap-2 shrink-0">
+          {/* Brand Logo Tile + "INSTITUTIONAL EA" with blue accent word */}
+          <div className="h-[68px] px-4 border-b border-iea-borderSubtle flex items-center justify-between gap-2 shrink-0">
             <div className="flex items-center space-x-3 min-w-0 flex-1">
               <div
-                className="w-11 h-11 rounded-[13px] bg-[#F8F8FA] shadow-xs flex items-center justify-center shrink-0"
+                className="w-10 h-10 rounded-[12px] bg-iea-accent text-white flex items-center justify-center shrink-0"
                 aria-hidden="true"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <rect x="4" y="4" width="16" height="16" rx="6" fill="#191D20" />
-                  <circle cx="12" cy="12" r="3" fill="#F8F8FA" />
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <rect
+                    x="4"
+                    y="4"
+                    width="16"
+                    height="16"
+                    rx="5"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                  />
+                  <circle cx="12" cy="12" r="3" fill="currentColor" />
                 </svg>
               </div>
 
               <div
-                className={`min-w-0 flex-1 whitespace-nowrap transition-all duration-200 ease-out ${
-                  isSidebarExpanded
-                    ? "opacity-100 translate-x-0"
-                    : "opacity-0 -translate-x-2 pointer-events-none w-0 overflow-hidden"
+                className={`iea-sidebar-label min-w-0 flex-1 whitespace-nowrap ${
+                  isSidebarExpanded ? "" : "w-0 overflow-hidden"
                 }`}
               >
-                <div className="text-[12px] font-semibold tracking-tight text-white leading-tight truncate">
-                  {UI_COPY.brand.title}
+                <div className="text-[13px] font-bold tracking-tight text-iea-textPrimary leading-tight truncate">
+                  INSTITUTIONAL <span className="text-iea-accent">EA</span>
                 </div>
-                <div className="text-[10px] font-mono text-[#9CA1A6] mt-0.5 truncate">
+                <div className="text-[10px] font-mono text-iea-textMuted mt-0.5 truncate">
                   {UI_COPY.brand.subtitle}
                 </div>
               </div>
@@ -714,10 +788,10 @@ export const App: React.FC = () => {
                     : "Pin navigation sidebar open"
                 }
                 title={isSidebarTouchPinned ? "Unpin sidebar" : "Pin sidebar"}
-                className={`p-1.5 rounded-lg text-xs transition shrink-0 ${
+                className={`p-1.5 rounded-[8px] text-xs transition shrink-0 ${
                   isSidebarTouchPinned
-                    ? "bg-[#272A2F] text-white border border-white/10"
-                    : "text-[#9CA1A6] hover:text-white hover:bg-white/5"
+                    ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
+                    : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-white/5"
                 }`}
               >
                 <PanelLeft className="w-4 h-4" />
@@ -728,7 +802,7 @@ export const App: React.FC = () => {
           {/* Navigation Body */}
           <nav
             aria-label="Screen Navigation"
-            className="flex-1 px-3 py-2 overflow-y-auto overflow-x-hidden space-y-1.5"
+            className="flex-1 px-3 py-2 overflow-y-auto overflow-x-hidden space-y-0.5"
           >
             {/* Top-Level: Dashboard */}
             {(() => {
@@ -741,38 +815,40 @@ export const App: React.FC = () => {
                   aria-current={active ? "page" : undefined}
                   aria-label={dashboardItem.label}
                   title={`${dashboardItem.label} — ${dashboardItem.tooltip}`}
-                  className={`group relative w-full flex items-center rounded-[12px] transition-all duration-200 ${
+                  className={`group relative w-full flex items-center rounded-[11px] transition-all duration-200 ${
                     isSidebarExpanded
-                      ? "h-12 px-3.5 justify-between"
-                      : "h-12 justify-center"
+                      ? "h-10 px-3 justify-between"
+                      : "h-9 justify-center"
                   } ${
                     active
                       ? isSidebarExpanded
-                        ? "bg-[#272A2F] text-white font-semibold border border-white/[0.06]"
-                        : "text-white"
-                      : "text-[#9CA1A6] hover:text-white hover:bg-white/[0.04] border border-transparent"
+                        ? "bg-iea-accentSoft text-iea-accent font-semibold border border-iea-accentBorder"
+                        : "text-iea-accent"
+                      : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-white/[0.04] border border-transparent"
                   }`}
                 >
                   {isSidebarExpanded ? (
                     <div className="flex items-center space-x-3 min-w-0">
                       <Icon
-                        className={`w-5 h-5 shrink-0 transition-colors ${
-                          active ? "text-white" : "text-[#9CA1A6] group-hover:text-white"
+                        className={`w-[18px] h-[18px] shrink-0 transition-colors ${
+                          active
+                            ? "text-iea-accent"
+                            : "text-iea-textSecondary group-hover:text-iea-textPrimary"
                         }`}
                       />
-                      <span className="text-[14px] whitespace-nowrap truncate">
+                      <span className="iea-sidebar-label text-[13px] whitespace-nowrap truncate">
                         {dashboardItem.label}
                       </span>
                     </div>
                   ) : (
                     <div
-                      className={`w-11 h-11 rounded-[12px] flex items-center justify-center transition-colors ${
+                      className={`w-9 h-9 rounded-[10px] flex items-center justify-center transition-colors ${
                         active
-                          ? "bg-[#303135] text-white"
-                          : "text-[#9CA1A6] group-hover:text-white group-hover:bg-white/[0.05]"
+                          ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
+                          : "text-iea-textSecondary group-hover:text-iea-textPrimary group-hover:bg-white/[0.05]"
                       }`}
                     >
-                      <Icon className="w-5 h-5" />
+                      <Icon className="w-[17px] h-[17px]" />
                     </div>
                   )}
                 </button>
@@ -788,8 +864,11 @@ export const App: React.FC = () => {
               if (!isSidebarExpanded) {
                 // Collapsed Rail: Continuous icon list with subtle divider between groups
                 return (
-                  <div key={grp.group} className="pt-1.5 space-y-1">
-                    <div className="w-6 h-px mx-auto bg-white/[0.08] mb-2" aria-hidden="true" />
+                  <div key={grp.group} className="pt-1 space-y-0.5">
+                    <div
+                      className="w-6 h-px mx-auto bg-iea-borderSubtle mb-1"
+                      aria-hidden="true"
+                    />
                     {grp.items.map((item) => {
                       const Icon = item.icon;
                       const active = activeScreen === item.id;
@@ -801,16 +880,16 @@ export const App: React.FC = () => {
                           aria-current={active ? "page" : undefined}
                           aria-label={item.label}
                           title={`${item.label} — ${item.tooltip}`}
-                          className="group relative w-full h-11 flex items-center justify-center rounded-[12px] transition"
+                          className="group relative w-full h-9 flex items-center justify-center rounded-[10px] transition"
                         >
                           <div
-                            className={`relative w-11 h-11 rounded-[12px] flex items-center justify-center transition-colors ${
+                            className={`relative w-9 h-9 rounded-[10px] flex items-center justify-center transition-colors ${
                               active
-                                ? "bg-[#303135] text-white"
-                                : "text-[#9CA1A6] group-hover:text-white group-hover:bg-white/[0.05]"
+                                ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
+                                : "text-iea-textSecondary group-hover:text-iea-textPrimary group-hover:bg-white/[0.05]"
                             }`}
                           >
-                            <Icon className="w-5 h-5" />
+                            <Icon className="w-[17px] h-[17px]" />
                             {renderCollapsedBadgeDot(item.badge, item.badgeTone)}
                           </div>
                         </button>
@@ -820,7 +899,7 @@ export const App: React.FC = () => {
                 );
               }
 
-              // Expanded State: Collapsible group header + tree-indented children (IMAGE 2)
+              // Expanded State: Collapsible group header + icons with labels
               return (
                 <div key={grp.group} className="pt-1">
                   <button
@@ -828,58 +907,73 @@ export const App: React.FC = () => {
                     data-testid={`sidebar-group-${grp.group.toLowerCase()}`}
                     aria-expanded={isOpen}
                     onClick={() => toggleGroup(grp.group)}
-                    className={`w-full h-12 px-3.5 rounded-[12px] flex items-center justify-between transition-all duration-200 border ${
-                      isOpen || hasActiveChild
-                        ? "bg-[#272A2F] text-white font-semibold border-white/[0.06]"
-                        : "text-[#9CA1A6] hover:text-white hover:bg-white/[0.04] font-medium border-transparent"
+                    className={`w-full h-10 px-3 rounded-[10px] flex items-center justify-between transition-all duration-200 border ${
+                      hasActiveChild
+                        ? "text-iea-textPrimary font-semibold border-transparent"
+                        : "text-iea-textMuted hover:text-iea-textPrimary hover:bg-white/[0.03] font-semibold border-transparent"
                     }`}
                   >
-                    <div className="flex items-center space-x-3 min-w-0">
+                    <div className="flex items-center space-x-2.5 min-w-0">
                       <GroupIcon
-                        className={`w-5 h-5 shrink-0 ${
-                          isOpen || hasActiveChild ? "text-white" : "text-[#9CA1A6]"
+                        className={`w-4 h-4 shrink-0 ${
+                          hasActiveChild ? "text-iea-accent" : "text-iea-textMuted"
                         }`}
                       />
-                      <span className="text-[14px] whitespace-nowrap truncate">{grp.label}</span>
+                      <span className="iea-sidebar-label text-[11px] uppercase tracking-wider whitespace-nowrap truncate">
+                        {grp.label}
+                      </span>
                     </div>
                     <ChevronDown
-                      className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
-                        isOpen ? "rotate-180 text-white" : "text-[#9CA1A6]"
+                      className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
+                        isOpen ? "rotate-180 text-iea-textSecondary" : "text-iea-textMuted"
                       }`}
                     />
                   </button>
 
-                  {/* Smooth Collapsible Tree Children */}
+                  {/* Smooth Collapsible Children (Icons + Labels) */}
                   <div
                     className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
-                      isOpen ? "grid-rows-[1fr] opacity-100 mt-1" : "grid-rows-[0fr] opacity-0 pointer-events-none"
+                      isOpen
+                        ? "grid-rows-[1fr] opacity-100 mt-0.5"
+                        : "grid-rows-[0fr] opacity-0 pointer-events-none"
                     }`}
                   >
                     <div className="overflow-hidden min-h-0">
-                      <div className={`iea-tree-children space-y-0.5 ${isOpen ? "py-0.5" : "py-0"}`}>
+                      <div className={`space-y-0.5 ${isOpen ? "py-0.5" : "py-0"}`}>
                         {grp.items.map((item) => {
+                          const ItemIcon = item.icon;
                           const active = activeScreen === item.id;
                           return (
-                            <div key={item.id} className="iea-tree-child-row">
-                              <button
-                                type="button"
-                                onClick={(e) => handleSelectNavItem(item.id, e)}
-                                aria-current={active ? "page" : undefined}
-                                aria-label={item.label}
-                                title={`${item.label} — ${item.tooltip}`}
-                                className={`w-full h-10 px-3 rounded-[10px] flex items-center justify-between text-[13px] transition-all duration-150 ${
-                                  active
-                                    ? "bg-[#272A2F] text-white font-medium border border-white/[0.06]"
-                                    : "text-[#9CA1A6] hover:text-white hover:bg-white/[0.04] font-normal border border-transparent"
-                                }`}
-                              >
-                                <span className="whitespace-nowrap truncate">{item.label}</span>
-                                <div className="flex items-center space-x-1.5 shrink-0">
-                                  {renderBadgePill(item.badge, item.badgeTone)}
-                                  {active && <ChevronRight className="w-4 h-4 text-white" />}
-                                </div>
-                              </button>
-                            </div>
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={(e) => handleSelectNavItem(item.id, e)}
+                              aria-current={active ? "page" : undefined}
+                              aria-label={item.label}
+                              title={`${item.label} — ${item.tooltip}`}
+                              className={`group w-full h-10 px-3 rounded-[10px] flex items-center justify-between text-[13px] transition-all duration-150 ${
+                                active
+                                  ? "bg-iea-accentSoft text-iea-accent font-semibold border border-iea-accentBorder"
+                                  : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-white/[0.04] font-normal border border-transparent"
+                              }`}
+                            >
+                              <div className="flex items-center space-x-3 min-w-0">
+                                <ItemIcon
+                                  className={`w-4 h-4 shrink-0 transition-colors ${
+                                    active
+                                      ? "text-iea-accent"
+                                      : "text-iea-textSecondary group-hover:text-iea-textPrimary"
+                                  }`}
+                                />
+                                <span className="iea-sidebar-label whitespace-nowrap truncate">
+                                  {item.label}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-1.5 shrink-0">
+                                {renderBadgePill(item.badge, item.badgeTone)}
+                                {active && <ChevronRight className="w-3.5 h-3.5 text-iea-accent" />}
+                              </div>
+                            </button>
                           );
                         })}
                       </div>
@@ -888,87 +982,113 @@ export const App: React.FC = () => {
                 </div>
               );
             })}
-
-            {/* Bottom Standalone Item: Settings */}
-            <div className="pt-1.5">
-              {!isSidebarExpanded && (
-                <div className="w-6 h-px mx-auto bg-white/[0.08] mb-2" aria-hidden="true" />
-              )}
-              {(() => {
-                const Icon = settingsItem.icon;
-                const active = activeScreen === settingsItem.id;
-                return (
-                  <button
-                    type="button"
-                    onClick={(e) => handleSelectNavItem(settingsItem.id, e)}
-                    aria-current={active ? "page" : undefined}
-                    aria-label={settingsItem.label}
-                    title={`${settingsItem.label} — ${settingsItem.tooltip}`}
-                    className={`group relative w-full flex items-center rounded-[12px] transition-all duration-200 ${
-                      isSidebarExpanded
-                        ? "h-12 px-3.5 justify-between"
-                        : "h-11 justify-center"
-                    } ${
-                      active
-                        ? isSidebarExpanded
-                          ? "bg-[#272A2F] text-white font-semibold border border-white/[0.06]"
-                          : "text-white"
-                        : "text-[#9CA1A6] hover:text-white hover:bg-white/[0.04] border border-transparent"
-                    }`}
-                  >
-                    {isSidebarExpanded ? (
-                      <div className="flex items-center space-x-3 min-w-0">
-                        <Icon
-                          className={`w-5 h-5 shrink-0 ${
-                            active ? "text-white" : "text-[#9CA1A6] group-hover:text-white"
-                          }`}
-                        />
-                        <span className="text-[14px] whitespace-nowrap truncate">
-                          {settingsItem.label}
-                        </span>
-                      </div>
-                    ) : (
-                      <div
-                        className={`w-11 h-11 rounded-[12px] flex items-center justify-center transition-colors ${
-                          active
-                            ? "bg-[#303135] text-white"
-                            : "text-[#9CA1A6] group-hover:text-white group-hover:bg-white/[0.05]"
-                        }`}
-                      >
-                        <Icon className="w-5 h-5" />
-                      </div>
-                    )}
-                  </button>
-                );
-              })()}
-            </div>
           </nav>
         </div>
 
-        {/* Sidebar Footer: Hard DEMO Safety Lock Indicator */}
-        <div className="p-3 border-t border-white/[0.07] shrink-0">
-          {isSidebarExpanded ? (
-            <div className="space-y-2 whitespace-nowrap px-1">
-              <div className="flex items-center justify-between text-[11px] font-mono">
-                <span
-                  className="inline-flex items-center space-x-1.5 text-[#6EE7B7] font-semibold"
-                  title={UI_COPY.brand.demoLockTooltip}
-                >
-                  <Lock className="w-3.5 h-3.5" />
-                  <span>{UI_COPY.brand.demoLockShort}</span>
-                </span>
-                <span className="text-[#9CA1A6] text-[10px]">
-                  {serviceStatus ? `${serviceStatus.host}:${serviceStatus.port}` : "127.0.0.1:8765"}
+        {/* Bottom Group Pinned Behind a Divider: Settings, Sign Out & DEMO Safety Lock */}
+        <div className="px-3 py-3 border-t border-iea-borderSubtle space-y-1 shrink-0">
+          {/* Settings Item */}
+          {(() => {
+            const Icon = settingsItem.icon;
+            const active = activeScreen === settingsItem.id;
+            return (
+              <button
+                type="button"
+                onClick={(e) => handleSelectNavItem(settingsItem.id, e)}
+                aria-current={active ? "page" : undefined}
+                aria-label={settingsItem.label}
+                title={`${settingsItem.label} — ${settingsItem.tooltip}`}
+                className={`group relative w-full flex items-center rounded-[11px] transition-all duration-200 ${
+                  isSidebarExpanded ? "h-10 px-3 justify-between" : "h-10 justify-center"
+                } ${
+                  active
+                    ? isSidebarExpanded
+                      ? "bg-iea-accentSoft text-iea-accent font-semibold border border-iea-accentBorder"
+                      : "text-iea-accent"
+                    : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-white/[0.04] border border-transparent"
+                }`}
+              >
+                {isSidebarExpanded ? (
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <Icon
+                      className={`w-[18px] h-[18px] shrink-0 ${
+                        active
+                          ? "text-iea-accent"
+                          : "text-iea-textSecondary group-hover:text-iea-textPrimary"
+                      }`}
+                    />
+                    <span className="iea-sidebar-label text-[13px] whitespace-nowrap truncate">
+                      {settingsItem.label}
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    className={`w-10 h-10 rounded-[11px] flex items-center justify-center transition-colors ${
+                      active
+                        ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
+                        : "text-iea-textSecondary group-hover:text-iea-textPrimary group-hover:bg-white/[0.05]"
+                    }`}
+                  >
+                    <Icon className="w-[18px] h-[18px]" />
+                  </div>
+                )}
+              </button>
+            );
+          })()}
+
+          {/* Sign Out / Cloud Pairing Action */}
+          <button
+            type="button"
+            onClick={handleSignOutClick}
+            aria-label="Sign out or manage cloud pairing"
+            title={
+              pairing.isPaired
+                ? `Sign out from Institutional EA Cloud (${pairing.instanceId || "Paired"})`
+                : "Sign Out / Cloud Pairing"
+            }
+            className={`group relative w-full flex items-center rounded-[11px] transition-all duration-200 text-iea-textSecondary hover:text-iea-danger hover:bg-iea-dangerSoft/60 border border-transparent ${
+              isSidebarExpanded ? "h-10 px-3 justify-between" : "h-10 justify-center"
+            }`}
+          >
+            {isSidebarExpanded ? (
+              <div className="flex items-center space-x-3 min-w-0">
+                <LogOut className="w-[18px] h-[18px] shrink-0 text-iea-textSecondary group-hover:text-iea-danger" />
+                <span className="iea-sidebar-label text-[13px] whitespace-nowrap truncate">
+                  Sign Out
                 </span>
               </div>
-              <div className="text-[11px] text-[#9CA1A6] flex items-center justify-between">
-                <span className="font-mono text-[10px]">{feedStatus}</span>
+            ) : (
+              <div className="w-10 h-10 rounded-[11px] flex items-center justify-center transition-colors">
+                <LogOut className="w-[18px] h-[18px]" />
+              </div>
+            )}
+          </button>
+
+          {/* Compact DEMO Lock Status Row */}
+          {isSidebarExpanded ? (
+            <div className="iea-sidebar-label pt-2 mt-1 border-t border-iea-borderSubtle space-y-1.5 whitespace-nowrap px-1">
+              <div className="flex items-center justify-between text-[10px] font-mono">
+                <span
+                  className="inline-flex items-center space-x-1.5 text-iea-profit font-semibold"
+                  title={UI_COPY.brand.demoLockTooltip}
+                >
+                  <Lock className="w-3 h-3" />
+                  <span>{UI_COPY.brand.demoLockShort}</span>
+                </span>
+                <span className="text-iea-textMuted">
+                  {serviceStatus
+                    ? `${serviceStatus.host}:${serviceStatus.port}`
+                    : "127.0.0.1:8765"}
+                </span>
+              </div>
+              <div className="text-[10px] text-iea-textMuted flex items-center justify-between">
+                <span className="font-mono">{feedStatus}</span>
                 <div className="flex items-center space-x-2.5">
                   <button
                     type="button"
                     onClick={() => setActiveScreen("settings")}
                     title="Open Short-Form Glossary (Settings > Glossary)"
-                    className="text-[#9CA1A6] hover:text-white font-mono text-[10px] transition"
+                    className="text-iea-textSecondary hover:text-iea-textPrimary font-mono transition"
                   >
                     ? Glossary
                   </button>
@@ -976,7 +1096,7 @@ export const App: React.FC = () => {
                     type="button"
                     onClick={() => refreshStatus()}
                     aria-label="Refresh terminal telemetry"
-                    className="text-white/90 hover:text-white inline-flex items-center space-x-1 text-[11px] font-medium transition"
+                    className="text-iea-accent hover:text-iea-textPrimary inline-flex items-center space-x-1 font-medium transition"
                   >
                     <RefreshCw className="w-3 h-3" />
                     <span>Sync</span>
@@ -986,11 +1106,11 @@ export const App: React.FC = () => {
             </div>
           ) : (
             <div
-              className="flex justify-center py-0.5"
+              className="flex justify-center pt-1"
               title="DEMO Lock Active (LIVE_TRADING_ENABLED=false)"
             >
-              <div className="w-10 h-10 rounded-[12px] bg-[#272A2F] border border-white/[0.06] flex items-center justify-center">
-                <Lock className="w-4 h-4 text-[#6EE7B7]" />
+              <div className="w-9 h-9 rounded-[10px] bg-iea-card border border-iea-borderSubtle flex items-center justify-center">
+                <Lock className="w-3.5 h-3.5 text-iea-profit" />
               </div>
             </div>
           )}
@@ -998,21 +1118,19 @@ export const App: React.FC = () => {
       </aside>
 
       {/* =====================================================================
-          MAIN CONTENT AREA — IMAGE 1 RAISED ROUNDED PANEL
+          MAIN CONTENT AREA — FULL-BLEED NEAR-BLACK CANVAS (~24px PAGE PADDING)
       ====================================================================== */}
       <div
         style={{
-          paddingLeft: isMobileViewport ? "8px" : `${mainLeftOffsetPx}px`,
-          paddingTop: `${titlebarHeightPx + 8}px`,
-          paddingRight: "8px",
-          paddingBottom: "8px",
+          paddingLeft: isMobileViewport ? "0px" : `${mainLeftOffsetPx}px`,
+          paddingTop: `${titlebarHeightPx}px`,
         }}
         className="iea-no-drag relative z-10 flex-1 min-w-0 flex flex-col h-screen overflow-hidden"
       >
         <div className="iea-main-panel flex-1 min-h-0 flex flex-col overflow-hidden">
-          {/* Consistent Neutral Navigation Header Bar (when viewing any sub-screen) */}
+          {/* Sub-screen Navigation Header Bar (when viewing any sub-screen) */}
           {activeScreen !== "dashboard" && (
-            <header className="h-14 px-6 border-b border-[rgba(255,255,253,0.07)] flex items-center justify-between shrink-0">
+            <header className="h-14 px-6 border-b border-iea-borderSubtle flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-3.5">
                 <button
                   type="button"
@@ -1021,20 +1139,20 @@ export const App: React.FC = () => {
                 >
                   <span>← Dashboard</span>
                 </button>
-                <h1 className="text-[18px] font-semibold tracking-tight text-[#F5F5F2]">
+                <h1 className="text-[18px] font-bold tracking-tight text-iea-textPrimary">
                   {allScreenItems.find((i) => i.id === activeScreen)?.label || activeScreen}
                 </h1>
               </div>
 
               <div className="flex items-center space-x-2 text-xs font-mono">
-                <span className="px-3 py-1 rounded-full bg-[#36B37E]/15 border border-[#6EE7B7]/30 text-[#6EE7B7] font-semibold">
+                <span className="px-3 py-1 rounded-full bg-iea-accentSoft border border-iea-accentBorder text-iea-accent font-semibold">
                   {UI_COPY.brand.demoLockChip}
                 </span>
-                <span className="iea-pill-control px-3 py-1 text-[#B4B3B0]">
+                <span className="iea-pill-control px-3 py-1 text-iea-textSecondary">
                   MT5 {normalized.maskedAccount}
                 </span>
-                <span className="iea-pill-control px-3 py-1 text-[#5EC2C6] inline-flex items-center space-x-1.5">
-                  <Radio className="w-3 h-3 text-[#6EE7B7]" />
+                <span className="iea-pill-control px-3 py-1 text-iea-accent inline-flex items-center space-x-1.5">
+                  <Radio className="w-3 h-3 text-iea-profit" />
                   <span>{feedStatus}</span>
                 </span>
               </div>
@@ -1046,17 +1164,17 @@ export const App: React.FC = () => {
             <div
               role="status"
               aria-live="polite"
-              className={`mx-6 mt-4 px-4 py-2.5 rounded-2xl border text-xs flex items-center justify-between shrink-0 ${
+              className={`mx-6 mt-4 px-4 py-2.5 rounded-[14px] border text-xs flex items-center justify-between shrink-0 ${
                 actionToast.isError
-                  ? "bg-[#D94854]/15 border-[#F07178]/35 text-[#F5F5F2]"
-                  : "bg-[#36B37E]/15 border-[#6EE7B7]/30 text-[#F5F5F2]"
+                  ? "bg-iea-dangerSoft border-iea-dangerBorder text-iea-textPrimary"
+                  : "bg-iea-profitSoft border-iea-profitBorder text-iea-textPrimary"
               }`}
             >
               <div className="flex items-center space-x-2.5">
                 {actionToast.isError ? (
-                  <AlertOctagon className="w-4 h-4 text-[#F07178] shrink-0" />
+                  <AlertOctagon className="w-4 h-4 text-iea-danger shrink-0" />
                 ) : (
-                  <CheckCircle2 className="w-4 h-4 text-[#6EE7B7] shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-iea-profit shrink-0" />
                 )}
                 <span className="font-medium">{actionToast.message}</span>
               </div>
@@ -1064,14 +1182,14 @@ export const App: React.FC = () => {
                 type="button"
                 onClick={() => setActionToast(null)}
                 aria-label="Dismiss notification"
-                className="p-1 rounded-lg text-[#B4B3B0] hover:text-[#F5F5F2] hover:bg-white/10"
+                className="p-1 rounded-lg text-iea-textSecondary hover:text-iea-textPrimary hover:bg-white/10"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
 
-          {/* Scrollable Screen Viewport */}
+          {/* Scrollable Screen Viewport (~24px Page Padding) */}
           <main
             className={`flex-1 min-h-0 overflow-y-auto p-4 md:p-6 ${
               isMobileViewport ? "pb-20" : ""
@@ -1168,7 +1286,7 @@ export const App: React.FC = () => {
       {/* Responsive Read-Only Mobile Companion Bottom Navigation (< 768px) */}
       <nav
         aria-label="Mobile Companion Navigation"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#17181A] border-t border-white/[0.08] grid grid-cols-4 px-2"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-iea-card border-t border-iea-borderSubtle grid grid-cols-4 px-2"
       >
         {(
           [
@@ -1186,7 +1304,7 @@ export const App: React.FC = () => {
               type="button"
               onClick={() => setActiveScreen(tab.id)}
               className={`flex flex-col items-center justify-center space-y-1 text-[11px] font-medium transition ${
-                active ? "text-white" : "text-[#9CA1A6]"
+                active ? "text-iea-accent" : "text-iea-textSecondary"
               }`}
             >
               <Icon className="w-4 h-4" />
