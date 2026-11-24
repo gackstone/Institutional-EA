@@ -110,7 +110,7 @@ export type SymbolAccentSpec = {
 };
 
 /**
- * Circular symbol badge styling for watchlist, non-chart tables, and cards.
+ * Circular symbol badge styling for non-chart tables and cards.
  */
 export function getNeutralSymbolChipSpec(symbol: string): SymbolAccentSpec {
   const upper = (symbol || "").toUpperCase();

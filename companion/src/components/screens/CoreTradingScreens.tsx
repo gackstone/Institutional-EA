@@ -15,7 +15,6 @@ import {
   Pause,
   Play,
   Plug,
-  Plus,
   Scissors,
   Search,
   Send,
@@ -24,7 +23,6 @@ import {
   Square,
   Sun,
   TrendingDown,
-  TrendingUp,
   Unplug,
   Wifi,
   WifiOff,
@@ -85,17 +83,6 @@ const TREND_RANGES: TrendRangeOption[] = [
   "6 Months",
   "1 Year",
   "All",
-];
-
-const WATCHLIST_INSTRUMENTS: Array<{
-  symbol: ChartSymbol;
-  brokerSymbol: string;
-  name: string;
-  digits: number;
-}> = [
-  { symbol: "XAUUSD", brokerSymbol: "XAUUSD.m", name: "Gold Spot / US Dollar", digits: 2 },
-  { symbol: "BTCUSD", brokerSymbol: "BTCUSD.m", name: "Bitcoin / US Dollar", digits: 2 },
-  { symbol: "USDJPY", brokerSymbol: "USDJPY.m", name: "US Dollar / Japanese Yen", digits: 3 },
 ];
 
 function formatHeaderClock(now: Date): string {
@@ -610,15 +597,6 @@ export const DashboardScreen: React.FC<
     }
   };
 
-  const filteredWatchlist = useMemo(() => {
-    if (!searchQuery.trim()) return WATCHLIST_INSTRUMENTS;
-    const q = searchQuery.trim().toLowerCase();
-    return WATCHLIST_INSTRUMENTS.filter(
-      (item) =>
-        item.symbol.toLowerCase().includes(q) || item.name.toLowerCase().includes(q)
-    );
-  }, [searchQuery]);
-
   return (
     <div className="max-w-[1920px] mx-auto space-y-[18px] text-iea-textPrimary">
       {/* Compact Connection / Stale / Emergency Banner States */}
@@ -735,9 +713,20 @@ export const DashboardScreen: React.FC<
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter symbol..."
-                  aria-label="Filter watchlist symbol"
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setSearchQuery(next);
+                    const upper = next.trim().toUpperCase();
+                    if (upper === "XAU" || upper === "XAUUSD" || upper === "GOLD") {
+                      setSelectedSymbol("XAUUSD");
+                    } else if (upper === "BTC" || upper === "BTCUSD") {
+                      setSelectedSymbol("BTCUSD");
+                    } else if (upper === "JPY" || upper === "USDJPY") {
+                      setSelectedSymbol("USDJPY");
+                    }
+                  }}
+                  placeholder="Jump symbol..."
+                  aria-label="Quick jump chart symbol"
                   className="bg-transparent text-xs text-iea-textPrimary placeholder:text-iea-textMuted focus:outline-none w-24 font-mono"
                 />
               </div>
@@ -1346,14 +1335,10 @@ export const DashboardScreen: React.FC<
       </PanelErrorBoundary>
 
       {/* =====================================================================
-          ROW 3: MAIN CARDS — PNL TREND (LEFT, 8 COLS) + WATCHLIST (RIGHT, 4 COLS)
+          ROW 3: FULL-WIDTH MAIN CHART CARD
       ====================================================================== */}
-      <section
-        aria-label="Main Trading Cards"
-        className="grid grid-cols-1 xl:grid-cols-12 gap-[18px]"
-      >
-        {/* LEFT CARD: PNL Trend Wrapper + Untouched LiveTradingChart */}
-        <div className="xl:col-span-8 iea-card p-5 flex flex-col gap-4">
+      <section aria-label="Main Trading Chart Card" className="w-full">
+        <div className="w-full iea-card p-5 flex flex-col gap-4">
           {/* PNL Trend Header Row 1: Icon tile + Title + LIVE pill + Subtitle | Big Balance + Synced hh:mm */}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-center space-x-3.5">
@@ -1474,7 +1459,7 @@ export const DashboardScreen: React.FC<
             </div>
           </div>
 
-          {/* Untouched LiveTradingChart Container */}
+          {/* LiveTradingChart Container */}
           <PanelErrorBoundary panelName="Live Chart">
             <div
               className="w-full flex flex-col"
@@ -1494,194 +1479,6 @@ export const DashboardScreen: React.FC<
               />
             </div>
           </PanelErrorBoundary>
-        </div>
-
-        {/* RIGHT CARD: Watchlist Style Card */}
-        <div className="xl:col-span-4 iea-card p-5 flex flex-col justify-between gap-4">
-          <div className="space-y-4">
-            {/* Watchlist Header: Title + "+" Button */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold text-iea-textPrimary tracking-tight">
-                  Watchlist
-                </h2>
-                <p className="text-xs text-iea-textMuted mt-0.5">
-                  Live MT5 Market Watch &amp; active exposure
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onNavigate("signals")}
-                aria-label="Add or inspect live symbol signals"
-                title="View Live Signal Grid"
-                className="w-8 h-8 rounded-[10px] bg-iea-elevated hover:bg-iea-active border border-iea-borderSubtle text-iea-textPrimary flex items-center justify-center transition"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Watchlist Rows with Thin Dividers */}
-            <div className="divide-y divide-iea-borderSubtle border-t border-b border-iea-borderSubtle">
-              {filteredWatchlist.map((item) => {
-                const liveSpecs = effectiveStatus.mt5.symbols || {};
-                const spec: ControlSymbolSpec | undefined =
-                  (selectedSymbol === item.symbol && liveQuote) ||
-                  liveSpecs[item.brokerSymbol] ||
-                  liveSpecs[item.symbol] ||
-                  Object.values(liveSpecs).find(
-                    (s) => normalizeCanonicalSymbol(s.symbol) === item.symbol
-                  );
-
-                const chip = getNeutralSymbolChipSpec(item.symbol);
-                const isSelected = selectedSymbol === item.symbol;
-                const bidPrice = spec && spec.bid > 0 ? spec.bid : null;
-                const askPrice = spec && spec.ask > 0 ? spec.ask : null;
-                const spreadPts = spec?.spread_points ?? null;
-
-                // Open positions on this symbol
-                const symPositions = activePositions.filter(
-                  (p) => normalizeCanonicalSymbol(p.symbol) === item.symbol
-                );
-                const symPnl = symPositions.reduce((s, p) => s + p.profit, 0);
-
-                // Compute latest bar % change if selectedSymbol has candles
-                let pctChange: number | null = null;
-                if (isSelected && realCandles.length >= 2) {
-                  const first = realCandles[0].open;
-                  const last = realCandles[realCandles.length - 1].close;
-                  if (first > 0) {
-                    pctChange = ((last - first) / first) * 100;
-                  }
-                }
-
-                const isPositive =
-                  symPositions.length > 0
-                    ? symPnl >= 0
-                    : pctChange !== null
-                    ? pctChange >= 0
-                    : true;
-
-                return (
-                  <button
-                    key={item.symbol}
-                    type="button"
-                    onClick={() => setSelectedSymbol(item.symbol)}
-                    className={`w-full py-3.5 px-2.5 text-left flex items-center justify-between gap-3 transition rounded-[10px] ${
-                      isSelected
-                        ? "bg-iea-accentSoft/60"
-                        : "hover:bg-iea-elevated/60"
-                    }`}
-                  >
-                    {/* Left: Circular Symbol Badge + Symbol & Name */}
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <span
-                        className={`w-10 h-10 rounded-full text-xs font-mono font-bold inline-flex items-center justify-center shrink-0 ${chip.chipBg} ${chip.chipRing}`}
-                      >
-                        {chip.shortCode}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-bold text-iea-textPrimary truncate">
-                            {item.symbol}
-                          </span>
-                          {isSelected && (
-                            <span className="px-1.5 py-0.5 rounded-[5px] bg-iea-accent text-white font-mono text-[9px] font-bold uppercase">
-                              ACTIVE
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-iea-textMuted truncate mt-0.5">
-                          {item.name}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Price & Change/P&L (Green/Red) */}
-                    <div className="text-right font-mono tabular-nums shrink-0">
-                      <div className="text-sm font-bold text-iea-textPrimary">
-                        {bidPrice !== null
-                          ? bidPrice.toLocaleString(undefined, {
-                              minimumFractionDigits: item.digits,
-                              maximumFractionDigits: item.digits,
-                            })
-                          : "—"}
-                      </div>
-                      <div
-                        className={`text-[11px] font-semibold mt-0.5 inline-flex items-center space-x-1 ${
-                          symPositions.length > 0
-                            ? isPositive
-                              ? "text-iea-profit"
-                              : "text-iea-danger"
-                            : pctChange !== null
-                            ? isPositive
-                              ? "text-iea-profit"
-                              : "text-iea-danger"
-                            : "text-iea-textMuted"
-                        }`}
-                      >
-                        {symPositions.length > 0 ? (
-                          <span>
-                            {symPnl >= 0 ? "+" : "-"}${Math.abs(symPnl).toFixed(2)} ({symPositions.length}P)
-                          </span>
-                        ) : pctChange !== null ? (
-                          <>
-                            {isPositive ? (
-                              <TrendingUp className="w-3 h-3" />
-                            ) : (
-                              <TrendingDown className="w-3 h-3" />
-                            )}
-                            <span>
-                              {pctChange >= 0 ? "+" : ""}
-                              {pctChange.toFixed(2)}%
-                            </span>
-                          </>
-                        ) : spreadPts !== null && askPrice !== null ? (
-                          <span className="text-iea-profit">Spr {spreadPts} pts</span>
-                        ) : (
-                          <span>Waiting</span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Account & Execution Telemetry Footer inside Watchlist Card */}
-          <div className="iea-inset p-4 space-y-2.5 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="iea-label-caps">ACCOUNT TELEMETRY</span>
-              <span className="font-mono text-[10px] font-bold text-iea-accent">
-                {dash.connected
-                  ? `1:${effectiveStatus.mt5.account.leverage} · ${effectiveStatus.mt5.account.margin_mode_str}`
-                  : "DEMO MODE"}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-1 font-mono">
-              <div className="p-2.5 rounded-[10px] bg-iea-card border border-iea-borderSubtle">
-                <div className="text-[10px] text-iea-textMuted uppercase">Balance</div>
-                <div className="text-xs font-bold text-iea-textPrimary mt-0.5">
-                  {kpis.balance !== null
-                    ? `$${kpis.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : "—"}
-                </div>
-              </div>
-              <div className="p-2.5 rounded-[10px] bg-iea-card border border-iea-borderSubtle">
-                <div className="text-[10px] text-iea-textMuted uppercase">Floating P/L</div>
-                <div
-                  className={`text-xs font-bold mt-0.5 ${
-                    (kpis.floatingPnl ?? 0) >= 0 ? "text-iea-profit" : "text-iea-danger"
-                  }`}
-                >
-                  {kpis.floatingPnl !== null
-                    ? `${kpis.floatingPnl >= 0 ? "+" : "-"}$${Math.abs(kpis.floatingPnl).toFixed(2)}`
-                    : "$0.00"}
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
