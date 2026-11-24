@@ -1,96 +1,102 @@
 /**
- * Institutional EA Companion — Centralized Neutral Charcoal Design Tokens
- * Single Source of Truth sampled from IMAGE 1 ("Overlay") and IMAGE 2 (Sidebar).
- * Documented in companion/docs/THEME_SPEC.md.
+ * Institutional EA Companion — Centralized BM Forex Hub Design Tokens
+ * Single Source of Truth for Global Theme (Colors, Radii, Spacing, Sidebar).
  */
 
 export const DESIGN_TOKENS = {
   colors: {
     bg: {
-      canvas: "#0E0D0B",
-      titlebar: "#12110F",
-      panel: "#1E1D1B",
-      panelTopLeft: "#2B2A26",
-      panelMid: "#23221F",
-      card: "#161513",
-      inset: "#100F0D",
-      elevated: "#242320",
-      active: "#2B2A26",
+      canvas: "#0A0A0C",
+      titlebar: "#0A0A0C",
+      panel: "#0A0A0C",
+      panelTopLeft: "#101114",
+      panelMid: "#101114",
+      card: "#111216",
+      cardAlt: "#121317",
+      inset: "#0D0E11",
+      elevated: "#16181D",
+      active: "#1D2026",
     },
     sidebar: {
-      expandedBg: "#191D20",
-      collapsedBg: "#17181A",
-      activeFill: "#272A2F",
-      collapsedActiveFill: "#303135",
-      border: "rgba(255, 255, 255, 0.08)",
-      textActive: "#FFFFFF",
-      textInactive: "#9CA1A6",
-      treeLine: "#303437",
-      logoTileBg: "#F8F8FA",
-      badgeMintBg: "#A9ECDA",
-      badgeMintText: "#0E1A16",
-      badgePeachBg: "#F5C59F",
-      badgePeachText: "#1F140B",
+      expandedBg: "#0D0E12",
+      collapsedBg: "#0D0E12",
+      activeFill: "rgba(59, 130, 246, 0.14)",
+      collapsedActiveFill: "rgba(59, 130, 246, 0.16)",
+      border: "rgba(255, 255, 255, 0.06)",
+      textActive: "#3B82F6",
+      textInactive: "#8E95A5",
+      treeLine: "rgba(255, 255, 255, 0.08)",
+      logoTileBg: "#3B82F6",
+      badgeMintBg: "rgba(59, 130, 246, 0.16)",
+      badgeMintText: "#60A5FA",
+      badgePeachBg: "rgba(239, 68, 68, 0.16)",
+      badgePeachText: "#F87171",
     },
     border: {
-      subtle: "rgba(255, 255, 253, 0.07)",
-      default: "rgba(255, 255, 253, 0.11)",
-      strong: "#3A3935",
-      divider: "rgba(255, 255, 253, 0.06)",
+      subtle: "rgba(255, 255, 255, 0.06)",
+      default: "rgba(255, 255, 255, 0.09)",
+      strong: "rgba(255, 255, 255, 0.14)",
+      divider: "rgba(255, 255, 255, 0.06)",
     },
     accent: {
-      primary: "#F5F5F2",
-      primaryHover: "#FFFFFF",
-      onPrimary: "#121110",
+      primary: "#3B82F6",
+      primaryHover: "#2563EB",
+      primarySoft: "rgba(59, 130, 246, 0.14)",
+      primaryBorder: "rgba(59, 130, 246, 0.32)",
+      onPrimary: "#FFFFFF",
     },
     semantic: {
-      profit: "#6EE7B7",
-      profitSolid: "#36B37E",
-      profitSoft: "rgba(54, 179, 126, 0.14)",
-      profitBorder: "rgba(110, 231, 183, 0.30)",
-      danger: "#F07178",
-      dangerSolid: "#D94854",
-      dangerSoft: "rgba(217, 72, 84, 0.14)",
-      dangerBorder: "rgba(240, 113, 120, 0.34)",
-      warning: "#EAB354",
-      warningSoft: "rgba(234, 179, 84, 0.14)",
-      warningBorder: "rgba(234, 179, 84, 0.34)",
-      info: "#5EC2C6",
-      infoSoft: "rgba(94, 194, 198, 0.13)",
-      infoBorder: "rgba(94, 194, 198, 0.34)",
+      profit: "#22C55E",
+      profitSolid: "#22C55E",
+      profitSoft: "rgba(34, 197, 94, 0.14)",
+      profitBorder: "rgba(34, 197, 94, 0.28)",
+      danger: "#EF4444",
+      dangerSolid: "#EF4444",
+      dangerSoft: "rgba(239, 68, 68, 0.14)",
+      dangerBorder: "rgba(239, 68, 68, 0.28)",
+      warning: "#F59E0B",
+      warningSoft: "rgba(245, 158, 11, 0.14)",
+      warningBorder: "rgba(245, 158, 11, 0.28)",
+      info: "#3B82F6",
+      infoSoft: "rgba(59, 130, 246, 0.14)",
+      infoBorder: "rgba(59, 130, 246, 0.28)",
     },
     text: {
-      primary: "#F5F5F2",
-      secondary: "#B4B3B0",
-      muted: "#8A8986",
-      dim: "#666562",
+      primary: "#F3F4F6",
+      secondary: "#9CA3AF",
+      muted: "#6B7280",
+      dim: "#4B5563",
     },
     chart: {
-      background: "#100F0D",
-      gridLine: "rgba(255, 255, 253, 0.06)",
-      axisText: "#8A8986",
-      axisBorder: "rgba(255, 255, 253, 0.08)",
-      crosshair: "rgba(245, 245, 242, 0.38)",
-      crosshairLabelBg: "#242320",
-      upCandle: "#36B37E",
-      upWick: "#6EE7B7",
-      downCandle: "#D94854",
-      downWick: "#F07178",
+      background: "#0D0E11",
+      gridLine: "rgba(255, 255, 255, 0.05)",
+      axisText: "#6B7280",
+      axisBorder: "rgba(255, 255, 255, 0.07)",
+      crosshair: "rgba(59, 130, 246, 0.45)",
+      crosshairLabelBg: "#16181D",
+      upCandle: "#22C55E",
+      upWick: "#22C55E",
+      downCandle: "#EF4444",
+      downWick: "#EF4444",
     },
   },
   radii: {
-    panel: "28px",
-    sidebar: "20px",
-    card: "16px",
+    panel: "0px",
+    sidebar: "0px",
+    card: "18px",
     tile: "12px",
-    button: "12px",
+    button: "10px",
     pill: "9999px",
   },
+  spacing: {
+    pagePaddingPx: 24,
+    cardGapPx: 18,
+  },
   sidebar: {
-    collapsedWidthPx: 76,
-    expandedWidthPx: 264,
-    collapseDelayMs: 140,
-    transitionDurationMs: 220,
+    collapsedWidthPx: 72,
+    expandedWidthPx: 256,
+    collapseDelayMs: 120,
+    transitionDurationMs: 200,
   },
 } as const;
 
@@ -104,7 +110,7 @@ export type SymbolAccentSpec = {
 };
 
 /**
- * Neutral monochrome symbol chip styling for non-chart tables and cards.
+ * Circular symbol badge styling for watchlist, non-chart tables, and cards.
  */
 export function getNeutralSymbolChipSpec(symbol: string): SymbolAccentSpec {
   const upper = (symbol || "").toUpperCase();
@@ -112,39 +118,39 @@ export function getNeutralSymbolChipSpec(symbol: string): SymbolAccentSpec {
     return {
       symbol,
       shortCode: "Au",
-      chipBg: "bg-[#242320] text-[#F5F5F2]",
-      chipText: "text-[#F5F5F2]",
-      chipRing: "ring-1 ring-[#3A3935]",
-      tagLabel: "Gold Spot",
+      chipBg: "bg-[var(--iea-warning-soft)] text-[var(--iea-warning)]",
+      chipText: "text-[var(--iea-warning)]",
+      chipRing: "ring-1 ring-[var(--iea-warning-border)]",
+      tagLabel: "Gold Spot / USD",
     };
   }
   if (upper.includes("BTC")) {
     return {
       symbol,
       shortCode: "₿",
-      chipBg: "bg-[#242320] text-[#F5F5F2]",
-      chipText: "text-[#F5F5F2]",
-      chipRing: "ring-1 ring-[#3A3935]",
-      tagLabel: "Bitcoin 24/7",
+      chipBg: "bg-[var(--iea-accent-primary-soft)] text-[var(--iea-accent-primary)]",
+      chipText: "text-[var(--iea-accent-primary)]",
+      chipRing: "ring-1 ring-[var(--iea-accent-primary-border)]",
+      tagLabel: "Bitcoin / USD",
     };
   }
   if (upper.includes("JPY")) {
     return {
       symbol,
       shortCode: "¥",
-      chipBg: "bg-[#242320] text-[#F5F5F2]",
-      chipText: "text-[#F5F5F2]",
-      chipRing: "ring-1 ring-[#3A3935]",
-      tagLabel: "FX Inverse",
+      chipBg: "bg-[var(--iea-surface-elevated)] text-[var(--iea-text-primary)]",
+      chipText: "text-[var(--iea-text-primary)]",
+      chipRing: "ring-1 ring-[var(--iea-border-default)]",
+      tagLabel: "US Dollar / Yen",
     };
   }
   return {
     symbol,
     shortCode: upper.slice(0, 2) || "FX",
-    chipBg: "bg-[#242320] text-[#F5F5F2]",
-    chipText: "text-[#F5F5F2]",
-    chipRing: "ring-1 ring-[#3A3935]",
-    tagLabel: "Instrument",
+    chipBg: "bg-[var(--iea-surface-elevated)] text-[var(--iea-text-primary)]",
+    chipText: "text-[var(--iea-text-primary)]",
+    chipRing: "ring-1 ring-[var(--iea-border-default)]",
+    tagLabel: "FX Instrument",
   };
 }
 

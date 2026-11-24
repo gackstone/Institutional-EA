@@ -7,117 +7,124 @@
 [data-theme="dark"],
 [data-theme="light"] {
   /* =========================================================================
-     Institutional EA Companion — Neutral Charcoal Design Tokens
-     Sampled from IMAGE 1 ("Overlay") & IMAGE 2 (Sidebar)
-     See companion/docs/THEME_SPEC.md
+     Institutional EA Companion — BM Forex Hub Global Theme Tokens
+     Near-black canvas (~#0A0A0C), stepped cards (~#101114 to #121317),
+     1px subtle border (~rgba(255,255,255,0.06)), vivid blue accent (#3B82F6),
+     profit green (#22C55E), loss/drawdown red (#EF4444).
   ========================================================================= */
 
-  /* Core Backgrounds & Surfaces (IMAGE 1) */
-  --iea-bg-canvas: #0E0D0B;
-  --iea-bg-titlebar: #12110F;
-  --iea-surface-panel: #1E1D1B;
-  --iea-surface-panel-grad: radial-gradient(ellipse 68% 58% at 0% 0%, #2B2A26 0%, #23221F 42%, #1E1D1B 100%);
-  --iea-surface-card: #161513;
-  --iea-surface-inset: #100F0D;
-  --iea-surface-elevated: #242320;
-  --iea-surface-active: #2B2A26;
+  /* Core Backgrounds & Surfaces */
+  --iea-bg-canvas: #0A0A0C;
+  --iea-bg-titlebar: #0A0A0C;
+  --iea-surface-panel: #0A0A0C;
+  --iea-surface-panel-grad: none;
+  --iea-surface-card: #111216;
+  --iea-surface-card-alt: #121317;
+  --iea-surface-inset: #0D0E11;
+  --iea-surface-elevated: #16181D;
+  --iea-surface-active: #1D2026;
 
   /* Table Surfaces */
-  --iea-table-header: #1C1B18;
-  --iea-table-row-hover: #242320;
-  --iea-table-row-stripe: rgba(255, 255, 253, 0.02);
+  --iea-table-header: #0E1014;
+  --iea-table-row-hover: #16181D;
+  --iea-table-row-stripe: rgba(255, 255, 255, 0.015);
 
   /* Borders & Dividers */
-  --iea-border-subtle: rgba(255, 255, 253, 0.07);
-  --iea-border-default: rgba(255, 255, 253, 0.11);
-  --iea-border-strong: #3A3935;
-  --iea-border-divider: rgba(255, 255, 253, 0.06);
+  --iea-border-subtle: rgba(255, 255, 255, 0.06);
+  --iea-border-default: rgba(255, 255, 255, 0.09);
+  --iea-border-strong: rgba(255, 255, 255, 0.14);
+  --iea-border-divider: rgba(255, 255, 255, 0.06);
 
-  /* Sidebar Surface Tokens (IMAGE 2) */
-  --iea-sidebar-bg: #191D20;
-  --iea-sidebar-rail-bg: #17181A;
-  --iea-sidebar-border: rgba(255, 255, 255, 0.08);
-  --iea-sidebar-active: #272A2F;
-  --iea-sidebar-rail-active: #303135;
-  --iea-sidebar-text: #9CA1A6;
-  --iea-sidebar-text-active: #FFFFFF;
-  --iea-sidebar-tree: #303437;
-  --iea-sidebar-logo-bg: #F8F8FA;
-  --iea-badge-mint-bg: #A9ECDA;
-  --iea-badge-mint-text: #0E1A16;
-  --iea-badge-peach-bg: #F5C59F;
-  --iea-badge-peach-text: #1F140B;
+  /* Sidebar Surface Tokens (Docked Full-Height, Border-Right) */
+  --iea-sidebar-bg: #0D0E12;
+  --iea-sidebar-rail-bg: #0D0E12;
+  --iea-sidebar-border: rgba(255, 255, 255, 0.06);
+  --iea-sidebar-active: rgba(59, 130, 246, 0.14);
+  --iea-sidebar-rail-active: rgba(59, 130, 246, 0.16);
+  --iea-sidebar-text: #8E95A5;
+  --iea-sidebar-text-active: #3B82F6;
+  --iea-sidebar-tree: rgba(255, 255, 255, 0.08);
+  --iea-sidebar-logo-bg: #3B82F6;
+  --iea-badge-mint-bg: rgba(59, 130, 246, 0.16);
+  --iea-badge-mint-text: #60A5FA;
+  --iea-badge-peach-bg: rgba(239, 68, 68, 0.16);
+  --iea-badge-peach-text: #F87171;
 
   /* Typography Hierarchy */
-  --iea-text-primary: #F5F5F2;
-  --iea-text-secondary: #B4B3B0;
-  --iea-text-muted: #8A8986;
-  --iea-text-dim: #666562;
+  --iea-text-primary: #F3F4F6;
+  --iea-text-secondary: #9CA3AF;
+  --iea-text-muted: #6B7280;
+  --iea-text-dim: #4B5563;
 
-  /* Monochrome Primary Accent */
-  --iea-accent-primary: #F5F5F2;
-  --iea-accent-primary-hover: #FFFFFF;
-  --iea-accent-on-primary: #121110;
+  /* Vivid Blue Primary Accent */
+  --iea-accent-primary: #3B82F6;
+  --iea-accent-primary-hover: #2563EB;
+  --iea-accent-primary-soft: rgba(59, 130, 246, 0.14);
+  --iea-accent-primary-border: rgba(59, 130, 246, 0.32);
+  --iea-accent-on-primary: #FFFFFF;
 
-  /* Semantic Meaning Palette (Muted for Charcoal) */
-  --iea-profit: #6EE7B7;
-  --iea-profit-solid: #36B37E;
-  --iea-profit-soft: rgba(54, 179, 126, 0.14);
-  --iea-profit-border: rgba(110, 231, 183, 0.30);
+  /* Semantic Meaning Palette */
+  --iea-profit: #22C55E;
+  --iea-profit-solid: #22C55E;
+  --iea-profit-soft: rgba(34, 197, 94, 0.14);
+  --iea-profit-border: rgba(34, 197, 94, 0.28);
 
-  --iea-danger: #F07178;
-  --iea-danger-solid: #D94854;
-  --iea-danger-soft: rgba(217, 72, 84, 0.14);
-  --iea-danger-border: rgba(240, 113, 120, 0.34);
+  --iea-danger: #EF4444;
+  --iea-danger-solid: #EF4444;
+  --iea-danger-soft: rgba(239, 68, 68, 0.14);
+  --iea-danger-border: rgba(239, 68, 68, 0.28);
 
-  --iea-warning: #EAB354;
-  --iea-warning-soft: rgba(234, 179, 84, 0.14);
-  --iea-warning-border: rgba(234, 179, 84, 0.34);
+  --iea-warning: #F59E0B;
+  --iea-warning-soft: rgba(245, 158, 11, 0.14);
+  --iea-warning-border: rgba(245, 158, 11, 0.28);
 
-  --iea-info: #5EC2C6;
-  --iea-info-soft: rgba(94, 194, 198, 0.13);
-  --iea-info-border: rgba(94, 194, 198, 0.34);
+  --iea-info: #3B82F6;
+  --iea-info-soft: rgba(59, 130, 246, 0.14);
+  --iea-info-border: rgba(59, 130, 246, 0.28);
 
-  /* Radii */
-  --iea-radius-panel: 28px;
-  --iea-radius-sidebar: 20px;
-  --iea-radius-card: 16px;
+  /* Radii & Spacing */
+  --iea-radius-panel: 0px;
+  --iea-radius-sidebar: 0px;
+  --iea-radius-card: 18px;
   --iea-radius-nav: 12px;
+  --iea-radius-btn: 10px;
   --iea-radius-pill: 9999px;
+  --iea-page-padding: 24px;
+  --iea-card-gap: 18px;
 
-  /* Legacy Variable Mapping (unified to neutral tokens for modals & shared components) */
-  --institutional-ea-bg: #0E0D0B;
-  --institutional-ea-card: #161513;
-  --institutional-ea-surface: #161513;
-  --institutional-ea-surface-secondary: #1E1D1B;
-  --institutional-ea-surface-tertiary: #242320;
-  --institutional-ea-surface-hover: #2B2A26;
-  --institutional-ea-border: rgba(255, 255, 253, 0.11);
-  --institutional-ea-border-subtle: rgba(255, 255, 253, 0.07);
-  --institutional-ea-border-strong: #3A3935;
-  --institutional-ea-text: #F5F5F2;
-  --institutional-ea-text-secondary: #B4B3B0;
-  --institutional-ea-text-muted: #8A8986;
-  --institutional-ea-primary: #F5F5F2;
-  --institutional-ea-primary-hover: #FFFFFF;
-  --institutional-ea-primary-active: #E5E4DF;
-  --institutional-ea-primary-soft: rgba(245, 245, 242, 0.12);
-  --institutional-ea-profit: #6EE7B7;
-  --institutional-ea-profit-soft: rgba(54, 179, 126, 0.14);
-  --institutional-ea-loss: #F07178;
-  --institutional-ea-loss-soft: rgba(217, 72, 84, 0.14);
-  --institutional-ea-error: #F07178;
-  --institutional-ea-error-soft: rgba(217, 72, 84, 0.14);
-  --institutional-ea-warning: #EAB354;
-  --institutional-ea-warning-soft: rgba(234, 179, 84, 0.14);
-  --institutional-ea-info: #5EC2C6;
-  --institutional-ea-info-soft: rgba(94, 194, 198, 0.13);
+  /* Legacy Variable Mapping (unified for modals & shared components) */
+  --institutional-ea-bg: #0A0A0C;
+  --institutional-ea-card: #111216;
+  --institutional-ea-surface: #111216;
+  --institutional-ea-surface-secondary: #121317;
+  --institutional-ea-surface-tertiary: #16181D;
+  --institutional-ea-surface-hover: #1D2026;
+  --institutional-ea-border: rgba(255, 255, 255, 0.09);
+  --institutional-ea-border-subtle: rgba(255, 255, 255, 0.06);
+  --institutional-ea-border-strong: rgba(255, 255, 255, 0.14);
+  --institutional-ea-text: #F3F4F6;
+  --institutional-ea-text-secondary: #9CA3AF;
+  --institutional-ea-text-muted: #6B7280;
+  --institutional-ea-primary: #3B82F6;
+  --institutional-ea-primary-hover: #2563EB;
+  --institutional-ea-primary-active: #1D4ED8;
+  --institutional-ea-primary-soft: rgba(59, 130, 246, 0.14);
+  --institutional-ea-profit: #22C55E;
+  --institutional-ea-profit-soft: rgba(34, 197, 94, 0.14);
+  --institutional-ea-loss: #EF4444;
+  --institutional-ea-loss-soft: rgba(239, 68, 68, 0.14);
+  --institutional-ea-error: #EF4444;
+  --institutional-ea-error-soft: rgba(239, 68, 68, 0.14);
+  --institutional-ea-warning: #F59E0B;
+  --institutional-ea-warning-soft: rgba(245, 158, 11, 0.14);
+  --institutional-ea-info: #3B82F6;
+  --institutional-ea-info-soft: rgba(59, 130, 246, 0.14);
 
   /* Scrollbars & Modal Backdrop */
   --scrollbar-track: transparent;
-  --scrollbar-thumb: rgba(255, 255, 253, 0.14);
-  --scrollbar-thumb-hover: rgba(255, 255, 253, 0.28);
-  --overlay-bg: rgba(8, 8, 7, 0.78);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.24);
+  --overlay-bg: rgba(5, 6, 8, 0.80);
 }
 
 @layer base {
@@ -140,7 +147,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid rgba(245, 245, 242, 0.65);
+    outline: 2px solid var(--iea-accent-primary);
     outline-offset: 2px;
   }
 }
@@ -167,27 +174,21 @@
 }
 
 /* ============================================================================
-   IMAGE 1 ("Overlay") App Shell, Raised Panel & Inset Card Surfaces
+   BM Forex Hub App Shell, Cards, Badges & Controls (No heavy shadows or blur)
 ============================================================================ */
 .iea-shell-bg {
   background-color: var(--iea-bg-canvas);
 }
 
 .iea-main-panel {
-  background-color: var(--iea-surface-panel);
-  background-image: var(--iea-surface-panel-grad);
-  border: 1px solid var(--iea-border-subtle);
-  border-radius: var(--iea-radius-panel);
-  box-shadow:
-    0 20px 48px -16px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 0 rgba(255, 255, 253, 0.06);
+  background-color: var(--iea-bg-canvas);
 }
 
 .iea-card {
   background-color: var(--iea-surface-card);
   border: 1px solid var(--iea-border-subtle);
   border-radius: var(--iea-radius-card);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 253, 0.035);
+  box-shadow: none;
   transition:
     border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
     background-color 180ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -203,12 +204,41 @@
   border-radius: 12px;
 }
 
+.iea-label-caps {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--iea-text-muted);
+}
+
+.iea-header-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--iea-radius-btn);
+  background-color: var(--iea-surface-card);
+  border: 1px solid var(--iea-border-subtle);
+  color: var(--iea-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.iea-header-icon-btn:hover {
+  background-color: var(--iea-surface-elevated);
+  border-color: var(--iea-border-default);
+  color: var(--iea-text-primary);
+}
+
 .iea-pill-control {
   background-color: var(--iea-surface-elevated);
-  border: 1px solid var(--iea-border-default);
+  border: 1px solid var(--iea-border-subtle);
   border-radius: var(--iea-radius-pill);
   color: var(--iea-text-primary);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 253, 0.04);
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
@@ -217,7 +247,7 @@
 
 .iea-pill-control:hover {
   background-color: var(--iea-surface-active);
-  border-color: var(--iea-border-strong);
+  border-color: var(--iea-border-default);
 }
 
 .iea-btn-primary {
@@ -265,35 +295,52 @@
 
 .iea-input:focus {
   outline: none;
-  border-color: var(--iea-border-strong);
+  border-color: var(--iea-accent-primary);
 }
 
 /* ============================================================================
-   IMAGE 2 Collapsible Overlay Sidebar
+   Docked Full-Height Overlay Sidebar (Border-Right, ~200ms Transitions)
 ============================================================================ */
 .iea-sidebar-rail {
   background-color: var(--iea-sidebar-rail-bg);
-  border: 1px solid var(--iea-sidebar-border);
-  border-radius: var(--iea-radius-sidebar);
+  border-right: 1px solid var(--iea-sidebar-border);
+  border-radius: 0;
   transition:
-    width 220ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
-    background-color 220ms ease;
+    width 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 200ms ease,
+    border-color 200ms ease;
   will-change: width;
 }
 
 .iea-sidebar-rail[data-expanded="true"] {
   background-color: var(--iea-sidebar-bg);
-  border-color: rgba(255, 255, 255, 0.10);
-  box-shadow:
-    18px 0 48px -8px rgba(0, 0, 0, 0.72),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  border-right-color: var(--iea-border-default);
 }
 
-/* Tree connector for collapsible sidebar group children (IMAGE 2) */
+.iea-sidebar-label {
+  transition:
+    opacity 150ms ease 55ms,
+    transform 150ms ease 55ms;
+}
+
+.iea-sidebar-rail[data-expanded="false"] .iea-sidebar-label {
+  opacity: 0;
+  transform: translateX(-6px);
+  transition:
+    opacity 90ms ease 0ms,
+    transform 90ms ease 0ms;
+  pointer-events: none;
+}
+
+.iea-sidebar-rail[data-expanded="true"] .iea-sidebar-label {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Tree connector for collapsible sidebar group children */
 .iea-tree-children {
   position: relative;
-  padding-left: 26px;
+  padding-left: 24px;
 }
 
 .iea-tree-children::before {
@@ -302,7 +349,7 @@
   left: 16px;
   top: 0;
   bottom: 18px;
-  width: 1.5px;
+  width: 1px;
   background-color: var(--iea-sidebar-tree);
   border-radius: 9999px;
 }
@@ -314,19 +361,19 @@
 .iea-tree-child-row::before {
   content: "";
   position: absolute;
-  left: -10px;
+  left: -8px;
   top: 50%;
-  width: 10px;
+  width: 8px;
   height: 10px;
   margin-top: -10px;
-  border-left: 1.5px solid var(--iea-sidebar-tree);
-  border-bottom: 1.5px solid var(--iea-sidebar-tree);
-  border-bottom-left-radius: 6px;
+  border-left: 1px solid var(--iea-sidebar-tree);
+  border-bottom: 1px solid var(--iea-sidebar-tree);
+  border-bottom-left-radius: 5px;
   pointer-events: none;
 }
 
 /* ============================================================================
-   Neutral Segmented Tab & Data Table
+   Segmented Tab & Data Table
 ============================================================================ */
 .iea-tab-button {
   position: relative;
@@ -341,7 +388,7 @@
 }
 
 .iea-tab-button[data-active="true"] {
-  color: var(--iea-text-primary);
+  color: var(--iea-accent-primary);
   font-weight: 600;
 }
 
@@ -353,7 +400,7 @@
   bottom: 0;
   height: 2px;
   border-radius: 9999px;
-  background: var(--iea-text-primary);
+  background: var(--iea-accent-primary);
 }
 
 .iea-table thead tr {
@@ -363,9 +410,10 @@
 
 .iea-table th {
   color: var(--iea-text-muted);
-  font-weight: 500;
-  font-size: 0.75rem;
-  letter-spacing: 0.01em;
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .iea-table tbody tr {
