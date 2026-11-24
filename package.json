@@ -1,0 +1,22 @@
+{
+  "name": "institutional-ea-monorepo",
+  "version": "1.3.0",
+  "private": true,
+  "description": "Institutional EA Monorepo — Desktop Companion, Mobile App, and Shared Packages",
+  "workspaces": [
+    "companion",
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "npm test --workspace=companion",
+    "test:desktop": "npm test --workspace=companion",
+    "test:packages": "npm test --workspace=@institutional-ea/data-contract --workspace=@institutional-ea/chart-core",
+    "test:mobile": "npm test --workspace=@institutional-ea/mobile",
+    "test:all": "npm run test:desktop && npm run test:packages && npm run test:mobile",
+    "build:desktop": "npm run build --workspace=companion"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0"
+  }
+}

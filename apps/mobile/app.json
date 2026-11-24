@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Institutional EA Monitor",
+    "slug": "institutional-ea-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D0E11"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.institutionalea.monitor",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Use FaceID to unlock your read-only monitoring dashboard."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0D0E11"
+      },
+      "package": "com.institutionalea.monitor",
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "INTERNET"
+      ]
+    },
+    "plugins": []
+  }
+}

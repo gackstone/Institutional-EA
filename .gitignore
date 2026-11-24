@@ -56,6 +56,7 @@ $RECYCLE.BIN/
 
 scratch/
 config/backups/
+companion/config/
 
 # Desktop Companion & Node artifacts
 node_modules/
