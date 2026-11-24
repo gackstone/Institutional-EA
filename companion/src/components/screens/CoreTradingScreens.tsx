@@ -1,18 +1,28 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Activity,
   AlertTriangle,
+  Award,
+  BarChart3,
+  Bell,
+  Bot,
   ChevronDown,
   Clock,
+  DollarSign,
   Loader2,
   Lock,
+  Moon,
   Pause,
   Play,
   Plug,
+  Plus,
   Scissors,
+  Search,
   Send,
   ShieldAlert,
   ShieldCheck,
   Square,
+  Sun,
   TrendingDown,
   TrendingUp,
   Unplug,
@@ -25,6 +35,7 @@ import {
   ControlPosition,
   ControlServiceStatus,
   ControlStatusPayload,
+  ControlSymbolSpec,
   MT5TerminalInfo,
   ScreenId,
   TradeHistoryRecord,
@@ -37,9 +48,9 @@ import {
   ChartTimeframe,
   DataFeedStatus,
 } from "../../services/dashboardDataAdapter";
-import { ControlSymbolSpec } from "../../types";
 import {
   calculateTradeMetrics,
+  normalizeCanonicalSymbol,
   validateTightenOnlyStopLoss,
 } from "../../utils/tradeChartMath";
 import {
@@ -48,12 +59,52 @@ import {
 } from "../../utils/topBarControlState";
 import { getNeutralSymbolChipSpec } from "../../styles/designTokens";
 import { UI_COPY } from "../../constants/uiCopy";
+import { useTheme } from "../../context/ThemeContext";
 import { LiveTradingChart } from "../LiveTradingChart";
 import { PanelErrorBoundary } from "../ErrorBoundary";
 import type { EngineDrawingsFeed } from "../../utils/chartDrawingsSchema";
 
 // One-time confirmation flag per app session for demo order-placing Start
 let sessionStartDemoConfirmed = false;
+
+type TrendMetricMode = "PNL" | "EQUITY";
+type TrendRangeOption =
+  | "1 Day"
+  | "1 Week"
+  | "1 Month"
+  | "3 Months"
+  | "6 Months"
+  | "1 Year"
+  | "All";
+
+const TREND_RANGES: TrendRangeOption[] = [
+  "1 Day",
+  "1 Week",
+  "1 Month",
+  "3 Months",
+  "6 Months",
+  "1 Year",
+  "All",
+];
+
+const WATCHLIST_INSTRUMENTS: Array<{
+  symbol: ChartSymbol;
+  brokerSymbol: string;
+  name: string;
+  digits: number;
+}> = [
+  { symbol: "XAUUSD", brokerSymbol: "XAUUSD.m", name: "Gold Spot / US Dollar", digits: 2 },
+  { symbol: "BTCUSD", brokerSymbol: "BTCUSD.m", name: "Bitcoin / US Dollar", digits: 2 },
+  { symbol: "USDJPY", brokerSymbol: "USDJPY.m", name: "US Dollar / Japanese Yen", digits: 3 },
+];
+
+function formatHeaderClock(now: Date): string {
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const day = days[now.getDay()];
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  return `${day} ${hh}:${mm}`;
+}
 
 interface CommonProps {
   status: ControlStatusPayload | null;
@@ -83,6 +134,7 @@ export const DashboardScreen: React.FC<
   serviceStatus = null,
   onReconnectService,
 }) => {
+  const { theme, toggleTheme } = useTheme();
   const [selectedSymbol, setSelectedSymbol] = useState<ChartSymbol>(initialSymbol);
   const [selectedTimeframe, setSelectedTimeframe] = useState<ChartTimeframe>("M5");
   const [realCandles, setRealCandles] = useState<CandleBar[]>([]);
@@ -90,12 +142,18 @@ export const DashboardScreen: React.FC<
   const [candleWaitingReason, setCandleWaitingReason] = useState<string | undefined>(undefined);
   const [drawingsFeed, setDrawingsFeed] = useState<EngineDrawingsFeed | null>(null);
   const [drawingsError, setDrawingsError] = useState<string | null>(null);
-  const [utcClockText, setUtcClockText] = useState<string>(() =>
-    `${new Date().toISOString().slice(11, 19)} UTC`
+  const [headerClockText, setHeaderClockText] = useState<string>(() =>
+    formatHeaderClock(new Date())
   );
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [connectingMt5, setConnectingMt5] = useState<boolean>(false);
   const [mt5PickerTerminals, setMt5PickerTerminals] = useState<MT5TerminalInfo[] | null>(null);
+
+  // Main Card Header states (PNL Trend segmented toggle, range selector, quick search)
+  const [trendMode, setTrendMode] = useState<TrendMetricMode>("EQUITY");
+  const [selectedRange, setSelectedRange] = useState<TrendRangeOption>("1 Month");
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Sync external symbol jump (e.g., clicking a row in Live Signal Grid)
   useEffect(() => {
@@ -113,11 +171,11 @@ export const DashboardScreen: React.FC<
   const [proposedSlInput, setProposedSlInput] = useState<string>("");
   const [proposedTpInput, setProposedTpInput] = useState<string>("");
 
-  // Lightweight 1-second UTC clock (isolated from chart series)
+  // Lightweight clock pill updater ("Tue 17:38")
   useEffect(() => {
     const timer = setInterval(() => {
-      setUtcClockText(`${new Date().toISOString().slice(11, 19)} UTC`);
-    }, 1000);
+      setHeaderClockText(formatHeaderClock(new Date()));
+    }, 10000);
     return () => clearInterval(timer);
   }, []);
 
@@ -222,13 +280,69 @@ export const DashboardScreen: React.FC<
       }),
     [effectiveStatus, serviceStatus, feedStatus, busyAction, connectingMt5]
   );
-  const provenanceLabel = dash.provenance.connected
-    ? `${dash.provenance.source}${
+
+  const syncedTimeLabel = dash.provenance.connected
+    ? `Synced ${
         dash.provenance.updatedAt
-          ? ` · ${new Date(dash.provenance.updatedAt).toISOString().slice(11, 19)}`
-          : ""
+          ? new Date(dash.provenance.updatedAt).toTimeString().slice(0, 5)
+          : new Date().toTimeString().slice(0, 5)
       }`
     : "Waiting for MT5";
+
+  // Derive 4 KPI Metrics: Net Realized P/L, Win Rate, Profit Factor, Max Drawdown
+  const kpiSummary = useMemo(() => {
+    const closedTrades = (dash.recentTrades || []).filter(
+      (t) =>
+        String(t.status || "")
+          .toUpperCase()
+          .includes("CLOSED") || Boolean(t.closed_at)
+    );
+    const wins = closedTrades.filter((t) => Number(t.profit || 0) > 0);
+    const losses = closedTrades.filter((t) => Number(t.profit || 0) < 0);
+    const realizedNetPnl = closedTrades.reduce((sum, t) => sum + Number(t.profit || 0), 0);
+    const grossWin = wins.reduce((sum, t) => sum + Number(t.profit || 0), 0);
+    const grossLoss = Math.abs(losses.reduce((sum, t) => sum + Number(t.profit || 0), 0));
+
+    const netPnlValue =
+      closedTrades.length > 0
+        ? realizedNetPnl
+        : kpis.todayPnlUsd !== null
+        ? kpis.todayPnlUsd
+        : kpis.floatingPnl;
+
+    const winRatePct =
+      closedTrades.length > 0 ? (wins.length / closedTrades.length) * 100 : null;
+
+    const profitFactorVal =
+      closedTrades.length === 0
+        ? null
+        : grossLoss > 0
+        ? grossWin / grossLoss
+        : grossWin > 0
+        ? 99.9
+        : 0;
+
+    return {
+      closedCount: closedTrades.length,
+      winsCount: wins.length,
+      lossesCount: losses.length,
+      netPnlValue,
+      winRatePct,
+      profitFactorVal,
+      grossWin,
+      grossLoss,
+    };
+  }, [dash.recentTrades, kpis.todayPnlUsd, kpis.floatingPnl]);
+
+  const handleRangeSelect = (range: TrendRangeOption) => {
+    setSelectedRange(range);
+    // Map range pills to chart timeframes while keeping direct timeframe selection intact
+    if (range === "1 Day") setSelectedTimeframe("M1");
+    else if (range === "1 Week") setSelectedTimeframe("M5");
+    else if (range === "1 Month" || range === "3 Months") setSelectedTimeframe("M15");
+    else if (range === "6 Months" || range === "1 Year") setSelectedTimeframe("H1");
+    else setSelectedTimeframe("H4");
+  };
 
   const handleSaveScreenshot = async (
     ticket: number,
@@ -496,17 +610,26 @@ export const DashboardScreen: React.FC<
     }
   };
 
+  const filteredWatchlist = useMemo(() => {
+    if (!searchQuery.trim()) return WATCHLIST_INSTRUMENTS;
+    const q = searchQuery.trim().toLowerCase();
+    return WATCHLIST_INSTRUMENTS.filter(
+      (item) =>
+        item.symbol.toLowerCase().includes(q) || item.name.toLowerCase().includes(q)
+    );
+  }, [searchQuery]);
+
   return (
-    <div className="max-w-[1920px] mx-auto space-y-3.5 text-[#F5F5F2]">
+    <div className="max-w-[1920px] mx-auto space-y-[18px] text-iea-textPrimary">
       {/* Compact Connection / Stale / Emergency Banner States */}
       {feedStatus === "DISCONNECTED" && (
         <div
           role="alert"
           title="Local Python Control Service unreachable on 127.0.0.1:8765"
-          className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-[#F07178]/18 border border-[#F07178]/50 backdrop-blur-xl text-xs text-[#F5F5F2]"
+          className="flex items-center justify-between px-4 py-2.5 rounded-[14px] bg-iea-dangerSoft border border-iea-dangerBorder text-xs text-iea-textPrimary"
         >
           <div className="flex items-center space-x-2">
-            <WifiOff className="w-4 h-4 text-[#F07178] shrink-0" />
+            <WifiOff className="w-4 h-4 text-iea-danger shrink-0" />
             <span>
               <strong>Svc Offline (127.0.0.1:8765)</strong> · Cached DEMO
             </span>
@@ -514,7 +637,7 @@ export const DashboardScreen: React.FC<
           <button
             type="button"
             onClick={() => onRefresh()}
-            className="px-3 py-1 rounded-full bg-[#F07178] hover:bg-[#F5989E] text-white font-semibold transition"
+            className="px-3 py-1 rounded-full bg-iea-danger hover:opacity-90 text-white font-semibold transition"
           >
             Reconnect
           </button>
@@ -525,16 +648,16 @@ export const DashboardScreen: React.FC<
         <div
           role="alert"
           title="Last MT5 sync heartbeat exceeded 15 seconds"
-          className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-[#EAB354]/18 border border-[#EAB354]/50 backdrop-blur-xl text-xs text-[#F5F5F2]"
+          className="flex items-center justify-between px-4 py-2.5 rounded-[14px] bg-iea-warningSoft border border-iea-warningBorder text-xs text-iea-textPrimary"
         >
           <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-4 h-4 text-[#EAB354] shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-iea-warning shrink-0" />
             <strong>Stale Sync (&gt;15s)</strong>
           </div>
           <button
             type="button"
             onClick={() => onRefresh()}
-            className="px-3 py-1 rounded-full bg-[#EAB354] text-[#121110] font-semibold transition"
+            className="px-3 py-1 rounded-full bg-iea-warning text-iea-canvas font-semibold transition"
           >
             Sync
           </button>
@@ -545,18 +668,18 @@ export const DashboardScreen: React.FC<
         <div
           role="alert"
           title="Emergency STOP.flag kill switch is active; all new entries are blocked"
-          className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-[#F07178]/22 border border-[#F07178]/60 backdrop-blur-xl text-xs"
+          className="flex items-center justify-between px-4 py-2.5 rounded-[14px] bg-iea-dangerSoft border border-iea-dangerBorder text-xs"
         >
           <div className="flex items-center space-x-2">
-            <ShieldAlert className="w-4 h-4 text-[#F07178] shrink-0" />
-            <span className="font-bold text-[#F5B5B9]">STOP.flag ACTIVE · Entries Blocked</span>
+            <ShieldAlert className="w-4 h-4 text-iea-danger shrink-0" />
+            <span className="font-bold text-iea-danger">STOP.flag ACTIVE · Entries Blocked</span>
           </div>
           <button
             type="button"
             onClick={() =>
               executeControlAction("Clear Stop", () => controlClient.clearEmergencyStop(true))
             }
-            className="px-3 py-1 rounded-full bg-[#36B37E] hover:bg-[#3FC48B] text-[#121110] font-bold transition"
+            className="px-3 py-1 rounded-full bg-iea-profit hover:opacity-90 text-white font-bold transition"
           >
             Clear Stop
           </button>
@@ -564,351 +687,376 @@ export const DashboardScreen: React.FC<
       )}
 
       {/* =====================================================================
-          ROW 1: COMPACT TOP STATUS BAR + CONTROLS (Connect MT5 / Start / Pause-Resume / Stop | Close All)
+          ROW 1: BM FOREX HUB SLIM TOP HEADER BAR (Bottom Border, Search Left,
+          Telemetry + Controls Center, Clock Pill + Rounded-Square Icon Buttons Right)
       ====================================================================== */}
       <PanelErrorBoundary panelName="Top Control Bar">
-      <section
-        aria-label="Terminal Top Status Bar"
-        className="iea-card relative flex flex-wrap items-center justify-between gap-2 px-3.5 py-2"
-      >
-        <div className="flex flex-wrap items-center gap-1.5 text-xs min-w-0">
-          {/* MT5 Connection + Masked Account */}
-          <div
-            title={
-              topBar.mt5Connected
-                ? `Connected MT5 Account ${dash.maskedAccount} (${effectiveStatus.mt5.account.broker})`
-                : "MT5 Terminal disconnected"
-            }
-            className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 whitespace-nowrap"
-          >
-            {topBar.mt5Connected ? (
-              <Wifi className="w-3.5 h-3.5 text-[#6EE7B7] shrink-0" />
-            ) : (
-              <WifiOff className="w-3.5 h-3.5 text-[#F07178] shrink-0" />
-            )}
-            <span className="font-medium text-[#F5F5F2]">MT5</span>
-            <span
-              className={`font-mono font-bold ${
-                topBar.mt5Connected ? "text-[#6EE7B7]" : "text-[#8A8986]"
-              }`}
-              data-testid="masked-account-badge"
+        <section
+          aria-label="Terminal Top Status Bar"
+          className="relative flex flex-wrap items-center justify-between gap-2.5 pb-4 border-b border-iea-borderSubtle"
+        >
+          {/* Left: Rounded Search Icon Button + Status Pills */}
+          <div className="flex flex-wrap items-center gap-2 text-xs min-w-0">
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen((prev) => !prev)}
+              aria-label="Search instruments and terminal actions"
+              title="Search instruments (XAUUSD, BTCUSD, USDJPY)"
+              className="iea-header-icon-btn shrink-0"
             >
-              {topBar.mt5Connected ? dash.maskedAccount : "OFF"}
-            </span>
-          </div>
+              <Search className="w-4 h-4" />
+            </button>
 
-          {/* Compact Engine State + Mode Chip */}
-          <div
-            data-testid="engine-state-chip"
-            title={`Engine State: ${topBar.engineState} · Mode: ${topBar.operatingMode}${
-              eng.engine_pid ? ` · PID ${eng.engine_pid}` : ""
-            }`}
-            className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full border font-mono text-[11px] font-bold whitespace-nowrap ${
-              topBar.engineChipTone === "lime"
-                ? "bg-[#6EE7B7]/16 border-[#6EE7B7]/50 text-[#6EE7B7]"
-                : topBar.engineChipTone === "amber"
-                ? "bg-[#EAB354]/16 border-[#EAB354]/50 text-[#EAB354]"
-                : topBar.engineChipTone === "red"
-                ? "bg-[#F07178]/18 border-[#F07178]/55 text-[#F5989E]"
-                : "bg-[#242320]/60 border-[rgba(255,255,253,0.11)] text-[#B4B3B0]"
-            }`}
-          >
-            <span
-              className={`w-2 h-2 rounded-full shrink-0 ${
-                topBar.engineChipTone === "lime"
-                  ? "bg-[#6EE7B7] "
-                  : topBar.engineChipTone === "amber"
-                  ? "bg-[#EAB354]"
-                  : topBar.engineChipTone === "red"
-                  ? "bg-[#F07178]"
-                  : "bg-[#8A8986]"
-              }`}
-            />
-            <span>{topBar.engineStateLabel}</span>
-            <span className="opacity-60">·</span>
-            <span className="text-[#F5F5F2]/90">{topBar.modeShort}</span>
-          </div>
+            {isSearchOpen && (
+              <div className="inline-flex items-center bg-iea-card border border-iea-borderDefault rounded-[10px] px-2.5 h-9">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Filter symbol..."
+                  aria-label="Filter watchlist symbol"
+                  className="bg-transparent text-xs text-iea-textPrimary placeholder:text-iea-textMuted focus:outline-none w-28 font-mono"
+                />
+              </div>
+            )}
 
-          {/* Hard Safety Lock Badge */}
-          <div
-            data-testid="demo-lock-badge"
-            title={UI_COPY.brand.demoLockTooltip}
-            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-[#6EE7B7]/14 border border-[#6EE7B7]/45 text-[#6EE7B7] font-mono text-[11px] font-bold whitespace-nowrap"
-          >
-            <Lock className="w-3 h-3 text-[#6EE7B7] shrink-0" />
-            <span>{UI_COPY.brand.demoLockChip}</span>
-          </div>
-
-          {/* Control Service Status Pill + Reconnect */}
-          {serviceStatus && (
+            {/* MT5 Connection + Masked Account */}
             <div
-              data-testid="control-service-status-pill"
-              title={`Control Service on ${serviceStatus.baseUrl}${serviceStatus.lastError ? ` · ${serviceStatus.lastError}` : ""}`}
-              className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 font-mono text-[11px] whitespace-nowrap"
+              title={
+                topBar.mt5Connected
+                  ? `Connected MT5 Account ${dash.maskedAccount} (${effectiveStatus.mt5.account.broker})`
+                  : "MT5 Terminal disconnected"
+              }
+              className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1.5 whitespace-nowrap"
+            >
+              {topBar.mt5Connected ? (
+                <Wifi className="w-3.5 h-3.5 text-iea-profit shrink-0" />
+              ) : (
+                <WifiOff className="w-3.5 h-3.5 text-iea-danger shrink-0" />
+              )}
+              <span className="font-medium text-iea-textPrimary">MT5</span>
+              <span
+                className={`font-mono font-bold ${
+                  topBar.mt5Connected ? "text-iea-profit" : "text-iea-textMuted"
+                }`}
+                data-testid="masked-account-badge"
+              >
+                {topBar.mt5Connected ? dash.maskedAccount : "OFF"}
+              </span>
+            </div>
+
+            {/* Compact Engine State + Mode Chip */}
+            <div
+              data-testid="engine-state-chip"
+              title={`Engine State: ${topBar.engineState} · Mode: ${topBar.operatingMode}${
+                eng.engine_pid ? ` · PID ${eng.engine_pid}` : ""
+              }`}
+              className={`inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full border font-mono text-[11px] font-bold whitespace-nowrap ${
+                topBar.engineChipTone === "lime"
+                  ? "bg-iea-profitSoft border-iea-profitBorder text-iea-profit"
+                  : topBar.engineChipTone === "amber"
+                  ? "bg-iea-warningSoft border-iea-warningBorder text-iea-warning"
+                  : topBar.engineChipTone === "red"
+                  ? "bg-iea-dangerSoft border-iea-dangerBorder text-iea-danger"
+                  : "bg-iea-card border-iea-borderSubtle text-iea-textSecondary"
+              }`}
             >
               <span
                 className={`w-2 h-2 rounded-full shrink-0 ${
-                  serviceStatus.status === "ONLINE"
-                    ? "bg-[#6EE7B7] "
-                    : serviceStatus.status === "STARTING"
-                    ? "bg-[#EAB354]"
-                    : "bg-[#F07178]"
+                  topBar.engineChipTone === "lime"
+                    ? "bg-iea-profit"
+                    : topBar.engineChipTone === "amber"
+                    ? "bg-iea-warning"
+                    : topBar.engineChipTone === "red"
+                    ? "bg-iea-danger"
+                    : "bg-iea-textMuted"
                 }`}
               />
-              <span className="text-[#B4B3B0]">SVC</span>
-              <span
-                className={`font-bold ${
-                  serviceStatus.status === "ONLINE"
-                    ? "text-[#6EE7B7]"
-                    : serviceStatus.status === "STARTING"
-                    ? "text-[#EAB354]"
-                    : "text-[#F07178]"
-                }`}
-              >
-                {serviceStatus.status === "ONLINE"
-                  ? "ONLINE"
-                  : serviceStatus.status === "STARTING"
-                  ? "STARTING"
-                  : "OFFLINE"}
-              </span>
-              {serviceStatus.status !== "ONLINE" && onReconnectService && (
-                <button
-                  type="button"
-                  onClick={() => onReconnectService()}
-                  className="ml-1 px-2 py-0.5 rounded-full bg-[#F5F5F2] text-[#121110] font-bold text-[10px] hover:bg-[#FFFFFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6EE7B7]"
-                >
-                  Reconnect
-                </button>
-              )}
+              <span>{topBar.engineStateLabel}</span>
+              <span className="opacity-60">·</span>
+              <span className="text-iea-textPrimary">{topBar.modeShort}</span>
             </div>
-          )}
 
-          {/* ZMQ Bridge Ports 5555 / 5556 (Real TCP Probe Status) */}
-          <div
-            title={`ZMQ/TCP Bridge Sockets: Port 5555 (${effectiveStatus.mt5.zmq_bridge?.port_5555 ? "LISTENING" : "IDLE"}) & Port 5556 (${effectiveStatus.mt5.zmq_bridge?.port_5556 ? "LISTENING" : "IDLE"})`}
-            className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 font-mono text-[11px] whitespace-nowrap"
-          >
-            <span
-              className={`w-2 h-2 rounded-full shrink-0 ${
-                effectiveStatus.mt5.zmq_bridge?.port_5555
-                  ? "bg-[#6EE7B7] "
-                  : "bg-[#8A8986]"
-              }`}
-            />
-            <span className="text-[#B4B3B0]">ZMQ</span>
-            <span
-              className={`font-bold ${
-                effectiveStatus.mt5.zmq_bridge?.port_5555 ? "text-[#6EE7B7]" : "text-[#8A8986]"
-              }`}
+            {/* Hard Safety Lock Badge */}
+            <div
+              data-testid="demo-lock-badge"
+              title={UI_COPY.brand.demoLockTooltip}
+              className="hidden xl:inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-full bg-iea-accentSoft border border-iea-accentBorder text-iea-accent font-mono text-[11px] font-bold whitespace-nowrap"
             >
-              {effectiveStatus.mt5.zmq_bridge?.port_5555 ? "5555 UP" : "5555 IDLE"}
-            </span>
-          </div>
+              <Lock className="w-3 h-3 text-iea-accent shrink-0" />
+              <span>{UI_COPY.brand.demoLockChip}</span>
+            </div>
 
-          {/* Telegram Status */}
-          <button
-            type="button"
-            onClick={() =>
-              executeControlAction("TG Test", () => controlClient.testTelegram(false))
-            }
-            aria-label="Telegram status and quick connectivity test"
-            title="Telegram notification dispatcher ready (click to test)"
-            className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 text-[11px] text-[#F5F5F2] whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EC2C6]"
-          >
-            <Send className="w-3 h-3 text-[#5EC2C6] shrink-0" />
-            <span className="text-[#6EE7B7] font-semibold">TG Ready</span>
-          </button>
-
-          {/* Live UTC Clock */}
-          <div
-            title="Live UTC Terminal Clock"
-            className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1 text-[11px] whitespace-nowrap"
-          >
-            <Clock className="w-3 h-3 text-[#8A8986] shrink-0" />
-            <span className="font-mono text-[#F5F5F2] tabular-nums" data-testid="utc-clock">
-              {utcClockText}
-            </span>
-          </div>
-        </div>
-
-        {/* Right: Ordered Action Group [Connect MT5] [Start] [Pause / Resume] [Stop]  |  [Close All] */}
-        <div
-          aria-label="Engine and MT5 Controls"
-          className="flex flex-wrap items-center gap-1.5 shrink-0"
-        >
-          {/* 1. Connect MT5 (or quiet Connected + Disconnect) */}
-          {!readOnlyMobile && (
-            <div className="relative inline-flex items-center">
-              {topBar.connectBtn.showDisconnect ? (
-                <div className="inline-flex items-center rounded-full bg-[#242320]/55 border border-[#5EC2C6]/35 text-xs overflow-hidden">
-                  <span
-                    data-testid="btn-connect-mt5-connected"
-                    title={topBar.connectBtn.tooltip}
-                    className="px-2.5 py-1 text-[#5EC2C6] font-semibold inline-flex items-center space-x-1 whitespace-nowrap"
-                  >
-                    <Plug className="w-3 h-3 shrink-0" />
-                    <span>Connected</span>
-                  </span>
+            {/* Control Service Status Pill + Reconnect */}
+            {serviceStatus && (
+              <div
+                data-testid="control-service-status-pill"
+                title={`Control Service on ${serviceStatus.baseUrl}${
+                  serviceStatus.lastError ? ` · ${serviceStatus.lastError}` : ""
+                }`}
+                className="iea-pill-control inline-flex items-center space-x-1.5 px-2.5 py-1.5 font-mono text-[11px] whitespace-nowrap"
+              >
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    serviceStatus.status === "ONLINE"
+                      ? "bg-iea-profit"
+                      : serviceStatus.status === "STARTING"
+                      ? "bg-iea-warning"
+                      : "bg-iea-danger"
+                  }`}
+                />
+                <span className="text-iea-textSecondary">SVC</span>
+                <span
+                  className={`font-bold ${
+                    serviceStatus.status === "ONLINE"
+                      ? "text-iea-profit"
+                      : serviceStatus.status === "STARTING"
+                      ? "text-iea-warning"
+                      : "text-iea-danger"
+                  }`}
+                >
+                  {serviceStatus.status === "ONLINE"
+                    ? "ONLINE"
+                    : serviceStatus.status === "STARTING"
+                    ? "STARTING"
+                    : "OFFLINE"}
+                </span>
+                {serviceStatus.status !== "ONLINE" && onReconnectService && (
                   <button
                     type="button"
-                    data-testid="btn-disconnect-mt5"
-                    disabled={!topBar.connectBtn.disconnectEnabled}
-                    onClick={handleDisconnectMt5Click}
-                    aria-label="Disconnect MT5"
-                    title={topBar.connectBtn.disconnectTooltip}
-                    className="px-2 py-1 border-l border-[#5EC2C6]/25 text-[#B4B3B0] hover:text-[#F5989E] hover:bg-[#F07178]/15 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center space-x-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EC2C6]"
+                    onClick={() => onReconnectService()}
+                    className="ml-1 px-2 py-0.5 rounded-full bg-iea-accent text-white font-bold text-[10px] hover:bg-iea-accentHover"
                   >
-                    {busyAction === "Disconnect MT5" ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Unplug className="w-3 h-3" />
-                    )}
-                    <span className="text-[11px]">Disconnect</span>
+                    Reconnect
                   </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  data-testid="btn-connect-mt5"
-                  disabled={!topBar.connectBtn.enabled}
-                  onClick={handleConnectMt5Click}
-                  aria-label="Connect MT5 terminal"
-                  title={topBar.connectBtn.tooltip}
-                  className="px-3 py-1.5 rounded-full bg-[#5EC2C6]/14 hover:bg-[#5EC2C6]/24 border border-[#5EC2C6]/55 disabled:opacity-40 disabled:cursor-not-allowed text-[#5EC2C6] text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EC2C6]"
-                >
-                  {topBar.mt5Syncing || busyAction === "Connect MT5" || busyAction === "Scan MT5" ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                  ) : (
-                    <Plug className="w-3.5 h-3.5 shrink-0" />
-                  )}
-                  <span>{topBar.connectBtn.label}</span>
-                  {mt5PickerTerminals && mt5PickerTerminals.length > 1 && (
-                    <ChevronDown className="w-3 h-3 shrink-0" />
-                  )}
-                </button>
-              )}
+                )}
+              </div>
+            )}
 
-              {/* Multi-terminal picker popover */}
-              {mt5PickerTerminals && mt5PickerTerminals.length > 1 && (
-                <div
-                  role="menu"
-                  aria-label="Select MT5 Terminal"
-                  className="absolute right-0 top-full mt-2 z-50 w-72 iea-card p-2 shadow-2xl border border-[#5EC2C6]/40 space-y-1"
-                >
-                  <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#8A8986]">
-                    <span>Select MT5 Terminal ({mt5PickerTerminals.length})</span>
+            {/* ZMQ Bridge Ports 5555 / 5556 (Real TCP Probe Status) */}
+            <div
+              title={`ZMQ/TCP Bridge Sockets: Port 5555 (${
+                effectiveStatus.mt5.zmq_bridge?.port_5555 ? "LISTENING" : "IDLE"
+              }) & Port 5556 (${
+                effectiveStatus.mt5.zmq_bridge?.port_5556 ? "LISTENING" : "IDLE"
+              })`}
+              className="iea-pill-control hidden lg:inline-flex items-center space-x-1.5 px-2.5 py-1.5 font-mono text-[11px] whitespace-nowrap"
+            >
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  effectiveStatus.mt5.zmq_bridge?.port_5555
+                    ? "bg-iea-profit"
+                    : "bg-iea-textMuted"
+                }`}
+              />
+              <span className="text-iea-textSecondary">ZMQ</span>
+              <span
+                className={`font-bold ${
+                  effectiveStatus.mt5.zmq_bridge?.port_5555
+                    ? "text-iea-profit"
+                    : "text-iea-textMuted"
+                }`}
+              >
+                {effectiveStatus.mt5.zmq_bridge?.port_5555 ? "5555 UP" : "5555 IDLE"}
+              </span>
+            </div>
+
+            {/* Telegram Status */}
+            <button
+              type="button"
+              onClick={() =>
+                executeControlAction("TG Test", () => controlClient.testTelegram(false))
+              }
+              aria-label="Telegram status and quick connectivity test"
+              title="Telegram notification dispatcher ready (click to test)"
+              className="iea-pill-control hidden sm:inline-flex items-center space-x-1.5 px-2.5 py-1.5 text-[11px] text-iea-textPrimary whitespace-nowrap"
+            >
+              <Send className="w-3 h-3 text-iea-accent shrink-0" />
+              <span className="text-iea-profit font-semibold">TG Ready</span>
+            </button>
+          </div>
+
+          {/* Right: Engine & MT5 Controls + Clock Pill ("Tue 17:38") + Rounded-Square Icon Buttons (Bot, Notifications, Theme Toggle) */}
+          <div
+            aria-label="Engine and MT5 Controls"
+            className="flex flex-wrap items-center gap-2 shrink-0"
+          >
+            {/* 1. Connect MT5 (or Connected + Disconnect) */}
+            {!readOnlyMobile && (
+              <div className="relative inline-flex items-center">
+                {topBar.connectBtn.showDisconnect ? (
+                  <div className="inline-flex items-center rounded-[10px] bg-iea-card border border-iea-borderDefault text-xs overflow-hidden h-9">
+                    <span
+                      data-testid="btn-connect-mt5-connected"
+                      title={topBar.connectBtn.tooltip}
+                      className="px-2.5 py-1 text-iea-profit font-semibold inline-flex items-center space-x-1 whitespace-nowrap"
+                    >
+                      <Plug className="w-3 h-3 shrink-0" />
+                      <span>Connected</span>
+                    </span>
                     <button
                       type="button"
-                      onClick={() => setMt5PickerTerminals(null)}
-                      className="text-[#B4B3B0] hover:text-white"
+                      data-testid="btn-disconnect-mt5"
+                      disabled={!topBar.connectBtn.disconnectEnabled}
+                      onClick={handleDisconnectMt5Click}
+                      aria-label="Disconnect MT5"
+                      title={topBar.connectBtn.disconnectTooltip}
+                      className="px-2.5 h-full border-l border-iea-borderSubtle text-iea-textSecondary hover:text-iea-danger hover:bg-iea-dangerSoft disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center space-x-1 transition"
                     >
-                      Close
+                      {busyAction === "Disconnect MT5" ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Unplug className="w-3 h-3" />
+                      )}
+                      <span className="text-[11px]">Disconnect</span>
                     </button>
                   </div>
-                  {mt5PickerTerminals.map((t) => (
-                    <button
-                      key={t.executablePath}
-                      type="button"
-                      onClick={() => connectToTerminalPath(t.executablePath)}
-                      className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-[#5EC2C6]/15 text-xs transition flex items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5EC2C6]"
-                    >
-                      <div className="min-w-0">
-                        <div className="font-semibold text-[#F5F5F2] truncate">{t.name}</div>
-                        <div className="text-[10px] font-mono text-[#8A8986] truncate">
-                          {t.executablePath}
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="btn-connect-mt5"
+                    disabled={!topBar.connectBtn.enabled}
+                    onClick={handleConnectMt5Click}
+                    aria-label="Connect MT5 terminal"
+                    title={topBar.connectBtn.tooltip}
+                    className="h-9 px-3 rounded-[10px] bg-iea-accentSoft hover:bg-iea-accent/25 border border-iea-accentBorder disabled:opacity-40 disabled:cursor-not-allowed text-iea-accent text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition"
+                  >
+                    {topBar.mt5Syncing ||
+                    busyAction === "Connect MT5" ||
+                    busyAction === "Scan MT5" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    ) : (
+                      <Plug className="w-3.5 h-3.5 shrink-0" />
+                    )}
+                    <span>{topBar.connectBtn.label}</span>
+                    {mt5PickerTerminals && mt5PickerTerminals.length > 1 && (
+                      <ChevronDown className="w-3 h-3 shrink-0" />
+                    )}
+                  </button>
+                )}
+
+                {/* Multi-terminal picker popover */}
+                {mt5PickerTerminals && mt5PickerTerminals.length > 1 && (
+                  <div
+                    role="menu"
+                    aria-label="Select MT5 Terminal"
+                    className="absolute right-0 top-full mt-2 z-50 w-72 iea-card p-2 shadow-pop border border-iea-accentBorder space-y-1"
+                  >
+                    <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-iea-textMuted">
+                      <span>Select MT5 Terminal ({mt5PickerTerminals.length})</span>
+                      <button
+                        type="button"
+                        onClick={() => setMt5PickerTerminals(null)}
+                        className="text-iea-textSecondary hover:text-white"
+                      >
+                        Close
+                      </button>
+                    </div>
+                    {mt5PickerTerminals.map((t) => (
+                      <button
+                        key={t.executablePath}
+                        type="button"
+                        onClick={() => connectToTerminalPath(t.executablePath)}
+                        className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-iea-accentSoft text-xs transition flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-semibold text-iea-textPrimary truncate">
+                            {t.name}
+                          </div>
+                          <div className="text-[10px] font-mono text-iea-textMuted truncate">
+                            {t.executablePath}
+                          </div>
                         </div>
-                      </div>
-                      {t.isRunning && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-[#6EE7B7]/20 text-[#6EE7B7] text-[9px] font-mono font-bold shrink-0">
-                          RUN
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 2. Start */}
-          {!readOnlyMobile && (
-            <button
-              type="button"
-              data-testid="btn-start-engine"
-              disabled={!topBar.startBtn.enabled}
-              onClick={handleStartEngineClick}
-              aria-label="Start trading engine"
-              title={topBar.startBtn.tooltip}
-              className="px-3 py-1.5 rounded-full bg-[#36B37E] hover:bg-[#3FC48B] disabled:bg-[#6EE7B7]/25 disabled:text-[#6EE7B7]/60 disabled:border disabled:border-[#6EE7B7]/30 disabled:cursor-not-allowed text-[#121110] text-xs font-extrabold inline-flex items-center space-x-1.5 whitespace-nowrap  disabled:shadow-none transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6EE7B7]"
-            >
-              {busyAction === "Start" ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-              ) : (
-                <Play className="w-3.5 h-3.5 shrink-0 fill-current" />
-              )}
-              <span>{topBar.startBtn.label}</span>
-            </button>
-          )}
-
-          {/* 3. Pause / Resume toggle */}
-          <button
-            type="button"
-            data-testid="btn-pause-resume-engine"
-            disabled={!topBar.pauseResumeBtn.enabled}
-            onClick={() =>
-              readOnlyMobile
-                ? setConfirmModal({ type: "PAUSE", step: 1 })
-                : executeControlAction(topBar.pauseResumeBtn.label, () =>
-                    topBar.pauseResumeBtn.action === "RESUME"
-                      ? controlClient.resumeEntries()
-                      : controlClient.pauseEntries()
-                  )
-            }
-            aria-label={
-              topBar.pauseResumeBtn.action === "RESUME"
-                ? "Resume new trade entries"
-                : "Pause new trade entries"
-            }
-            title={topBar.pauseResumeBtn.tooltip}
-            className={`px-3 py-1.5 rounded-full border disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition duration-200 focus-visible:outline-none focus-visible:ring-2 ${
-              topBar.pauseResumeBtn.tone === "lime"
-                ? "bg-[#6EE7B7]/20 hover:bg-[#6EE7B7]/30 border-[#6EE7B7]/55 text-[#6EE7B7] focus-visible:ring-[#6EE7B7]"
-                : "bg-[#EAB354]/20 hover:bg-[#EAB354]/30 border-[#EAB354]/55 text-[#EAB354] focus-visible:ring-[#EAB354]"
-            }`}
-          >
-            {busyAction === "Pause" || busyAction === "Resume" ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-            ) : topBar.pauseResumeBtn.action === "RESUME" ? (
-              <Play className="w-3.5 h-3.5 shrink-0" />
-            ) : (
-              <Pause className="w-3.5 h-3.5 shrink-0" />
+                        {t.isRunning && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-iea-profitSoft text-iea-profit text-[9px] font-mono font-bold shrink-0">
+                            RUN
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
-            <span>{topBar.pauseResumeBtn.label}</span>
-          </button>
 
-          {/* 4. Stop */}
-          {!readOnlyMobile && (
+            {/* 2. Start */}
+            {!readOnlyMobile && (
+              <button
+                type="button"
+                data-testid="btn-start-engine"
+                disabled={!topBar.startBtn.enabled}
+                onClick={handleStartEngineClick}
+                aria-label="Start trading engine"
+                title={topBar.startBtn.tooltip}
+                className="h-9 px-3.5 rounded-[10px] bg-iea-accent hover:bg-iea-accentHover disabled:bg-iea-card disabled:text-iea-textMuted disabled:border disabled:border-iea-borderSubtle disabled:cursor-not-allowed text-white text-xs font-bold inline-flex items-center space-x-1.5 whitespace-nowrap transition"
+              >
+                {busyAction === "Start" ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                ) : (
+                  <Play className="w-3.5 h-3.5 shrink-0 fill-current" />
+                )}
+                <span>{topBar.startBtn.label}</span>
+              </button>
+            )}
+
+            {/* 3. Pause / Resume toggle */}
             <button
               type="button"
-              data-testid="btn-stop-engine"
-              disabled={!topBar.stopBtn.enabled}
-              onClick={() => setConfirmModal({ type: "STOP", step: 1 })}
-              aria-label="Stop trading engine"
-              title={topBar.stopBtn.tooltip}
-              className="px-3 py-1.5 rounded-full bg-[#D94854]/12 hover:bg-[#D94854]/20 border border-[#F07178]/35 disabled:opacity-40 disabled:cursor-not-allowed text-[#F5989E] text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F07178]"
+              data-testid="btn-pause-resume-engine"
+              disabled={!topBar.pauseResumeBtn.enabled}
+              onClick={() =>
+                readOnlyMobile
+                  ? setConfirmModal({ type: "PAUSE", step: 1 })
+                  : executeControlAction(topBar.pauseResumeBtn.label, () =>
+                      topBar.pauseResumeBtn.action === "RESUME"
+                        ? controlClient.resumeEntries()
+                        : controlClient.pauseEntries()
+                    )
+              }
+              aria-label={
+                topBar.pauseResumeBtn.action === "RESUME"
+                  ? "Resume new trade entries"
+                  : "Pause new trade entries"
+              }
+              title={topBar.pauseResumeBtn.tooltip}
+              className={`h-9 px-3 rounded-[10px] border disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition ${
+                topBar.pauseResumeBtn.tone === "lime"
+                  ? "bg-iea-profitSoft hover:bg-iea-profit/25 border-iea-profitBorder text-iea-profit"
+                  : "bg-iea-warningSoft hover:bg-iea-warning/25 border-iea-warningBorder text-iea-warning"
+              }`}
             >
-              {busyAction === "Stop" ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-[#F07178]" />
+              {busyAction === "Pause" || busyAction === "Resume" ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+              ) : topBar.pauseResumeBtn.action === "RESUME" ? (
+                <Play className="w-3.5 h-3.5 shrink-0" />
               ) : (
-                <Square className="w-3.5 h-3.5 shrink-0 text-[#F07178]" />
+                <Pause className="w-3.5 h-3.5 shrink-0" />
               )}
-              <span>{topBar.stopBtn.label}</span>
+              <span>{topBar.pauseResumeBtn.label}</span>
             </button>
-          )}
 
-          {/* 5. Visually separated Close All on far right */}
-          {!readOnlyMobile && (
-            <div className="ml-1.5 pl-2.5 border-l border-[rgba(255,255,253,0.11)]">
+            {/* 4. Stop */}
+            {!readOnlyMobile && (
+              <button
+                type="button"
+                data-testid="btn-stop-engine"
+                disabled={!topBar.stopBtn.enabled}
+                onClick={() => setConfirmModal({ type: "STOP", step: 1 })}
+                aria-label="Stop trading engine"
+                title={topBar.stopBtn.tooltip}
+                className="h-9 px-3 rounded-[10px] bg-iea-dangerSoft hover:bg-iea-danger/25 border border-iea-dangerBorder disabled:opacity-40 disabled:cursor-not-allowed text-iea-danger text-xs font-semibold inline-flex items-center space-x-1.5 whitespace-nowrap transition"
+              >
+                {busyAction === "Stop" ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-iea-danger" />
+                ) : (
+                  <Square className="w-3.5 h-3.5 shrink-0 text-iea-danger" />
+                )}
+                <span>{topBar.stopBtn.label}</span>
+              </button>
+            )}
+
+            {/* 5. Close All */}
+            {!readOnlyMobile && (
               <button
                 type="button"
                 data-testid="btn-close-all"
@@ -916,7 +1064,7 @@ export const DashboardScreen: React.FC<
                 onClick={() => setConfirmModal({ type: "CLOSE_ALL", step: 1 })}
                 aria-label="Close all bot-owned positions (two-step confirmation)"
                 title={topBar.closeAllBtn.tooltip}
-                className="px-3.5 py-1.5 rounded-full bg-[#D94854] hover:bg-[#E35662] disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold inline-flex items-center space-x-1.5 whitespace-nowrap  disabled:shadow-none transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F07178]"
+                className="h-9 px-3 rounded-[10px] bg-iea-danger hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold inline-flex items-center space-x-1.5 whitespace-nowrap transition"
               >
                 {busyAction === "Close All" ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
@@ -925,422 +1073,803 @@ export const DashboardScreen: React.FC<
                 )}
                 <span>{topBar.closeAllBtn.label}</span>
               </button>
-            </div>
-          )}
-        </div>
-      </section>
-      </PanelErrorBoundary>
+            )}
 
-      {/* =====================================================================
-          ROW 2: 5 EVENLY DISTRIBUTED, EQUAL-HEIGHT KPI CARDS
-      ====================================================================== */}
-      <PanelErrorBoundary panelName="KPI Summary">
-      <section
-        aria-label="Account and Risk Key Performance Indicators"
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3"
-      >
-        {/* 1. Bal / Eq */}
-        <div
-          className="iea-card p-4 flex flex-col justify-between min-h-[112px]"
-          title={`${UI_COPY.kpis.balEq.tooltip} · ${provenanceLabel}`}
-        >
-          <div className="flex items-center justify-between text-xs text-[#B4B3B0]">
-            <span className="font-medium">{UI_COPY.kpis.balEq.label}</span>
-            <span
-              className={`font-mono text-[10px] px-2 py-0.5 rounded-full border ${
-                dash.provenance.stale
-                  ? "text-[#EAB354] bg-[#EAB354]/15 border-[#EAB354]/35"
-                  : "text-[#6EE7B7] bg-[#6EE7B7]/14 border-[#6EE7B7]/30"
+            {/* Divider before BM Forex Hub Clock Pill & Rounded-Square Icon Buttons */}
+            <div className="h-5 w-px bg-iea-borderSubtle mx-0.5 hidden sm:block" />
+
+            {/* Clock Pill (icon + "Tue 17:38") */}
+            <div
+              title="Live Terminal Clock"
+              className="h-9 px-3 rounded-[10px] bg-iea-card border border-iea-borderSubtle inline-flex items-center space-x-2 text-xs whitespace-nowrap"
+            >
+              <Clock className="w-3.5 h-3.5 text-iea-accent shrink-0" />
+              <span
+                className="font-mono text-iea-textPrimary tabular-nums font-medium"
+                data-testid="utc-clock"
+              >
+                {headerClockText}
+              </span>
+            </div>
+
+            {/* Rounded-Square Icon Button 1: Bot */}
+            <button
+              type="button"
+              onClick={() => onNavigate("operations")}
+              aria-label="Bot Engine & Operations Centre"
+              title={`Bot Engine: ${topBar.engineStateLabel} (${topBar.operatingMode}) — Open Operations`}
+              className={`iea-header-icon-btn relative ${
+                topBar.engineState === "RUNNING"
+                  ? "text-iea-accent border-iea-accentBorder bg-iea-accentSoft"
+                  : ""
               }`}
             >
-              {dash.connected
-                ? `Lev 1:${effectiveStatus.mt5.account.leverage}`
-                : "Waiting"}
-            </span>
-          </div>
-          <div className="text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight text-[#F5F5F2] mt-2">
-            {kpis.equity !== null
-              ? `$${kpis.equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-              : "—"}
-          </div>
-          <div className="text-[11px] font-mono tabular-nums text-[#8A8986] mt-1.5 flex items-center justify-between">
-            <span>
-              {kpis.balance !== null
-                ? `Bal $${kpis.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                : provenanceLabel}
-            </span>
-            {kpis.floatingPnl !== null && (
-              <span
-                className={
-                  kpis.floatingPnl >= 0 ? "text-[#6EE7B7] font-semibold" : "text-[#F07178] font-semibold"
-                }
-              >
-                {kpis.floatingPnl >= 0 ? "+" : ""}${kpis.floatingPnl.toFixed(2)}
-              </span>
-            )}
-          </div>
-        </div>
+              <Bot className="w-4 h-4" />
+              {topBar.engineState === "RUNNING" && (
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-iea-profit" />
+              )}
+            </button>
 
-        {/* 2. Today P&L (Primary Accent Highlight) */}
-        <div
-          className="iea-card p-4 flex flex-col justify-between min-h-[112px]"
-          title={`${UI_COPY.kpis.todayPnl.tooltip} · ${provenanceLabel}`}
-        >
-          <div className="flex items-center justify-between text-xs text-[#6EE7B7]">
-            <span className="font-medium">{UI_COPY.kpis.todayPnl.label}</span>
-            {(kpis.todayPnlUsd ?? 0) >= 0 ? (
-              <TrendingUp className="w-4 h-4 text-[#6EE7B7]" />
-            ) : (
-              <TrendingDown className="w-4 h-4 text-[#F07178]" />
-            )}
-          </div>
-          <div
-            className={`text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight mt-2 ${
-              kpis.todayPnlUsd === null
-                ? "text-[#8A8986]"
-                : kpis.todayPnlUsd >= 0
-                ? "text-[#6EE7B7]"
-                : "text-[#F07178]"
-            }`}
-          >
-            {kpis.todayPnlUsd !== null ? (
-              <>
-                {kpis.todayPnlUsd >= 0 ? "+" : ""}${kpis.todayPnlUsd.toFixed(2)}{" "}
-                {kpis.todayPnlR !== null && (
-                  <span className="text-xs font-semibold">
-                    ({kpis.todayPnlR >= 0 ? "+" : ""}
-                    {kpis.todayPnlR.toFixed(2)}R)
-                  </span>
-                )}
-              </>
-            ) : (
-              "—"
-            )}
-          </div>
-          <div className="text-[11px] font-mono tabular-nums text-[#B4B3B0] mt-1.5">
-            {kpis.balance !== null
-              ? `1R = $${(kpis.balance * 0.005).toFixed(2)} · ${provenanceLabel}`
-              : provenanceLabel}
-          </div>
-        </div>
+            {/* Rounded-Square Icon Button 2: Notifications */}
+            <button
+              type="button"
+              onClick={() => onNavigate("alerts")}
+              aria-label="Open Alert & Notification Centre"
+              title="Notifications & Alert Centre"
+              className="iea-header-icon-btn relative"
+            >
+              <Bell className="w-4 h-4" />
+              {activePositions.length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-iea-accent" />
+              )}
+            </button>
 
-        {/* 3. Daily Loss */}
-        <div
-          className="iea-card p-4 flex flex-col justify-between min-h-[112px]"
-          title={UI_COPY.kpis.dailyLoss.tooltip}
-        >
-          <div className="flex items-center justify-between text-xs text-[#B4B3B0]">
-            <span className="font-medium">{UI_COPY.kpis.dailyLoss.label}</span>
-            <span className="font-mono tabular-nums text-[11px] text-[#F5F5F2]">
-              {kpis.dailyLossUsedPct.toFixed(2)}% / {kpis.dailyLossLimitPct.toFixed(1)}%
-            </span>
-          </div>
-          <div className="text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight text-[#F5F5F2] mt-2">
-            ${kpis.dailyLossUsedUsd.toFixed(0)}{" "}
-            <span className="text-xs text-[#8A8986] font-normal">
-              / ${kpis.dailyLossLimitUsd.toFixed(0)}
-            </span>
-          </div>
-          <div className="w-full h-1.5 bg-[#0E0D0B]/80 rounded-full overflow-hidden mt-2 border border-[rgba(255,255,253,0.07)]">
-            <div
-              className="h-full bg-[#6EE7B7] rounded-full "
-              style={{
-                width: `${Math.min(100, (kpis.dailyLossUsedPct / kpis.dailyLossLimitPct) * 100)}%`,
-              }}
-            />
-          </div>
-        </div>
-
-        {/* 4. DD vs Cap */}
-        <div
-          className="iea-card p-4 flex flex-col justify-between min-h-[112px]"
-          title={UI_COPY.kpis.ddCap.tooltip}
-        >
-          <div className="flex items-center justify-between text-xs text-[#B4B3B0]">
-            <span className="font-medium">{UI_COPY.kpis.ddCap.label}</span>
-            <span className="font-mono text-[10px] text-[#6EE7B7] bg-[#6EE7B7]/14 px-2 py-0.5 rounded-full">
-              SAFE
-            </span>
-          </div>
-          <div className="text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight text-[#F5F5F2] mt-2">
-            {kpis.totalDrawdownUsedPct.toFixed(2)}%{" "}
-            <span className="text-xs text-[#8A8986] font-normal">
-              / {kpis.totalDrawdownCapPct.toFixed(1)}%
-            </span>
-          </div>
-          <div className="w-full h-1.5 bg-[#0E0D0B]/80 rounded-full overflow-hidden mt-2 border border-[rgba(255,255,253,0.07)]">
-            <div
-              className="h-full bg-[#5EC2C6] rounded-full"
-              style={{
-                width: `${Math.min(100, (kpis.totalDrawdownUsedPct / kpis.totalDrawdownCapPct) * 100)}%`,
-              }}
-            />
-          </div>
-        </div>
-
-        {/* 5. Open Exp (Simplified — spans 2 cols at sm so there is never an empty hole) */}
-        <div
-          className="iea-card p-4 flex flex-col justify-between min-h-[112px] sm:col-span-2 lg:col-span-1"
-          title={UI_COPY.kpis.openExp.tooltip}
-        >
-          <div className="flex items-center justify-between text-xs text-[#B4B3B0]">
-            <span className="font-medium">{UI_COPY.kpis.openExp.label}</span>
-            <span className="font-mono text-[10px] text-[#5EC2C6] bg-[#5EC2C6]/14 px-2 py-0.5 rounded-full">
-              {activePositions.length} Open
-            </span>
-          </div>
-          <div className="text-[clamp(1.35rem,1.8vw,1.75rem)] font-light font-mono tabular-nums tracking-tight text-[#F5F5F2] mt-2">
-            {activePositions.length}{" "}
-            <span className="text-xs text-[#8A8986] font-normal">
-              Pos · {kpis.pendingOrdersCount} Ord
-            </span>
-          </div>
-          <div className="text-[11px] font-mono tabular-nums text-[#8A8986] mt-1.5 flex items-center justify-between">
-            <span>Bot {botOpenCount}</span>
-            <span className="text-[#6EE7B7]">SL Guarded</span>
-          </div>
-        </div>
-      </section>
-      </PanelErrorBoundary>
-
-      {/* =====================================================================
-          ROW 3: DOMINANT FULL-WIDTH LIVE CHART (12 COLUMNS, FLUID HEIGHT)
-      ====================================================================== */}
-      <PanelErrorBoundary panelName="Live Chart">
-        <section
-          aria-label="Live Institutional Chart"
-          className="grid grid-cols-12"
-        >
-          <div
-            className="col-span-12 flex flex-col"
-            style={{ height: "clamp(480px, 56vh, 680px)" }}
-          >
-            <LiveTradingChart
-              bundle={chartBundle}
-              selectedSymbol={selectedSymbol}
-              selectedTimeframe={selectedTimeframe}
-              feedStatus={feedStatus}
-              waitingReason={candleWaitingReason}
-              drawingsFeed={drawingsFeed}
-              drawingsError={drawingsError}
-              onSelectSymbol={setSelectedSymbol}
-              onSelectTimeframe={setSelectedTimeframe}
-              onCaptureScreenshot={handleSaveScreenshot}
-            />
+            {/* Rounded-Square Icon Button 3: Theme Toggle */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label="Toggle color theme"
+              title={`Theme: ${theme.toUpperCase()} (click to switch)`}
+              className="iea-header-icon-btn"
+            >
+              {theme === "dark" ? (
+                <Moon className="w-4 h-4" />
+              ) : (
+                <Sun className="w-4 h-4" />
+              )}
+            </button>
           </div>
         </section>
       </PanelErrorBoundary>
 
       {/* =====================================================================
+          ROW 2: 4 EQUAL KPI CARDS IN A RESPONSIVE GRID
+          (Net Realized P/L, Win Rate, Profit Factor, Max Drawdown)
+      ====================================================================== */}
+      <PanelErrorBoundary panelName="KPI Summary">
+        <section
+          aria-label="Account and Risk Key Performance Indicators"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[18px]"
+        >
+          {/* KPI 1: NET REALIZED P/L */}
+          <div
+            className="iea-card p-5 flex flex-col justify-between"
+            title={`${UI_COPY.kpis.todayPnl.tooltip} · ${syncedTimeLabel}`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="iea-label-caps">NET REALIZED P/L</span>
+              <div
+                className={`w-8 h-8 rounded-[10px] flex items-center justify-center border ${
+                  (kpiSummary.netPnlValue ?? 0) >= 0
+                    ? "bg-iea-profitSoft border-iea-profitBorder text-iea-profit"
+                    : "bg-iea-dangerSoft border-iea-dangerBorder text-iea-danger"
+                }`}
+              >
+                <DollarSign className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div
+              className={`text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight mt-3 ${
+                kpiSummary.netPnlValue === null
+                  ? "text-iea-profit"
+                  : kpiSummary.netPnlValue >= 0
+                  ? "text-iea-profit"
+                  : "text-iea-danger"
+              }`}
+            >
+              {kpiSummary.netPnlValue !== null
+                ? `${kpiSummary.netPnlValue >= 0 ? "+" : "-"}$${Math.abs(
+                    kpiSummary.netPnlValue
+                  ).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}`
+                : "$0.00"}
+            </div>
+
+            <div className="h-px bg-iea-borderSubtle my-3.5" />
+
+            <div className="flex items-center justify-between font-mono text-[11px] tabular-nums">
+              <span className="text-iea-textSecondary truncate">
+                {kpis.todayPnlUsd !== null
+                  ? `Today ${kpis.todayPnlUsd >= 0 ? "+" : "-"}$${Math.abs(
+                      kpis.todayPnlUsd
+                    ).toFixed(2)}${
+                      kpis.todayPnlR !== null
+                        ? ` (${kpis.todayPnlR >= 0 ? "+" : ""}${kpis.todayPnlR.toFixed(2)}R)`
+                        : ""
+                    }`
+                  : `${kpiSummary.closedCount} closed trades`}
+              </span>
+              <span
+                className={`px-2 py-0.5 rounded-[6px] text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                  (kpiSummary.netPnlValue ?? 0) >= 0
+                    ? "bg-iea-profitSoft text-iea-profit"
+                    : "bg-iea-dangerSoft text-iea-danger"
+                }`}
+              >
+                {(kpiSummary.netPnlValue ?? 0) >= 0 ? "PROFIT" : "LOSS"}
+              </span>
+            </div>
+          </div>
+
+          {/* KPI 2: WIN RATE */}
+          <div
+            className="iea-card p-5 flex flex-col justify-between"
+            title="Closed trade win rate percentage"
+          >
+            <div className="flex items-center justify-between">
+              <span className="iea-label-caps">WIN RATE</span>
+              <div className="w-8 h-8 rounded-[10px] bg-iea-accentSoft border border-iea-accentBorder text-iea-accent flex items-center justify-center">
+                <Award className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight text-iea-textPrimary mt-3">
+              {kpiSummary.winRatePct !== null
+                ? `${kpiSummary.winRatePct.toFixed(1)}%`
+                : "0.0%"}
+            </div>
+
+            <div className="h-px bg-iea-borderSubtle my-3.5" />
+
+            <div className="flex items-center justify-between font-mono text-[11px] tabular-nums">
+              <span className="text-iea-textSecondary truncate">
+                {kpiSummary.winsCount}W / {kpiSummary.lossesCount}L ({kpiSummary.closedCount} total)
+              </span>
+              <span className="px-2 py-0.5 rounded-[6px] bg-iea-accentSoft text-iea-accent text-[10px] font-bold uppercase tracking-wider shrink-0">
+                {kpiSummary.winRatePct !== null && kpiSummary.winRatePct >= 55
+                  ? "OPTIMAL"
+                  : kpiSummary.closedCount > 0
+                  ? "ACTIVE"
+                  : "READY"}
+              </span>
+            </div>
+          </div>
+
+          {/* KPI 3: PROFIT FACTOR */}
+          <div
+            className="iea-card p-5 flex flex-col justify-between"
+            title={`${UI_COPY.kpis.openExp.tooltip} · Gross Win / Gross Loss`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="iea-label-caps">PROFIT FACTOR</span>
+              <div className="w-8 h-8 rounded-[10px] bg-iea-accentSoft border border-iea-accentBorder text-iea-accent flex items-center justify-center">
+                <BarChart3 className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight text-iea-textPrimary mt-3">
+              {kpiSummary.profitFactorVal !== null
+                ? kpiSummary.profitFactorVal.toFixed(2)
+                : "0.00"}
+            </div>
+
+            <div className="h-px bg-iea-borderSubtle my-3.5" />
+
+            <div className="flex items-center justify-between font-mono text-[11px] tabular-nums">
+              <span className="text-iea-textSecondary truncate">
+                {activePositions.length} Pos · {kpis.pendingOrdersCount} Ord (Bot {botOpenCount})
+              </span>
+              <span className="px-2 py-0.5 rounded-[6px] bg-iea-profitSoft text-iea-profit text-[10px] font-bold uppercase tracking-wider shrink-0">
+                SL GUARDED
+              </span>
+            </div>
+          </div>
+
+          {/* KPI 4: MAX DRAWDOWN */}
+          <div
+            className="iea-card p-5 flex flex-col justify-between"
+            title={`${UI_COPY.kpis.ddCap.tooltip} · ${UI_COPY.kpis.dailyLoss.tooltip}`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="iea-label-caps">MAX DRAWDOWN</span>
+              <div className="w-8 h-8 rounded-[10px] bg-iea-dangerSoft border border-iea-dangerBorder text-iea-danger flex items-center justify-center">
+                <TrendingDown className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="text-2xl md:text-[26px] font-bold font-mono tabular-nums tracking-tight text-iea-danger mt-3">
+              {kpis.totalDrawdownUsedPct.toFixed(2)}%{" "}
+              <span className="text-xs font-normal text-iea-textMuted">
+                / {kpis.totalDrawdownCapPct.toFixed(1)}%
+              </span>
+            </div>
+
+            <div className="h-px bg-iea-borderSubtle my-3.5" />
+
+            <div className="flex items-center justify-between font-mono text-[11px] tabular-nums">
+              <span className="text-iea-textSecondary truncate">
+                Daily Loss {kpis.dailyLossUsedPct.toFixed(2)}% / {kpis.dailyLossLimitPct.toFixed(1)}%
+              </span>
+              <span className="px-2 py-0.5 rounded-[6px] bg-iea-profitSoft text-iea-profit text-[10px] font-bold uppercase tracking-wider shrink-0">
+                SAFE
+              </span>
+            </div>
+          </div>
+        </section>
+      </PanelErrorBoundary>
+
+      {/* =====================================================================
+          ROW 3: MAIN CARDS — PNL TREND (LEFT, 8 COLS) + WATCHLIST (RIGHT, 4 COLS)
+      ====================================================================== */}
+      <section
+        aria-label="Main Trading Cards"
+        className="grid grid-cols-1 xl:grid-cols-12 gap-[18px]"
+      >
+        {/* LEFT CARD: PNL Trend Wrapper + Untouched LiveTradingChart */}
+        <div className="xl:col-span-8 iea-card p-5 flex flex-col gap-4">
+          {/* PNL Trend Header Row 1: Icon tile + Title + LIVE pill + Subtitle | Big Balance + Synced hh:mm */}
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-center space-x-3.5">
+              <div className="w-11 h-11 rounded-[12px] bg-iea-accentSoft border border-iea-accentBorder text-iea-accent flex items-center justify-center shrink-0">
+                <Activity className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2.5">
+                  <h2 className="text-base font-bold text-iea-textPrimary tracking-tight">
+                    PNL Trend
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full bg-iea-profitSoft border border-iea-profitBorder text-iea-profit font-mono text-[10px] font-bold uppercase tracking-wider inline-flex items-center space-x-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-iea-profit" />
+                    <span>LIVE</span>
+                  </span>
+                </div>
+                <p className="text-xs text-iea-textMuted mt-0.5">
+                  Real-time equity curve, institutional order flow &amp; live execution chart
+                </p>
+              </div>
+            </div>
+
+            {/* Big Balance / P&L Figure + Synced hh:mm Caption */}
+            <div className="text-right">
+              <div
+                className={`text-2xl md:text-[28px] font-bold font-mono tabular-nums tracking-tight leading-none ${
+                  trendMode === "PNL"
+                    ? (kpiSummary.netPnlValue ?? 0) >= 0
+                      ? "text-iea-profit"
+                      : "text-iea-danger"
+                    : "text-iea-textPrimary"
+                }`}
+              >
+                {trendMode === "PNL"
+                  ? kpiSummary.netPnlValue !== null
+                    ? `${kpiSummary.netPnlValue >= 0 ? "+" : "-"}$${Math.abs(
+                        kpiSummary.netPnlValue
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`
+                    : "$0.00"
+                  : kpis.equity !== null
+                  ? `$${kpis.equity.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`
+                  : kpis.balance !== null
+                  ? `$${kpis.balance.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`
+                  : "—"}
+              </div>
+              <div className="text-[11px] font-mono text-iea-textMuted mt-1.5 flex items-center justify-end space-x-2">
+                {kpis.balance !== null && (
+                  <span>
+                    Bal ${kpis.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ·
+                  </span>
+                )}
+                <span>{syncedTimeLabel}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* PNL Trend Header Row 2: P&L / Equity Segmented Toggle + Range Pill Selector */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-2 border-b border-iea-borderSubtle">
+            {/* P&L / Equity Segmented Toggle */}
+            <div
+              role="tablist"
+              aria-label="Toggle P&L or Equity display"
+              className="inline-flex items-center p-1 rounded-[10px] bg-iea-inset border border-iea-borderSubtle text-xs"
+            >
+              {(["PNL", "EQUITY"] as const).map((m) => {
+                const active = trendMode === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTrendMode(m)}
+                    className={`px-3 py-1 rounded-[8px] font-semibold transition ${
+                      active
+                        ? "bg-iea-accent text-white"
+                        : "text-iea-textSecondary hover:text-iea-textPrimary"
+                    }`}
+                  >
+                    {m === "PNL" ? "P&L" : "Equity"}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Range Pill Selector (1 Day, 1 Week, 1 Month, 3 Months, 6 Months, 1 Year, All) */}
+            <div
+              role="group"
+              aria-label="Select trend range"
+              className="flex flex-wrap items-center gap-1"
+            >
+              {TREND_RANGES.map((range) => {
+                const active = selectedRange === range;
+                return (
+                  <button
+                    key={range}
+                    type="button"
+                    onClick={() => handleRangeSelect(range)}
+                    className={`px-2.5 py-1 rounded-[8px] text-[11px] font-medium transition ${
+                      active
+                        ? "bg-iea-accent text-white font-semibold"
+                        : "bg-iea-inset hover:bg-iea-elevated text-iea-textSecondary hover:text-iea-textPrimary border border-iea-borderSubtle"
+                    }`}
+                  >
+                    {range}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Untouched LiveTradingChart Container */}
+          <PanelErrorBoundary panelName="Live Chart">
+            <div
+              className="w-full flex flex-col"
+              style={{ height: "clamp(480px, 56vh, 680px)" }}
+            >
+              <LiveTradingChart
+                bundle={chartBundle}
+                selectedSymbol={selectedSymbol}
+                selectedTimeframe={selectedTimeframe}
+                feedStatus={feedStatus}
+                waitingReason={candleWaitingReason}
+                drawingsFeed={drawingsFeed}
+                drawingsError={drawingsError}
+                onSelectSymbol={setSelectedSymbol}
+                onSelectTimeframe={setSelectedTimeframe}
+                onCaptureScreenshot={handleSaveScreenshot}
+              />
+            </div>
+          </PanelErrorBoundary>
+        </div>
+
+        {/* RIGHT CARD: Watchlist Style Card */}
+        <div className="xl:col-span-4 iea-card p-5 flex flex-col justify-between gap-4">
+          <div className="space-y-4">
+            {/* Watchlist Header: Title + "+" Button */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-iea-textPrimary tracking-tight">
+                  Watchlist
+                </h2>
+                <p className="text-xs text-iea-textMuted mt-0.5">
+                  Live MT5 Market Watch &amp; active exposure
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate("signals")}
+                aria-label="Add or inspect live symbol signals"
+                title="View Live Signal Grid"
+                className="w-8 h-8 rounded-[10px] bg-iea-elevated hover:bg-iea-active border border-iea-borderSubtle text-iea-textPrimary flex items-center justify-center transition"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Watchlist Rows with Thin Dividers */}
+            <div className="divide-y divide-iea-borderSubtle border-t border-b border-iea-borderSubtle">
+              {filteredWatchlist.map((item) => {
+                const liveSpecs = effectiveStatus.mt5.symbols || {};
+                const spec: ControlSymbolSpec | undefined =
+                  (selectedSymbol === item.symbol && liveQuote) ||
+                  liveSpecs[item.brokerSymbol] ||
+                  liveSpecs[item.symbol] ||
+                  Object.values(liveSpecs).find(
+                    (s) => normalizeCanonicalSymbol(s.symbol) === item.symbol
+                  );
+
+                const chip = getNeutralSymbolChipSpec(item.symbol);
+                const isSelected = selectedSymbol === item.symbol;
+                const bidPrice = spec && spec.bid > 0 ? spec.bid : null;
+                const askPrice = spec && spec.ask > 0 ? spec.ask : null;
+                const spreadPts = spec?.spread_points ?? null;
+
+                // Open positions on this symbol
+                const symPositions = activePositions.filter(
+                  (p) => normalizeCanonicalSymbol(p.symbol) === item.symbol
+                );
+                const symPnl = symPositions.reduce((s, p) => s + p.profit, 0);
+
+                // Compute latest bar % change if selectedSymbol has candles
+                let pctChange: number | null = null;
+                if (isSelected && realCandles.length >= 2) {
+                  const first = realCandles[0].open;
+                  const last = realCandles[realCandles.length - 1].close;
+                  if (first > 0) {
+                    pctChange = ((last - first) / first) * 100;
+                  }
+                }
+
+                const isPositive =
+                  symPositions.length > 0
+                    ? symPnl >= 0
+                    : pctChange !== null
+                    ? pctChange >= 0
+                    : true;
+
+                return (
+                  <button
+                    key={item.symbol}
+                    type="button"
+                    onClick={() => setSelectedSymbol(item.symbol)}
+                    className={`w-full py-3.5 px-2.5 text-left flex items-center justify-between gap-3 transition rounded-[10px] ${
+                      isSelected
+                        ? "bg-iea-accentSoft/60"
+                        : "hover:bg-iea-elevated/60"
+                    }`}
+                  >
+                    {/* Left: Circular Symbol Badge + Symbol & Name */}
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <span
+                        className={`w-10 h-10 rounded-full text-xs font-mono font-bold inline-flex items-center justify-center shrink-0 ${chip.chipBg} ${chip.chipRing}`}
+                      >
+                        {chip.shortCode}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-bold text-iea-textPrimary truncate">
+                            {item.symbol}
+                          </span>
+                          {isSelected && (
+                            <span className="px-1.5 py-0.5 rounded-[5px] bg-iea-accent text-white font-mono text-[9px] font-bold uppercase">
+                              ACTIVE
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-iea-textMuted truncate mt-0.5">
+                          {item.name}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Price & Change/P&L (Green/Red) */}
+                    <div className="text-right font-mono tabular-nums shrink-0">
+                      <div className="text-sm font-bold text-iea-textPrimary">
+                        {bidPrice !== null
+                          ? bidPrice.toLocaleString(undefined, {
+                              minimumFractionDigits: item.digits,
+                              maximumFractionDigits: item.digits,
+                            })
+                          : "—"}
+                      </div>
+                      <div
+                        className={`text-[11px] font-semibold mt-0.5 inline-flex items-center space-x-1 ${
+                          symPositions.length > 0
+                            ? isPositive
+                              ? "text-iea-profit"
+                              : "text-iea-danger"
+                            : pctChange !== null
+                            ? isPositive
+                              ? "text-iea-profit"
+                              : "text-iea-danger"
+                            : "text-iea-textMuted"
+                        }`}
+                      >
+                        {symPositions.length > 0 ? (
+                          <span>
+                            {symPnl >= 0 ? "+" : "-"}${Math.abs(symPnl).toFixed(2)} ({symPositions.length}P)
+                          </span>
+                        ) : pctChange !== null ? (
+                          <>
+                            {isPositive ? (
+                              <TrendingUp className="w-3 h-3" />
+                            ) : (
+                              <TrendingDown className="w-3 h-3" />
+                            )}
+                            <span>
+                              {pctChange >= 0 ? "+" : ""}
+                              {pctChange.toFixed(2)}%
+                            </span>
+                          </>
+                        ) : spreadPts !== null && askPrice !== null ? (
+                          <span className="text-iea-profit">Spr {spreadPts} pts</span>
+                        ) : (
+                          <span>Waiting</span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Account & Execution Telemetry Footer inside Watchlist Card */}
+          <div className="iea-inset p-4 space-y-2.5 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="iea-label-caps">ACCOUNT TELEMETRY</span>
+              <span className="font-mono text-[10px] font-bold text-iea-accent">
+                {dash.connected
+                  ? `1:${effectiveStatus.mt5.account.leverage} · ${effectiveStatus.mt5.account.margin_mode_str}`
+                  : "DEMO MODE"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1 font-mono">
+              <div className="p-2.5 rounded-[10px] bg-iea-card border border-iea-borderSubtle">
+                <div className="text-[10px] text-iea-textMuted uppercase">Balance</div>
+                <div className="text-xs font-bold text-iea-textPrimary mt-0.5">
+                  {kpis.balance !== null
+                    ? `$${kpis.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : "—"}
+                </div>
+              </div>
+              <div className="p-2.5 rounded-[10px] bg-iea-card border border-iea-borderSubtle">
+                <div className="text-[10px] text-iea-textMuted uppercase">Floating P/L</div>
+                <div
+                  className={`text-xs font-bold mt-0.5 ${
+                    (kpis.floatingPnl ?? 0) >= 0 ? "text-iea-profit" : "text-iea-danger"
+                  }`}
+                >
+                  {kpis.floatingPnl !== null
+                    ? `${kpis.floatingPnl >= 0 ? "+" : "-"}$${Math.abs(kpis.floatingPnl).toFixed(2)}`
+                    : "$0.00"}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* =====================================================================
           ROW 4: FULL-WIDTH OPEN POSITIONS & ORDERS TABLE (STICKY HEADERS)
       ====================================================================== */}
       <PanelErrorBoundary panelName="Positions Table">
-      <section
-        aria-label="Open Positions and Pending Orders"
-        className="iea-card p-4 md:p-5 space-y-3"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center space-x-3">
-            <h2
-              className="text-sm font-semibold text-[#F5F5F2]"
-              title="Active MT5 positions & pending orders (Rule R9.3 Tighten-Only SL)"
-            >
-              Open Positions &amp; Orders ({activePositions.length})
-            </h2>
-            <span
-              title="All open positions carry verified server-side Stop Loss protection"
-              className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-[#6EE7B7]/14 border border-[#6EE7B7]/35 text-[#6EE7B7] font-mono text-[10px] font-semibold"
-            >
-              <ShieldCheck className="w-3 h-3" />
-              <span>SL Guarded</span>
-            </span>
+        <section
+          aria-label="Open Positions and Pending Orders"
+          className="iea-card p-5 space-y-3.5"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center space-x-3">
+              <h2
+                className="text-sm font-bold text-iea-textPrimary"
+                title="Active MT5 positions & pending orders (Rule R9.3 Tighten-Only SL)"
+              >
+                Open Positions &amp; Orders ({activePositions.length})
+              </h2>
+              <span
+                title="All open positions carry verified server-side Stop Loss protection"
+                className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-iea-profitSoft border border-iea-profitBorder text-iea-profit font-mono text-[10px] font-semibold"
+              >
+                <ShieldCheck className="w-3 h-3" />
+                <span>SL Guarded</span>
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-3 text-xs">
+              <span className="text-iea-textSecondary">
+                Pending Ord:{" "}
+                <strong className="font-mono text-iea-textPrimary">
+                  {kpis.pendingOrdersCount}
+                </strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigate("positions")}
+                className="iea-pill-control px-3 py-1 text-[11px] text-iea-accent hover:text-iea-textPrimary font-semibold"
+              >
+                Full View →
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center space-x-3 text-xs">
-            <span className="text-[#B4B3B0]">
-              Pending Ord: <strong className="font-mono text-[#F5F5F2]">{kpis.pendingOrdersCount}</strong>
-            </span>
-            <button
-              type="button"
-              onClick={() => onNavigate("positions")}
-              className="iea-pill-control px-3 py-1 text-[11px] text-[#6EE7B7] hover:text-[#6EE7B7] font-semibold"
-            >
-              Full View →
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto max-h-[340px] overflow-y-auto rounded-2xl border border-[rgba(255,255,253,0.07)]">
-          <table className="w-full text-left text-xs iea-table">
-            <thead className="sticky top-0 z-10 backdrop-blur-md">
-              <tr>
-                <th className="py-2.5 pl-4 pr-3">Instrument</th>
-                <th className="py-2.5 pr-3">Side / Lot</th>
-                <th className="py-2.5 pr-3">Entry → Live</th>
-                <th className="py-2.5 pr-3">SL</th>
-                <th className="py-2.5 pr-3">TP</th>
-                <th className="py-2.5 pr-3">P&amp;L (R)</th>
-                <th className="py-2.5 pr-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="font-mono tabular-nums">
-              {activePositions.length === 0 ? (
+          <div className="overflow-x-auto max-h-[340px] overflow-y-auto rounded-[14px] border border-iea-borderSubtle">
+            <table className="w-full text-left text-xs iea-table">
+              <thead className="sticky top-0 z-10">
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-[#8A8986] font-sans">
-                    No open positions.
-                  </td>
+                  <th className="py-2.5 pl-4 pr-3">Instrument</th>
+                  <th className="py-2.5 pr-3">Side / Lot</th>
+                  <th className="py-2.5 pr-3">Entry → Live</th>
+                  <th className="py-2.5 pr-3">SL</th>
+                  <th className="py-2.5 pr-3">TP</th>
+                  <th className="py-2.5 pr-3">P&amp;L (R)</th>
+                  <th className="py-2.5 pr-4 text-right">Actions</th>
                 </tr>
-              ) : (
-                activePositions.map((pos) => {
-                  const symClean: ChartSymbol = pos.symbol.includes("JPY")
-                    ? "USDJPY"
-                    : pos.symbol.includes("BTC")
-                    ? "BTCUSD"
-                    : "XAUUSD";
-                  const digits = symClean === "USDJPY" ? 3 : 2;
-                  const contractVal =
-                    symClean === "XAUUSD" ? 100 : symClean === "USDJPY" ? 650 : 1;
-                  const dir = pos.direction === "SELL" ? "SELL" : "BUY";
-                  const m = calculateTradeMetrics({
-                    direction: dir,
-                    entryPrice: pos.open_price,
-                    stopLoss: pos.sl,
-                    currentPrice: pos.current_price,
-                    volumeLots: pos.volume,
-                    contractValuePerPoint: contractVal,
-                  });
-                  const chip = getNeutralSymbolChipSpec(pos.symbol);
+              </thead>
+              <tbody className="font-mono tabular-nums">
+                {activePositions.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-iea-textMuted font-sans">
+                      No open positions.
+                    </td>
+                  </tr>
+                ) : (
+                  activePositions.map((pos) => {
+                    const symClean: ChartSymbol = pos.symbol.includes("JPY")
+                      ? "USDJPY"
+                      : pos.symbol.includes("BTC")
+                      ? "BTCUSD"
+                      : "XAUUSD";
+                    const digits = symClean === "USDJPY" ? 3 : 2;
+                    const contractVal =
+                      symClean === "XAUUSD" ? 100 : symClean === "USDJPY" ? 650 : 1;
+                    const dir = pos.direction === "SELL" ? "SELL" : "BUY";
+                    const m = calculateTradeMetrics({
+                      direction: dir,
+                      entryPrice: pos.open_price,
+                      stopLoss: pos.sl,
+                      currentPrice: pos.current_price,
+                      volumeLots: pos.volume,
+                      contractValuePerPoint: contractVal,
+                    });
+                    const chip = getNeutralSymbolChipSpec(pos.symbol);
 
-                  return (
-                    <tr key={pos.ticket}>
-                      <td className="py-2.5 pl-4 pr-3">
-                        <div className="flex items-center space-x-2.5">
-                          <span
-                            className={`w-6 h-6 rounded-full text-[10px] font-extrabold inline-flex items-center justify-center shrink-0 ${chip.chipBg} ${chip.chipRing}`}
-                          >
-                            {chip.shortCode}
-                          </span>
-                          <div>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedSymbol(symClean)}
-                              title={`Focus ${symClean} on chart`}
-                              className="font-bold text-[#F5F5F2] hover:text-[#6EE7B7] transition"
+                    return (
+                      <tr key={pos.ticket}>
+                        <td className="py-2.5 pl-4 pr-3">
+                          <div className="flex items-center space-x-2.5">
+                            <span
+                              className={`w-7 h-7 rounded-full text-[10px] font-extrabold inline-flex items-center justify-center shrink-0 ${chip.chipBg} ${chip.chipRing}`}
                             >
-                              {pos.symbol}
-                            </button>
-                            <div className="text-[10px] font-sans text-[#8A8986]">#{pos.ticket}</div>
+                              {chip.shortCode}
+                            </span>
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedSymbol(symClean)}
+                                title={`Focus ${symClean} on chart`}
+                                className="font-bold text-iea-textPrimary hover:text-iea-accent transition"
+                              >
+                                {pos.symbol}
+                              </button>
+                              <div className="text-[10px] font-sans text-iea-textMuted">
+                                #{pos.ticket}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      <td className="py-2.5 pr-3">
-                        <span
-                          className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                            dir === "BUY"
-                              ? "bg-[#6EE7B7]/18 text-[#6EE7B7]"
-                              : "bg-[#F07178]/20 text-[#F07178]"
+                        <td className="py-2.5 pr-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                              dir === "BUY"
+                                ? "bg-iea-profitSoft text-iea-profit"
+                                : "bg-iea-dangerSoft text-iea-danger"
+                            }`}
+                          >
+                            {dir} {pos.volume.toFixed(2)}L
+                          </span>
+                        </td>
+
+                        <td className="py-2.5 pr-3 text-iea-textSecondary">
+                          <span className="text-iea-textPrimary">
+                            {pos.open_price.toFixed(digits)}
+                          </span>
+                          <span className="text-iea-textMuted mx-1">→</span>
+                          <span className="text-iea-textPrimary font-semibold">
+                            {pos.current_price.toFixed(digits)}
+                          </span>
+                        </td>
+
+                        <td className="py-2.5 pr-3 text-iea-danger font-semibold">
+                          {pos.sl > 0 ? pos.sl.toFixed(digits) : "—"}
+                        </td>
+
+                        <td className="py-2.5 pr-3 text-iea-profit font-semibold">
+                          {pos.tp > 0 ? pos.tp.toFixed(digits) : "—"}
+                        </td>
+
+                        <td
+                          className={`py-2.5 pr-3 font-bold ${
+                            pos.profit >= 0 ? "text-iea-profit" : "text-iea-danger"
                           }`}
                         >
-                          {dir} {pos.volume.toFixed(2)}L
-                        </span>
-                      </td>
+                          {pos.profit >= 0 ? "+" : ""}${pos.profit.toFixed(2)}{" "}
+                          <span className="text-[11px] opacity-85">
+                            ({m.floatingR >= 0 ? "+" : ""}
+                            {m.floatingR.toFixed(2)}R)
+                          </span>
+                        </td>
 
-                      <td className="py-2.5 pr-3 text-[#B4B3B0]">
-                        <span className="text-[#F5F5F2]">{pos.open_price.toFixed(digits)}</span>
-                        <span className="text-[#8A8986] mx-1">→</span>
-                        <span className="text-[#F5F5F2] font-semibold">
-                          {pos.current_price.toFixed(digits)}
-                        </span>
-                      </td>
+                        <td className="py-2.5 pr-4 text-right font-sans">
+                          {readOnlyMobile ? (
+                            <span className="text-[10px] text-iea-textMuted font-mono">
+                              READ-ONLY
+                            </span>
+                          ) : (
+                            <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handlePartialClose50(pos)}
+                                aria-label={`Partial close 50% of ticket ${pos.ticket}`}
+                                title="Partial Close 50% volume"
+                                className="px-2.5 py-1 rounded-full bg-iea-elevated hover:bg-iea-active border border-iea-borderSubtle text-iea-textPrimary text-[10px] font-semibold inline-flex items-center space-x-1 transition"
+                              >
+                                <Scissors className="w-2.5 h-2.5 text-iea-accent" />
+                                <span>50%</span>
+                              </button>
 
-                      <td className="py-2.5 pr-3 text-[#F5989E] font-semibold">
-                        {pos.sl > 0 ? pos.sl.toFixed(digits) : "—"}
-                      </td>
+                              <button
+                                type="button"
+                                onClick={() => handleMoveToBreakEven(pos)}
+                                aria-label={`Move stop loss to break-even for ticket ${pos.ticket}`}
+                                title="Lock Stop Loss at Break-Even+"
+                                className="px-2.5 py-1 rounded-full bg-iea-accentSoft hover:bg-iea-accent/25 border border-iea-accentBorder text-iea-accent text-[10px] font-semibold transition"
+                              >
+                                BE+
+                              </button>
 
-                      <td className="py-2.5 pr-3 text-[#6EE7B7] font-semibold">
-                        {pos.tp > 0 ? pos.tp.toFixed(digits) : "—"}
-                      </td>
+                              <button
+                                type="button"
+                                onClick={() => openTightenSlModal(pos)}
+                                aria-label={`Tighten stop loss for ticket ${pos.ticket}`}
+                                title="Tighten Stop Loss (Rule R9.3)"
+                                className="px-2.5 py-1 rounded-full bg-iea-profitSoft hover:bg-iea-profit/25 border border-iea-profitBorder text-iea-profit text-[10px] font-semibold transition"
+                              >
+                                SL+
+                              </button>
 
-                      <td
-                        className={`py-2.5 pr-3 font-bold ${
-                          pos.profit >= 0 ? "text-[#6EE7B7]" : "text-[#F07178]"
-                        }`}
-                      >
-                        {pos.profit >= 0 ? "+" : ""}${pos.profit.toFixed(2)}{" "}
-                        <span className="text-[11px] opacity-85">
-                          ({m.floatingR >= 0 ? "+" : ""}
-                          {m.floatingR.toFixed(2)}R)
-                        </span>
-                      </td>
+                              <button
+                                type="button"
+                                disabled
+                                aria-disabled="true"
+                                title="Hard Safety Rule R9.3: Widening or removing Stop Loss is permanently disabled"
+                                className="px-2.5 py-1 rounded-full bg-iea-inset border border-iea-borderSubtle text-iea-textMuted text-[10px] font-medium cursor-not-allowed opacity-60 inline-flex items-center space-x-1"
+                              >
+                                <Lock className="w-2.5 h-2.5" />
+                                <span>Widen</span>
+                              </button>
 
-                      <td className="py-2.5 pr-4 text-right font-sans">
-                        {readOnlyMobile ? (
-                          <span className="text-[10px] text-[#8A8986] font-mono">READ-ONLY</span>
-                        ) : (
-                          <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handlePartialClose50(pos)}
-                              aria-label={`Partial close 50% of ticket ${pos.ticket}`}
-                              title="Partial Close 50% volume"
-                              className="px-2.5 py-1 rounded-full bg-[#242320] hover:bg-[#2B2A26] border border-[rgba(255,255,253,0.10)] text-[#F5F5F2] text-[10px] font-semibold inline-flex items-center space-x-1 transition"
-                            >
-                              <Scissors className="w-2.5 h-2.5 text-[#5EC2C6]" />
-                              <span>50%</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleMoveToBreakEven(pos)}
-                              aria-label={`Move stop loss to break-even for ticket ${pos.ticket}`}
-                              title="Lock Stop Loss at Break-Even+"
-                              className="px-2.5 py-1 rounded-full bg-[#5EC2C6]/15 hover:bg-[#5EC2C6]/25 border border-[#5EC2C6]/40 text-[#5EC2C6] text-[10px] font-semibold transition"
-                            >
-                              BE+
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => openTightenSlModal(pos)}
-                              aria-label={`Tighten stop loss for ticket ${pos.ticket}`}
-                              title="Tighten Stop Loss (Rule R9.3)"
-                              className="px-2.5 py-1 rounded-full bg-[#6EE7B7]/16 hover:bg-[#6EE7B7]/28 border border-[#6EE7B7]/45 text-[#6EE7B7] text-[10px] font-semibold transition"
-                            >
-                              SL+
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled
-                              aria-disabled="true"
-                              title="Hard Safety Rule R9.3: Widening or removing Stop Loss is permanently disabled"
-                              className="px-2.5 py-1 rounded-full bg-[#161513]/60 border border-[rgba(255,255,253,0.07)] text-[#8A8986] text-[10px] font-medium cursor-not-allowed opacity-60 inline-flex items-center space-x-1"
-                            >
-                              <Lock className="w-2.5 h-2.5" />
-                              <span>Widen</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleCloseSinglePosition(pos)}
-                              aria-label={`Close position ticket ${pos.ticket}`}
-                              title="Close position at market"
-                              className="px-2.5 py-1 rounded-full bg-[#F07178]/90 hover:bg-[#F07178] text-white text-[10px] font-bold transition"
-                            >
-                              Close
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                              <button
+                                type="button"
+                                onClick={() => handleCloseSinglePosition(pos)}
+                                aria-label={`Close position ticket ${pos.ticket}`}
+                                title="Close position at market"
+                                className="px-2.5 py-1 rounded-full bg-iea-danger hover:opacity-90 text-white text-[10px] font-bold transition"
+                              >
+                                Close
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </PanelErrorBoundary>
 
       {/* =====================================================================
@@ -1351,24 +1880,24 @@ export const DashboardScreen: React.FC<
           role="dialog"
           aria-modal="true"
           aria-labelledby="two-step-confirm-title"
-          className="fixed inset-0 z-50 bg-[#0E0D0B]/80 backdrop-blur-md flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"
         >
           <div
-            className={`iea-card p-5 max-w-sm w-full space-y-3 shadow-2xl ${
+            className={`iea-card p-5 max-w-sm w-full space-y-3 shadow-pop ${
               confirmModal.type === "START_DEMO"
-                ? "border-[#6EE7B7]/55"
+                ? "border-iea-accentBorder"
                 : confirmModal.type === "STOP"
-                ? "border-[#EAB354]/55"
-                : "border-[#F07178]/60"
+                ? "border-iea-warningBorder"
+                : "border-iea-dangerBorder"
             }`}
           >
             <div
               className={`flex items-center space-x-2 ${
                 confirmModal.type === "START_DEMO"
-                  ? "text-[#6EE7B7]"
+                  ? "text-iea-accent"
                   : confirmModal.type === "STOP"
-                  ? "text-[#EAB354]"
-                  : "text-[#F07178]"
+                  ? "text-iea-warning"
+                  : "text-iea-danger"
               }`}
             >
               {confirmModal.type === "START_DEMO" ? (
@@ -1376,7 +1905,7 @@ export const DashboardScreen: React.FC<
               ) : (
                 <ShieldAlert className="w-5 h-5 shrink-0" />
               )}
-              <h3 id="two-step-confirm-title" className="text-sm font-bold text-[#F5F5F2]">
+              <h3 id="two-step-confirm-title" className="text-sm font-bold text-iea-textPrimary">
                 {confirmModal.type === "START_DEMO"
                   ? `Start engine in ${topBar.operatingMode}?`
                   : confirmModal.type === "STOP"
@@ -1388,35 +1917,36 @@ export const DashboardScreen: React.FC<
             </div>
 
             {confirmModal.type === "START_DEMO" ? (
-              <p className="text-xs text-[#B4B3B0]">
+              <p className="text-xs text-iea-textSecondary">
                 The engine will run in{" "}
-                <strong className="text-[#6EE7B7] font-mono">{topBar.operatingMode}</strong> on DEMO{" "}
-                <span className="font-mono">{dash.maskedAccount}</span> and may place DEMO orders.
-                LIVE trading remains locked.
+                <strong className="text-iea-accent font-mono">{topBar.operatingMode}</strong> on
+                DEMO <span className="font-mono">{dash.maskedAccount}</span> and may place DEMO
+                orders. LIVE trading remains locked.
               </p>
             ) : confirmModal.type === "STOP" ? (
-              <p className="text-xs text-[#B4B3B0]">
+              <p className="text-xs text-iea-textSecondary">
                 Stop the trading engine process? Any open positions in MT5 will keep their existing
                 broker SL/TP levels.
               </p>
             ) : confirmModal.step === 1 ? (
-              <p className="text-xs text-[#B4B3B0]">
+              <p className="text-xs text-iea-textSecondary">
                 {confirmModal.type === "PAUSE" ? (
                   <>
                     {topBar.pauseResumeBtn.label} automated entries on DEMO{" "}
-                    <span className="font-mono">{dash.maskedAccount}</span>? Existing SL/TP stay active.
+                    <span className="font-mono">{dash.maskedAccount}</span>? Existing SL/TP stay
+                    active.
                   </>
                 ) : (
                   <>
                     Close{" "}
-                    <strong className="text-[#F5F5F2]">{botOpenCount} bot positions</strong> at market on
-                    DEMO <span className="font-mono">{dash.maskedAccount}</span>? Positions will be
-                    reconciled with MT5 before confirming.
+                    <strong className="text-iea-textPrimary">{botOpenCount} bot positions</strong>{" "}
+                    at market on DEMO <span className="font-mono">{dash.maskedAccount}</span>?
+                    Positions will be reconciled with MT5 before confirming.
                   </>
                 )}
               </p>
             ) : (
-              <div className="p-3 rounded-xl bg-[#F07178]/18 border border-[#F07178]/50 text-xs text-[#F5B5B9] font-semibold">
+              <div className="p-3 rounded-xl bg-iea-dangerSoft border border-iea-dangerBorder text-xs text-iea-danger font-semibold">
                 {confirmModal.type === "PAUSE"
                   ? `Final step: Confirm ${topBar.pauseResumeBtn.label.toLowerCase()}ing entries.`
                   : `Final step: Confirm immediate market closure on ${dash.maskedAccount}.`}
@@ -1427,19 +1957,19 @@ export const DashboardScreen: React.FC<
               <button
                 type="button"
                 onClick={() => setConfirmModal(null)}
-                className="iea-pill-control px-4 py-1.5 text-xs text-[#F5F5F2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5F5F2]"
+                className="iea-pill-control px-4 py-1.5 text-xs text-iea-textPrimary"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmTwoStep}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 ${
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${
                   confirmModal.type === "START_DEMO"
-                    ? "bg-[#36B37E] hover:bg-[#3FC48B] text-[#121110] focus-visible:ring-[#6EE7B7]"
+                    ? "bg-iea-accent hover:bg-iea-accentHover text-white"
                     : confirmModal.type === "STOP"
-                    ? "bg-[#EAB354] hover:brightness-110 text-[#121110] focus-visible:ring-[#EAB354]"
-                    : "bg-[#D94854] hover:bg-[#E35662] text-white focus-visible:ring-[#F07178]"
+                    ? "bg-iea-warning hover:opacity-90 text-iea-canvas"
+                    : "bg-iea-danger hover:opacity-90 text-white"
                 }`}
               >
                 {confirmModal.type === "START_DEMO"
@@ -1465,52 +1995,56 @@ export const DashboardScreen: React.FC<
           role="dialog"
           aria-modal="true"
           aria-labelledby="tighten-sl-modal-title"
-          className="fixed inset-0 z-50 bg-[#0E0D0B]/80 backdrop-blur-md flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"
         >
-          <div className="iea-card p-5 max-w-sm w-full space-y-3 shadow-2xl">
+          <div className="iea-card p-5 max-w-sm w-full space-y-3 shadow-pop">
             <div className="flex items-center justify-between">
-              <h3 id="tighten-sl-modal-title" className="text-sm font-bold text-[#F5F5F2]">
+              <h3 id="tighten-sl-modal-title" className="text-sm font-bold text-iea-textPrimary">
                 Tighten SL · #{slModalPos.ticket}
               </h3>
-              <span className="px-2 py-0.5 rounded-full bg-[#6EE7B7]/20 text-[#6EE7B7] text-[10px] font-mono font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-iea-profitSoft text-iea-profit text-[10px] font-mono font-bold">
                 R9.3 TIGHTEN-ONLY
               </span>
             </div>
 
-            <div className="text-xs text-[#B4B3B0] iea-inset p-2.5 font-mono flex items-center justify-between">
+            <div className="text-xs text-iea-textSecondary iea-inset p-2.5 font-mono flex items-center justify-between">
               <span>In: {slModalPos.open_price}</span>
               <span>Now: {slModalPos.current_price}</span>
-              <span className="text-[#F5989E]">SL: {slModalPos.sl}</span>
+              <span className="text-iea-danger">SL: {slModalPos.sl}</span>
             </div>
 
             <div className="space-y-2 text-xs">
               <label className="block">
-                <span className="text-[#B4B3B0] font-semibold">
-                  New SL ({slModalPos.direction === "BUY" ? `>= ${slModalPos.sl}` : `<= ${slModalPos.sl}`})
+                <span className="text-iea-textSecondary font-semibold">
+                  New SL (
+                  {slModalPos.direction === "BUY"
+                    ? `>= ${slModalPos.sl}`
+                    : `<= ${slModalPos.sl}`}
+                  )
                 </span>
                 <input
                   type="number"
                   step="any"
                   value={proposedSlInput}
                   onChange={(e) => setProposedSlInput(e.target.value)}
-                  className="w-full mt-1 bg-[#0E0D0B]/80 border border-[rgba(255,255,253,0.12)] rounded-xl px-3 py-1.5 text-[#F5F5F2] font-mono"
+                  className="w-full mt-1 iea-input px-3 py-1.5 font-mono"
                 />
               </label>
 
               <label className="block">
-                <span className="text-[#B4B3B0] font-semibold">TP Target</span>
+                <span className="text-iea-textSecondary font-semibold">TP Target</span>
                 <input
                   type="number"
                   step="any"
                   value={proposedTpInput}
                   onChange={(e) => setProposedTpInput(e.target.value)}
-                  className="w-full mt-1 bg-[#0E0D0B]/80 border border-[rgba(255,255,253,0.12)] rounded-xl px-3 py-1.5 text-[#F5F5F2] font-mono"
+                  className="w-full mt-1 iea-input px-3 py-1.5 font-mono"
                 />
               </label>
             </div>
 
             {!slValidation.allowed && (
-              <div className="p-2.5 rounded-xl bg-[#F07178]/20 border border-[#F07178]/50 text-[11px] text-[#F5B5B9]">
+              <div className="p-2.5 rounded-xl bg-iea-dangerSoft border border-iea-dangerBorder text-[11px] text-iea-danger">
                 {slValidation.reason}
               </div>
             )}
@@ -1519,7 +2053,7 @@ export const DashboardScreen: React.FC<
               <button
                 type="button"
                 onClick={() => setSlModalPos(null)}
-                className="iea-pill-control px-4 py-1.5 text-xs text-[#F5F5F2]"
+                className="iea-pill-control px-4 py-1.5 text-xs text-iea-textPrimary"
               >
                 Cancel
               </button>
@@ -1527,7 +2061,7 @@ export const DashboardScreen: React.FC<
                 type="button"
                 disabled={!slValidation.allowed || busyAction !== null}
                 onClick={handleApplyTightenSl}
-                className="px-4 py-1.5 rounded-full bg-[#36B37E] hover:bg-[#3FC48B] disabled:opacity-40 text-xs font-extrabold text-[#121110]"
+                className="px-4 py-1.5 rounded-full bg-iea-profit hover:opacity-90 disabled:opacity-40 text-xs font-extrabold text-white"
               >
                 Apply SL
               </button>
