@@ -49,6 +49,7 @@ import {
 import {
   drawLuxAlgoSmcOverlaysToCanvas,
   drawProjectedOverlaysToCanvas,
+  formatZoneLegend,
   hitTestProjectedDrawings,
   type MtfLevelInput,
   ProjectedDrawing,
@@ -166,6 +167,12 @@ function describeDrawingDetails(item: EngineDrawingItem, digits: number) {
   const title =
     item.type === "TRADE"
       ? `${item.direction === "BULLISH" ? "LONG" : "SHORT"} ${item.subtype}`
+      : item.subtype === "IFVG"
+      ? formatZoneLegend("IFVG")
+      : item.type === "FVG"
+      ? formatZoneLegend("FVG")
+      : item.type === "OB"
+      ? formatZoneLegend("OB")
       : item.meta?.label
       ? String(item.meta.label)
       : `${item.type} · ${item.subtype}`;
@@ -412,17 +419,28 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       drawProjectedOverlaysToCanvas(ctx, projected, plotW, plotH, activeHighlightId, {
         clear: false,
         onlyTypes: new Set(["SESS"]),
+        theme,
       });
 
       // 2. LuxAlgo Smart Money Concepts overlays (when enabled for current timeframe)
       if (activeSettings.visibleTimeframes[selectedTimeframe]) {
-        drawLuxAlgoSmcOverlaysToCanvas(ctx, smcResult, mtfLevels, activeSettings, projector, digits);
+        drawLuxAlgoSmcOverlaysToCanvas(ctx, smcResult, mtfLevels, activeSettings, projector, digits, theme);
+      }
+
+      // 2b. Engine-emitted IFVG overlays (when FVG/OB layer is enabled)
+      const projectedIfvgs = projected.filter((p) => p.item.subtype === "IFVG");
+      if (projectedIfvgs.length > 0) {
+        drawProjectedOverlaysToCanvas(ctx, projectedIfvgs, plotW, plotH, activeHighlightId, {
+          clear: false,
+          theme,
+        });
       }
 
       // 3. Trade position templates on top (LONG POSITION / SHORT POSITION)
       drawProjectedOverlaysToCanvas(ctx, projected, plotW, plotH, activeHighlightId, {
         clear: false,
         onlyTypes: new Set(["TRADE"]),
+        theme,
       });
 
       ctx.restore();
@@ -448,6 +466,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
     smcResult,
     mtfLevels,
     digits,
+    theme,
     hoveredHit?.item.id,
     pinnedHit?.item.id,
     selectedSymbol,
@@ -969,7 +988,7 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       key: "fvgOb",
       label: UI_COPY.chart.layers.fvgOb.label,
       count: smcCounts.fvgOb,
-      tooltip: "Fair Value Gaps (FVG) & Internal/Swing Order Blocks (OB)",
+      tooltip: `${formatZoneLegend("FVG")} · ${formatZoneLegend("OB")} · ${formatZoneLegend("IFVG")}`,
       icon: Layers,
     },
     {
@@ -1377,6 +1396,36 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Compact Zone Legend Bar (dashboard + fullscreen) */}
+      <div
+        data-testid="chart-zone-legend"
+        className="px-3.5 py-1.5 border-t border-iea-borderSubtle bg-[var(--iea-chart-toolbar-bg)] flex flex-wrap items-center justify-between gap-2 text-[11px] shrink-0"
+      >
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-iea-textSecondary">
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-iea-textMuted">
+            Zones
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-[3px] bg-iea-profitSoft border border-iea-profitBorder shrink-0" />
+            <strong className="font-mono text-iea-textPrimary">FVG</strong>
+            <span>- Fair Value Gap</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-[3px] bg-iea-accentSoft border border-iea-accentBorder shrink-0" />
+            <strong className="font-mono text-iea-textPrimary">OB</strong>
+            <span>- Order Block</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-[3px] bg-iea-dangerSoft border border-iea-dangerBorder shrink-0" />
+            <strong className="font-mono text-iea-textPrimary">IFVG</strong>
+            <span>- Inverse Fair Value Gap</span>
+          </span>
+        </div>
+        <span className="text-[10px] font-mono text-iea-textMuted hidden sm:inline">
+          F Fullscreen · 0 Reset · Scroll Zoom
+        </span>
       </div>
     </div>
   );

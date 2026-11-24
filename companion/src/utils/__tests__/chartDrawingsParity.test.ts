@@ -7,11 +7,18 @@ import {
   validateEngineDrawingsFeed,
 } from "../chartDrawingsSchema.ts";
 import {
+  computeZoneLabelPlacement,
+  drawCenteredZoneLabel,
+  drawLuxAlgoSmcOverlaysToCanvas,
+  drawProjectedOverlaysToCanvas,
+  formatZoneLegend,
   hitTestProjectedDrawings,
   projectEngineDrawings,
   type CandlePoint,
   type CoordinateProjector,
 } from "../chartCanvasRenderer.ts";
+import { cloneDefaultSmcSettings } from "../smcChartSettings.ts";
+import { computeLuxAlgoSmc } from "../luxalgoSmcEngine.ts";
 
 function makeSyntheticCandles(
   symbol: "XAUUSD" | "USDJPY" | "BTCUSD",
@@ -200,4 +207,101 @@ test("Layer toggles hide and show exact drawing groups and hitTest prioritizes T
     all
   );
   assert.equal(hit?.item.id, openTrade.item.id);
+});
+
+function createMockCanvasCtx() {
+  const fillTexts: Array<{ text: string; x: number; y: number; fillStyle: string }> = [];
+  const ctx: any = {
+    fillStyle: "",
+    strokeStyle: "",
+    lineWidth: 1,
+    lineJoin: "miter",
+    font: "",
+    textAlign: "left",
+    textBaseline: "alphabetic",
+    globalAlpha: 1,
+    save() {},
+    restore() {},
+    beginPath() {},
+    closePath() {},
+    rect() {},
+    clip() {},
+    arc() {},
+    moveTo() {},
+    lineTo() {},
+    fill() {},
+    stroke() {},
+    fillRect() {},
+    strokeRect() {},
+    clearRect() {},
+    setLineDash() {},
+    measureText(text: string) {
+      return { width: text.length * 6.5 };
+    },
+    strokeText() {},
+    fillText(text: string, x: number, y: number) {
+      fillTexts.push({ text, x, y, fillStyle: String(this.fillStyle) });
+    },
+  };
+  return { ctx: ctx as CanvasRenderingContext2D, fillTexts };
+}
+
+test("FVG / OB / IFVG zone labels center, clip to visible bounds, hide when too small, and format full legend names", () => {
+  assert.equal(formatZoneLegend("FVG"), "FVG - Fair Value Gap");
+  assert.equal(formatZoneLegend("OB"), "OB - Order Block");
+  assert.equal(formatZoneLegend("IFVG"), "IFVG - Inverse Fair Value Gap");
+
+  // Centered inside full visible zone
+  assert.deepEqual(computeZoneLabelPlacement(100, 40, 200, 80, 800, 400, 20), {
+    x: 150,
+    y: 60,
+  });
+
+  // Clipped to visible plot area when partially off-screen left & top
+  assert.deepEqual(computeZoneLabelPlacement(-60, -20, 140, 60, 800, 400, 20), {
+    x: 70,
+    y: 30,
+  });
+
+  // Hidden when too narrow or too short
+  assert.equal(computeZoneLabelPlacement(10, 10, 30, 50, 800, 400, 20), null);
+  assert.equal(computeZoneLabelPlacement(10, 10, 200, 20, 800, 400, 20), null);
+
+  // Canvas helper draws dark & light theme text and returns false when clipped box is too small
+  const mockDark = createMockCanvasCtx();
+  assert.equal(drawCenteredZoneLabel(mockDark.ctx, "IFVG", 100, 50, 260, 110, 800, 400, "dark"), true);
+  assert.equal(mockDark.fillTexts[0].text, "IFVG");
+  assert.equal(mockDark.fillTexts[0].x, 180);
+  assert.equal(mockDark.fillTexts[0].y, 80);
+
+  const mockTiny = createMockCanvasCtx();
+  assert.equal(drawCenteredZoneLabel(mockTiny.ctx, "FVG", 100, 50, 110, 58, 800, 400, "light"), false);
+  assert.equal(mockTiny.fillTexts.length, 0);
+
+  // Projected IFVG/FVG/OB renderer + LuxAlgo SMC renderer both render centered labels
+  const feed = buildEngineDrawingsParityFixture("XAUUSD", "M15");
+  const ifvgItem = {
+    ...feed.drawings.find((d) => d.type === "FVG")!,
+    id: "ifvg-test-1",
+    subtype: "IFVG",
+  };
+  const candles = makeSyntheticCandles("XAUUSD", "M15");
+  const projector = makeLinearProjector(candles, 1000, 500);
+  const projected = projectEngineDrawings(
+    [...feed.drawings, ifvgItem],
+    { liquidity: false, fvgOb: true, structure: false, sessions: false, trades: false },
+    projector
+  );
+  const projMock = createMockCanvasCtx();
+  drawProjectedOverlaysToCanvas(projMock.ctx, projected, 1000, 500, null, { theme: "light" });
+  const drawnProjLabels = new Set(projMock.fillTexts.map((t) => t.text));
+  assert.ok(drawnProjLabels.has("IFVG"));
+  assert.ok(drawnProjLabels.has("FVG") || drawnProjLabels.has("OB"));
+
+  const smc = computeLuxAlgoSmc(candles, cloneDefaultSmcSettings(), "M15");
+  const smcMock = createMockCanvasCtx();
+  drawLuxAlgoSmcOverlaysToCanvas(smcMock.ctx, smc, [], cloneDefaultSmcSettings(), projector, 2, "dark");
+  if (smc.swingOrderBlocks.length > 0 || smc.internalOrderBlocks.length > 0 || smc.fairValueGaps.length > 0) {
+    assert.ok(smcMock.fillTexts.some((t) => t.text === "OB" || t.text === "FVG"));
+  }
 });

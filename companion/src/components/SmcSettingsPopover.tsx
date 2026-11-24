@@ -366,8 +366,8 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
               />
             </Row>
 
-            <SectionHeader title="Order Blocks" />
-            <Row label="Internal Order Blocks">
+            <SectionHeader title="OB - Order Block" />
+            <Row label="Internal OB (Order Block)">
               <input
                 type="checkbox"
                 aria-label="Show Internal Order Blocks"
@@ -387,7 +387,7 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
                 className={numCls}
               />
             </Row>
-            <Row label="Swing Order Blocks">
+            <Row label="Swing OB (Order Block)">
               <input
                 type="checkbox"
                 aria-label="Show Swing Order Blocks"
@@ -512,8 +512,8 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
               </select>
             </Row>
 
-            <SectionHeader title="Fair Value Gaps" />
-            <Row label="Fair Value Gaps">
+            <SectionHeader title="FVG - Fair Value Gap / IFVG - Inverse Fair Value Gap" />
+            <Row label="FVG (Fair Value Gaps)">
               <input
                 type="checkbox"
                 aria-label="Show Fair Value Gaps"
@@ -756,7 +756,7 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
               />
             </Row>
 
-            <SectionHeader title="Order Block & FVG Fills" />
+            <SectionHeader title="OB (Order Block) & FVG (Fair Value Gap) Fills" />
             <Row label="Internal Bull / Bear OB">
               <ColorAlphaPicker
                 ariaLabel="Internal Bull OB"
