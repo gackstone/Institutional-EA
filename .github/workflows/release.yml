@@ -93,6 +93,7 @@ jobs:
   macos:
     name: macOS Universal Installer (.dmg)
     runs-on: macos-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -305,8 +306,8 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [windows, macos, android]
-    if: always() && (needs.windows.result == 'success' || needs.macos.result == 'success' || needs.android.result == 'success')
+    needs: [windows, android, macos]
+    if: ${{ !cancelled() && (needs.windows.result == 'success' || needs.android.result == 'success' || needs.macos.result == 'success') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -331,13 +332,18 @@ jobs:
             fi
           done
           cat SHA256SUMS.txt
+          if [ -f "InstitutionalEA.dmg" ]; then
+            MAC_LINE="- **macOS (Universal Apple Silicon + Intel):** \`InstitutionalEA.dmg\` *(build: ${MAC_STATUS})*"
+          else
+            MAC_LINE="- **macOS (Universal Apple Silicon + Intel):** *macOS build coming soon* *(runner status: ${MAC_STATUS})*"
+          fi
           cd ..
           cat <<EOF > release-notes.md
           ## Institutional EA Multi-Platform Release
 
           ### Direct Downloads
           - **Windows (x64 NSIS Installer):** \`InstitutionalEA-Setup.exe\` *(build: ${WIN_STATUS})*
-          - **macOS (Universal Apple Silicon + Intel):** \`InstitutionalEA.dmg\` *(build: ${MAC_STATUS})*
+          ${MAC_LINE}
           - **Android (API 24+ / Android 7.0+):** \`InstitutionalEA.apk\` & \`InstitutionalEA.aab\` *(build: ${AND_STATUS})*
           - **iOS:** Available via TestFlight once Apple Developer Program enrollment & \`EXPO_TOKEN\` are configured (use Expo Go for preview in the meantime).
 

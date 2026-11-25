@@ -1,0 +1,86 @@
+name: Release macOS Only (.dmg)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing GitHub Release tag to attach InstitutionalEA.dmg to (e.g. v1.3.1)"
+        required: true
+        default: "v1.3.1"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    name: Build & Attach macOS Universal DMG
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Typecheck & test desktop companion
+        run: |
+          npm --workspace=companion exec -- tsc --noEmit
+          npm run test:desktop && npm run test:packages
+
+      - name: Ensure resources/bin directory exists
+        run: mkdir -p companion/resources/bin
+
+      - name: Build macOS universal DMG (arm64 + x64)
+        working-directory: companion
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$CSC_LINK" ]; then
+            echo "::warning::MAC_CSC_LINK secret not configured — building UNSIGNED macOS .dmg (users will need Right-click > Open)."
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          fi
+          npm run build
+          npx electron-builder --mac dmg --universal --publish never
+
+      - name: Prepare macOS assets & upload to existing release with --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          mkdir -p release-out/macos
+          DMG_FILE=$(ls companion/release/InstitutionalEA-*.dmg | head -n 1)
+          if [ -z "$DMG_FILE" ]; then echo "macOS .dmg not found"; exit 1; fi
+          BASENAME=$(basename "$DMG_FILE")
+          cp "$DMG_FILE" "release-out/macos/$BASENAME"
+          cp "$DMG_FILE" "release-out/macos/InstitutionalEA.dmg"
+          HASH=$(shasum -a 256 "release-out/macos/InstitutionalEA.dmg" | awk '{print $1}')
+          echo "$HASH  InstitutionalEA.dmg" > "release-out/macos/InstitutionalEA.dmg.sha256"
+          echo "$HASH  $BASENAME" > "release-out/macos/$BASENAME.sha256"
+
+          # Upload DMG + checksums to existing release
+          gh release upload "$TAG" \
+            "release-out/macos/InstitutionalEA.dmg" \
+            "release-out/macos/InstitutionalEA.dmg.sha256" \
+            "release-out/macos/$BASENAME" \
+            "release-out/macos/$BASENAME.sha256" \
+            --clobber
+
+          # Refresh combined SHA256SUMS.txt on the release if present
+          gh release download "$TAG" -p "SHA256SUMS.txt" -D release-out/macos --clobber || true
+          touch release-out/macos/SHA256SUMS.txt
+          grep -v "InstitutionalEA.dmg$" release-out/macos/SHA256SUMS.txt > release-out/macos/SHA256SUMS.new || true
+          echo "$HASH  InstitutionalEA.dmg" >> release-out/macos/SHA256SUMS.new
+          mv release-out/macos/SHA256SUMS.new release-out/macos/SHA256SUMS.txt
+          gh release upload "$TAG" "release-out/macos/SHA256SUMS.txt" --clobber
