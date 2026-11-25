@@ -146,7 +146,16 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "release-out/windows" | Out-Null
-          Copy-Item "companion/release/InstitutionalEA-Setup*.exe*" "release-out/windows/"
+          $ver = (Get-Content "companion/package.json" | ConvertFrom-Json).version
+          Copy-Item "companion/release/InstitutionalEA-Setup.exe" "release-out/windows/InstitutionalEA-Setup.exe"
+          Copy-Item "companion/release/InstitutionalEA-Setup.exe" "release-out/windows/InstitutionalEA-Setup-$ver.exe"
+          Copy-Item "companion/release/InstitutionalEA-Setup.exe.sha256" "release-out/windows/InstitutionalEA-Setup.exe.sha256"
+          if (Test-Path "companion/release/InstitutionalEA-Setup.exe.blockmap") {
+            Copy-Item "companion/release/InstitutionalEA-Setup.exe.blockmap" "release-out/windows/InstitutionalEA-Setup.exe.blockmap"
+          }
+          if (Test-Path "companion/release/latest.yml") {
+            Copy-Item "companion/release/latest.yml" "release-out/windows/latest.yml"
+          }
           Get-ChildItem "release-out/windows"
 
       - name: Upload Windows artifacts

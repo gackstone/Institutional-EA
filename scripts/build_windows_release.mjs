@@ -38,6 +38,12 @@ function sha256File(filePath) {
   return hash.digest("hex");
 }
 
+function sha512Base64File(filePath) {
+  const hash = crypto.createHash("sha512");
+  hash.update(fs.readFileSync(filePath));
+  return hash.digest("base64");
+}
+
 function assertExistsNonEmpty(filePath, label) {
   if (!fs.existsSync(filePath)) {
     throw new Error(`Verification failed — missing ${label}: ${filePath}`);
@@ -133,26 +139,39 @@ function main() {
   console.log(`  [OK] Bundled MT5 sidecars (${sidecars.length}): ${sidecars.join(", ") || "none"}`);
   console.log(`  [OK] SHA-256: ${installerHash}`);
 
-  // 4. Publish verified installer + checksums safely without touching locked win-unpacked
-  console.log("\n[4/4] Publishing verified installer and cleaning temporary staging directory...");
+  // 4. Publish canonical verified installer + checksum + blockmap + latest.yml without touching locked win-unpacked
+  console.log("\n[4/4] Publishing canonical verified installer and cleaning temporary staging directory...");
   fs.mkdirSync(releaseDir, { recursive: true });
   let targetDir = releaseDir;
-  const versionedName = `InstitutionalEA-Setup-${version}.exe`;
   const latestName = "InstitutionalEA-Setup.exe";
+  const latestBlockmapName = "InstitutionalEA-Setup.exe.blockmap";
+  const sha512Base64 = sha512Base64File(stagedInstaller);
+  const releaseDateIso = new Date().toISOString();
 
   try {
-    fs.copyFileSync(stagedInstaller, path.join(targetDir, versionedName));
     fs.copyFileSync(stagedInstaller, path.join(targetDir, latestName));
+    fs.copyFileSync(stagedBlockmap, path.join(targetDir, latestBlockmapName));
   } catch (err) {
     targetDir = path.join(COMPANION_DIR, "release-out", "windows");
     fs.mkdirSync(targetDir, { recursive: true });
     console.warn(`[WARN] Could not write to ${releaseDir} (${err.message}); publishing to ${targetDir}`);
-    fs.copyFileSync(stagedInstaller, path.join(targetDir, versionedName));
     fs.copyFileSync(stagedInstaller, path.join(targetDir, latestName));
+    fs.copyFileSync(stagedBlockmap, path.join(targetDir, latestBlockmapName));
   }
 
-  fs.writeFileSync(path.join(targetDir, `${versionedName}.sha256`), `${installerHash}  ${versionedName}\n`, "ascii");
   fs.writeFileSync(path.join(targetDir, `${latestName}.sha256`), `${installerHash}  ${latestName}\n`, "ascii");
+  const latestYml = [
+    `version: ${version}`,
+    "files:",
+    `  - url: ${latestName}`,
+    `    sha512: ${sha512Base64}`,
+    `    size: ${installerSize}`,
+    `path: ${latestName}`,
+    `sha512: ${sha512Base64}`,
+    `releaseDate: '${releaseDateIso}'`,
+    "",
+  ].join("\n");
+  fs.writeFileSync(path.join(targetDir, "latest.yml"), latestYml, "utf8");
 
   // Clean temporary staging directory only after verified publication succeeds
   try {
@@ -161,9 +180,10 @@ function main() {
     console.warn(`[WARN] Deferred cleanup of temporary staging dir ${stagingName} (${cleanupErr.message}); published installers are unaffected.`);
   }
 
-  console.log(`\nSUCCESS: Verified Windows installer published to:`);
-  console.log(`  - ${path.join(targetDir, versionedName)}`);
+  console.log(`\nSUCCESS: Verified canonical Windows installer published to:`);
   console.log(`  - ${path.join(targetDir, latestName)}`);
+  console.log(`  - ${path.join(targetDir, `${latestName}.sha256`)}`);
+  console.log(`  - ${path.join(targetDir, "latest.yml")}`);
 }
 
 try {

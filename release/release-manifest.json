@@ -1,39 +1,68 @@
 {
-  "productName": "Institutional EA Companion",
-  "appId": "com.institutionalea.app",
-  "version": "1.2.0",
-  "platform": "windows",
-  "architecture": "x64",
-  "filename": "Institutional-EA-Companion-Setup.exe",
-  "fileSizeBytes": 156942722,
-  "sha256": "6957cbddf60820a365057595adb200a30d462898a77cff890805619b0b4ebcba",
-  "buildDate": "2026-11-11T08:48:47Z",
+  "productName": "Institutional EA",
+  "version": "1.3.1",
+  "releaseTag": "v1.3.1",
   "releaseChannel": "production",
-  "minWindowsVersion": "10.0.17763 (Windows 10 / Windows 11 64-bit)",
-  "sidecars": [
-    {
-      "name": "mt5_bridge_server",
-      "executable": "bin/mt5_bridge_server.exe",
-      "ports": [5555, 5556],
-      "purpose": "Dual-port MQL5 Expert Advisor TCP bridge & local IPC socket switchboard"
+  "releaseRepository": "gackstone/Institutional-EA",
+  "brandMaster": "assets/brand/institutional-ea-logo-source.jpg",
+  "updatedAt": "2026-11-25T21:00:30Z",
+  "platforms": {
+    "windows": {
+      "appId": "com.institutionalea.companion",
+      "version": "1.3.1",
+      "buildNumber": "10301",
+      "architecture": "x64",
+      "canonicalFilename": "InstitutionalEA-Setup.exe",
+      "fileSizeBytes": 204805028,
+      "sha256": "c0eb78e17b5b12478468dbff62f9c5b71cb61e18d9f4bba636d96f6db7c718c8",
+      "minOsVersion": "Windows 10 / 11 (64-bit)",
+      "signingStatus": "Unsigned locally (Authenticode signing supported via WIN_CSC_LINK secret in CI)",
+      "availabilityStatus": "verified_local_pending_public_release",
+      "updateMetadata": "latest.yml",
+      "sidecars": [
+        "mt5_bridge_server.exe",
+        "mt5_trading_engine.exe",
+        "mt5_bot_agent.exe",
+        "mt5_control_service.exe"
+      ]
     },
-    {
-      "name": "mt5_trading_engine",
-      "executable": "bin/mt5_trading_engine.exe",
-      "purpose": "Autonomous quantitative scalping and swing trading engine"
+    "macos": {
+      "appId": "com.institutionalea.companion",
+      "version": "1.3.1",
+      "buildNumber": "10301",
+      "architecture": "universal (arm64 + x64)",
+      "canonicalFilename": "InstitutionalEA.dmg",
+      "fileSizeBytes": null,
+      "sha256": null,
+      "minOsVersion": "macOS 11 Big Sur or later",
+      "signingStatus": "Configured via MAC_CSC_LINK + Apple notarization secrets in CI (unsigned fallback supported)",
+      "availabilityStatus": "pending_ci_macos_build"
     },
-    {
-      "name": "mt5_bot_agent",
-      "executable": "bin/mt5_bot_agent.exe",
-      "purpose": "Institutional EA cloud telemetry sync, pairing claim handler & remote commands"
+    "android": {
+      "applicationId": "com.institutionalea.monitor",
+      "version": "1.3.1",
+      "versionCode": 10301,
+      "architecture": "universal (read-only companion)",
+      "canonicalFilename": "InstitutionalEA.apk",
+      "playBundleFilename": "InstitutionalEA.aab",
+      "fileSizeBytes": null,
+      "sha256": null,
+      "minOsVersion": "Android 7.0 (API 24) or later",
+      "signingStatus": "Release keystore configured via ANDROID_KEYSTORE_* secrets in CI",
+      "availabilityStatus": "pending_ci_android_build"
+    },
+    "ios": {
+      "bundleIdentifier": "com.institutionalea.monitor",
+      "version": "1.3.1",
+      "buildNumber": "1.3.1",
+      "architecture": "arm64 (read-only companion)",
+      "canonicalFilename": null,
+      "distributionChannel": "Apple TestFlight / App Store (EAS Build)",
+      "fileSizeBytes": null,
+      "sha256": null,
+      "minOsVersion": "iOS 15.0 or later",
+      "signingStatus": "Requires Apple Developer Program enrollment & EXPO_TOKEN secret",
+      "availabilityStatus": "coming_soon"
     }
-  ],
-  "bundledAssets": [
-    "mql5/Experts/PythonBridgeEA.mq5",
-    "config/settings.json",
-    "config/strategy_config.json",
-    "config/risk_config.json",
-    "config/telegram_config.json"
-  ],
-  "signingStatus": "Unsigned (Ready for Authenticode signing pipeline)"
+  }
 }
