@@ -17,11 +17,18 @@ export const PhoneMockup: React.FC<PhoneMockupProps> = ({ compact = false }) => 
 
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
-            Institutional EA
-          </p>
-          <p className="text-sm font-bold text-white">XAUUSD · M15</p>
+        <div className="flex items-center gap-2">
+          <img
+            src="/logo.png"
+            alt="Institutional EA"
+            className="h-7 w-7 shrink-0 rounded-lg bg-black object-contain p-0.5 ring-1 ring-white/15"
+          />
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+              Institutional EA
+            </p>
+            <p className="text-sm font-bold text-white">XAUUSD · M15</p>
+          </div>
         </div>
         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[10px] font-semibold text-emerald-400">
           <ShieldCheck className="h-3 w-3" /> READ-ONLY

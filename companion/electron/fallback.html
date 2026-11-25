@@ -75,9 +75,15 @@
     </style>
   </head>
   <body>
-    <div class="drag-bar">INSTITUTIONAL EA · RECOVERY</div>
+    <div class="drag-bar">
+      <img src="./icon.png" alt="Institutional EA" style="width:18px;height:18px;border-radius:4px;margin-right:8px;object-fit:contain;background:#000;" />
+      INSTITUTIONAL EA · RECOVERY
+    </div>
     <main class="card" role="alert" data-testid="watchdog-fallback-screen">
-      <h1>Institutional EA did not finish loading</h1>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+        <img src="./icon.png" alt="Institutional EA Logo" style="width:40px;height:40px;border-radius:10px;object-fit:contain;background:#000;border:1px solid rgba(255,255,255,0.12);flex-shrink:0;" />
+        <h1 style="margin-bottom:0;">Institutional EA did not finish loading</h1>
+      </div>
       <p class="sub">
         The interface was safely intercepted before showing a blank window. Your MT5 terminal and DEMO lock remain unaffected.
       </p>

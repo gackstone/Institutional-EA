@@ -700,11 +700,11 @@ export const App: React.FC = () => {
           className="iea-drag-region fixed top-0 left-0 right-0 z-50 bg-iea-titlebar border-b border-iea-borderSubtle flex items-center justify-between px-3.5"
         >
           <div className="flex items-center space-x-2 min-w-0">
-            <div className="w-5 h-5 rounded-[6px] bg-iea-accent flex items-center justify-center shrink-0">
-              <span className="w-2.5 h-2.5 rounded-full border-[2px] border-white flex items-center justify-center">
-                <span className="w-1 h-1 rounded-full bg-white" />
-              </span>
-            </div>
+            <img
+              src="./institutional-ea-logo.png"
+              alt="Institutional EA Logo"
+              className="w-5 h-5 rounded-[5px] bg-black object-contain shrink-0 border border-iea-borderSubtle"
+            />
             <span className="text-[11px] font-bold tracking-tight text-iea-textPrimary truncate">
               INSTITUTIONAL <span className="text-iea-accent">EA</span>
             </span>
@@ -746,23 +746,11 @@ export const App: React.FC = () => {
           {/* Brand Logo Tile + "INSTITUTIONAL EA" with blue accent word */}
           <div className="h-[68px] px-4 border-b border-iea-borderSubtle flex items-center justify-between gap-2 shrink-0">
             <div className="flex items-center space-x-3 min-w-0 flex-1">
-              <div
-                className="w-10 h-10 rounded-[12px] bg-iea-accent text-white flex items-center justify-center shrink-0"
-                aria-hidden="true"
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                  <rect
-                    x="4"
-                    y="4"
-                    width="16"
-                    height="16"
-                    rx="5"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                  />
-                  <circle cx="12" cy="12" r="3" fill="currentColor" />
-                </svg>
-              </div>
+              <img
+                src="./institutional-ea-logo.png"
+                alt="Institutional EA Logo"
+                className="w-10 h-10 rounded-[12px] bg-black object-contain p-0.5 border border-iea-borderSubtle shrink-0"
+              />
 
               <div
                 className={`iea-sidebar-label min-w-0 flex-1 whitespace-nowrap ${

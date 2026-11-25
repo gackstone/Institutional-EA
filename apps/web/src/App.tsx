@@ -260,9 +260,11 @@ export default function App(): React.ReactElement {
       <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/90 backdrop-blur-md dark:border-slate-800/80 dark:bg-[#0D0E11]/90">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6">
           <a href="#" className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 font-mono text-sm font-extrabold text-white shadow-sm">
-              IEA
-            </span>
+            <img
+              src="/logo.png"
+              alt="Institutional EA Logo"
+              className="h-9 w-9 rounded-xl bg-black object-contain p-0.5 shadow-sm ring-1 ring-slate-200/80 dark:ring-white/15"
+            />
             <span className="text-base font-extrabold tracking-tight">Institutional EA</span>
           </a>
 
@@ -602,9 +604,11 @@ export default function App(): React.ReactElement {
         <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 font-mono text-xs font-extrabold text-white">
-                IEA
-              </span>
+              <img
+                src="/logo.png"
+                alt="Institutional EA Logo"
+                className="h-8 w-8 rounded-lg bg-black object-contain p-0.5 ring-1 ring-white/15"
+              />
               <span className="text-base font-bold text-white">Institutional EA</span>
             </div>
             <p className="mt-3 text-xs leading-relaxed text-slate-400">

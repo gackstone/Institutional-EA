@@ -1,0 +1,23 @@
+{
+  "name": "Institutional EA",
+  "short_name": "Institutional EA",
+  "description": "Institutional-grade Smart Money Concepts companion for MetaTrader 5 with cross-platform read-only mobile monitoring.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#0D0E11",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

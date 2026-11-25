@@ -1,11 +1,13 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { type ThemeMode, getThemeTokens } from "../theme/themeTokens.ts";
 import { ConnectionBanner, type ConnectionState } from "../components/ConnectionBanner.tsx";
 import { KpiCards, type KpiData } from "../components/KpiCards.tsx";
 import { PositionsList } from "../components/PositionsList.tsx";
 import { ChartWebView } from "../components/ChartWebView.tsx";
 import type { Position, Candle, SmcZone } from "@institutional-ea/data-contract";
+
+const BRAND_LOGO = require("../../assets/logo.png");
 
 export type MobileTab = "DASHBOARD" | "CHARTS" | "POSITIONS" | "SETTINGS";
 
@@ -38,7 +40,15 @@ export function RootNavigator({
       {/* Top Header */}
       <View style={[styles.header, { backgroundColor: tokens.surface, borderColor: tokens.border }]}>
         <View style={styles.titleRow}>
-          <Text style={[styles.appTitle, { color: tokens.text }]}>Institutional EA</Text>
+          <View style={styles.brandRow}>
+            <Image
+              source={BRAND_LOGO}
+              style={[styles.brandLogo, { borderColor: tokens.border }]}
+              resizeMode="contain"
+              accessibilityLabel="Institutional EA Logo"
+            />
+            <Text style={[styles.appTitle, { color: tokens.text }]}>Institutional EA</Text>
+          </View>
           <View style={styles.headerRight}>
             <View style={[styles.liveBadge, { backgroundColor: tokens.profitBg }]}>
               <Text style={[styles.liveText, { color: tokens.profit }]}>READ-ONLY</Text>
@@ -172,6 +182,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     marginBottom: 4,
+  },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  brandLogo: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    backgroundColor: "#000000",
+    borderWidth: 1,
   },
   appTitle: {
     fontSize: 18,
