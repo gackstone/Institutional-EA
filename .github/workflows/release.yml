@@ -17,7 +17,7 @@ on:
         default: false
         type: boolean
       run_ios:
-        description: "Trigger optional iOS EAS build (requires EXPO_TOKEN and paid Apple Developer account)"
+        description: "Trigger optional iOS EAS production build (requires EXPO_TOKEN and Apple Developer account)"
         required: false
         default: false
         type: boolean
@@ -30,8 +30,89 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  preflight:
+    name: Preflight (Branding, Versions & Tests)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12 & Pillow
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: python -m pip install --upgrade pip pillow
+
+      - name: Validate branding assets & cross-platform version sync
+        run: python scripts/verify-brand-assets.py
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Run full monorepo test suite
+        run: npm run test:all
+
+  web:
+    name: Web Production Build
+    needs: [preflight]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12 & Pillow
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: python -m pip install --upgrade pip pillow
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Typecheck and build Web production bundle
+        run: npm run build:web
+
+      - name: Verify branding assets in Web dist
+        run: |
+          for f in index.html logo.png favicon.ico favicon-32x32.png apple-touch-icon.png icon-192.png icon-512.png manifest.webmanifest; do
+            test -s "apps/web/dist/$f" || { echo "Missing apps/web/dist/$f"; exit 1; }
+          done
+
+      - name: Package Web release archive & SHA-256
+        run: |
+          mkdir -p release-out/web
+          VERSION=$(node -p "require('./apps/web/package.json').version")
+          tar -czf "release-out/web/InstitutionalEA-Web-${VERSION}.tar.gz" -C apps/web/dist .
+          HASH=$(sha256sum "release-out/web/InstitutionalEA-Web-${VERSION}.tar.gz" | awk '{print $1}')
+          echo "$HASH  InstitutionalEA-Web-${VERSION}.tar.gz" > "release-out/web/InstitutionalEA-Web-${VERSION}.tar.gz.sha256"
+          ls -lh release-out/web
+
+      - name: Upload Web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-production-build
+          path: release-out/web/*
+          if-no-files-found: error
+
   windows:
     name: Windows Installer (.exe)
+    needs: [preflight]
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -49,14 +130,7 @@ jobs:
       - name: Typecheck desktop companion
         run: npm --workspace=companion exec -- tsc --noEmit
 
-      - name: Run unit tests
-        run: npm run test:desktop && npm run test:packages
-
-      - name: Ensure resources/bin directory exists
-        shell: pwsh
-        run: New-Item -ItemType Directory -Force -Path "companion/resources/bin" | Out-Null
-
-      - name: Build Windows NSIS installer
+      - name: Build & verify Windows NSIS installer (safe isolated staging)
         working-directory: companion
         shell: pwsh
         env:
@@ -65,22 +139,14 @@ jobs:
         run: |
           if (-not $env:CSC_LINK) {
             Write-Warning "WIN_CSC_LINK secret not configured — building UNSIGNED Windows installer."
-            $env:CSC_IDENTITY_AUTO_DISCOVERY = "false"
           }
-          npm run build
-          npx electron-builder --win nsis:x64 --publish never
+          npm run dist:win
 
-      - name: Prepare Windows release assets & SHA-256
+      - name: Prepare Windows release assets
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "release-out/windows" | Out-Null
-          $exe = Get-ChildItem -Path "companion/release" -Filter "InstitutionalEA-Setup-*.exe" | Select-Object -First 1
-          if (-not $exe) { throw "Windows installer .exe not found in companion/release" }
-          Copy-Item $exe.FullName "release-out/windows/$($exe.Name)"
-          Copy-Item $exe.FullName "release-out/windows/InstitutionalEA-Setup.exe"
-          $hash = (Get-FileHash "release-out/windows/InstitutionalEA-Setup.exe" -Algorithm SHA256).Hash.ToLower()
-          "$hash  InstitutionalEA-Setup.exe" | Set-Content -Encoding ascii "release-out/windows/InstitutionalEA-Setup.exe.sha256"
-          "$hash  $($exe.Name)" | Set-Content -Encoding ascii "release-out/windows/$($exe.Name).sha256"
+          Copy-Item "companion/release/InstitutionalEA-Setup*.exe*" "release-out/windows/"
           Get-ChildItem "release-out/windows"
 
       - name: Upload Windows artifacts
@@ -92,6 +158,7 @@ jobs:
 
   macos:
     name: macOS Universal Installer (.dmg)
+    needs: [preflight]
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -109,9 +176,6 @@ jobs:
 
       - name: Typecheck desktop companion
         run: npm --workspace=companion exec -- tsc --noEmit
-
-      - name: Run unit tests
-        run: npm run test:desktop && npm run test:packages
 
       - name: Ensure resources/bin directory exists
         run: mkdir -p companion/resources/bin
@@ -132,11 +196,22 @@ jobs:
           npm run build
           npx electron-builder --mac dmg --universal --publish never
 
+      - name: Verify macOS app bundle & icon.icns inside DMG
+        run: |
+          DMG_FILE=$(ls companion/release/InstitutionalEA-*.dmg | head -n 1)
+          if [ -z "$DMG_FILE" ]; then echo "macOS .dmg not found"; exit 1; fi
+          MOUNT_DIR=$(mktemp -d)
+          hdiutil attach "$DMG_FILE" -mountpoint "$MOUNT_DIR" -nobrowse -readonly
+          test -d "$MOUNT_DIR/Institutional EA.app" || { hdiutil detach "$MOUNT_DIR" -force; echo "Missing Institutional EA.app in DMG"; exit 1; }
+          test -s "$MOUNT_DIR/Institutional EA.app/Contents/Info.plist" || { hdiutil detach "$MOUNT_DIR" -force; echo "Missing Info.plist"; exit 1; }
+          test -s "$MOUNT_DIR/Institutional EA.app/Contents/Resources/icon.icns" || { hdiutil detach "$MOUNT_DIR" -force; echo "Missing icon.icns in app bundle"; exit 1; }
+          hdiutil detach "$MOUNT_DIR" -force
+          echo "Verified Institutional EA.app bundle and icon.icns inside $DMG_FILE"
+
       - name: Prepare macOS release assets & SHA-256
         run: |
           mkdir -p release-out/macos
           DMG_FILE=$(ls companion/release/InstitutionalEA-*.dmg | head -n 1)
-          if [ -z "$DMG_FILE" ]; then echo "macOS .dmg not found"; exit 1; fi
           BASENAME=$(basename "$DMG_FILE")
           cp "$DMG_FILE" "release-out/macos/$BASENAME"
           cp "$DMG_FILE" "release-out/macos/InstitutionalEA.dmg"
@@ -154,6 +229,7 @@ jobs:
 
   android:
     name: Android APK & AAB (API 24+)
+    needs: [preflight]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -185,12 +261,15 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Run mobile & shared package tests
-        run: npm run test:packages && npm run test:mobile
-
       - name: Prebuild native Android project (minSdk 24)
         working-directory: apps/mobile
         run: npx expo prebuild --platform android --non-interactive
+
+      - name: Verify generated Android launcher & splash branding resources
+        run: |
+          find apps/mobile/android/app/src/main/res -name "ic_launcher*" | grep -q . || { echo "Missing Android ic_launcher resources"; exit 1; }
+          find apps/mobile/android/app/src/main/res -name "splashscreen*" | grep -q . || { echo "Missing Android splashscreen resources"; exit 1; }
+          echo "Verified Android launcher & splash branding resources."
 
       - name: Configure Android signing (release keystore or debug fallback)
         working-directory: apps/mobile/android
@@ -237,13 +316,14 @@ jobs:
               -Pandroid.injected.signing.key.password="android"
           fi
 
-      - name: Prepare Android release assets & SHA-256
+      - name: Prepare & verify Android release assets & SHA-256
         run: |
           mkdir -p release-out/android
           VERSION=$(node -p "require('./apps/mobile/package.json').version")
           APK_SRC=$(find apps/mobile/android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
           AAB_SRC=$(find apps/mobile/android/app/build/outputs/bundle/release -name "*.aab" | head -n 1)
           if [ -z "$APK_SRC" ]; then echo "Android APK not found"; exit 1; fi
+          unzip -l "$APK_SRC" | grep -q "ic_launcher" || { echo "Launcher icon missing inside built APK"; exit 1; }
           cp "$APK_SRC" "release-out/android/InstitutionalEA-${VERSION}.apk"
           cp "$APK_SRC" "release-out/android/InstitutionalEA.apk"
           APK_HASH=$(sha256sum "release-out/android/InstitutionalEA.apk" | awk '{print $1}')
@@ -265,12 +345,31 @@ jobs:
           if-no-files-found: error
 
   ios:
-    name: iOS TestFlight Build (Optional EAS)
-    runs-on: ubuntu-latest
+    name: iOS Prebuild Verification & Optional EAS Build
+    needs: [preflight]
+    runs-on: macos-latest
     if: github.event_name == 'push' || inputs.run_ios == true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Prebuild native iOS project & verify AppIcon / SplashScreen asset catalog
+        working-directory: apps/mobile
+        run: |
+          npx expo prebuild --platform ios --non-interactive
+          test -d ios/InstitutionalEA/Images.xcassets/AppIcon.appiconset || { echo "Missing iOS AppIcon.appiconset"; exit 1; }
+          find ios/InstitutionalEA/Images.xcassets/AppIcon.appiconset -name "*.png" | grep -q . || { echo "Missing PNG in AppIcon.appiconset"; exit 1; }
+          test -d ios/InstitutionalEA/Images.xcassets/SplashScreen.imageset || { echo "Missing iOS SplashScreen.imageset"; exit 1; }
+          echo "Verified iOS native project, AppIcon.appiconset, and SplashScreen.imageset."
 
       - name: Check EXPO_TOKEN availability
         id: check_secret
@@ -278,18 +377,11 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           if [ -z "$EXPO_TOKEN" ]; then
-            echo "::warning::EXPO_TOKEN secret is not configured. Skipping iOS EAS build until Apple Developer account and EXPO_TOKEN are set."
+            echo "::warning::EXPO_TOKEN secret is not configured. Native iOS prebuild & asset catalog were verified, but signed IPA / TestFlight build is skipped until Apple Developer credentials and EXPO_TOKEN are set."
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Setup Node.js 22
-        if: steps.check_secret.outputs.enabled == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
 
       - name: Setup Expo & EAS CLI
         if: steps.check_secret.outputs.enabled == 'true'
@@ -298,7 +390,7 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Trigger EAS iOS production build
+      - name: Trigger EAS iOS production IPA build
         if: steps.check_secret.outputs.enabled == 'true'
         working-directory: apps/mobile
         run: eas build --platform ios --profile production --non-interactive --no-wait
@@ -306,8 +398,8 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [windows, android, macos]
-    if: ${{ !cancelled() && (needs.windows.result == 'success' || needs.android.result == 'success' || needs.macos.result == 'success') }}
+    needs: [preflight, web, windows, android, macos]
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && (needs.windows.result == 'success' || needs.android.result == 'success' || needs.macos.result == 'success') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -320,13 +412,14 @@ jobs:
 
       - name: Assemble combined SHA256SUMS.txt & release notes
         env:
+          WEB_STATUS: ${{ needs.web.result }}
           WIN_STATUS: ${{ needs.windows.result }}
           MAC_STATUS: ${{ needs.macos.result }}
           AND_STATUS: ${{ needs.android.result }}
         run: |
           cd release-artifacts
           rm -f SHA256SUMS.txt
-          for f in InstitutionalEA-Setup.exe InstitutionalEA.dmg InstitutionalEA.apk InstitutionalEA.aab; do
+          for f in InstitutionalEA-Setup.exe InstitutionalEA.dmg InstitutionalEA.apk InstitutionalEA.aab InstitutionalEA-Web-*.tar.gz; do
             if [ -f "$f" ]; then
               sha256sum "$f" >> SHA256SUMS.txt
             fi
@@ -345,7 +438,8 @@ jobs:
           - **Windows (x64 NSIS Installer):** \`InstitutionalEA-Setup.exe\` *(build: ${WIN_STATUS})*
           ${MAC_LINE}
           - **Android (API 24+ / Android 7.0+):** \`InstitutionalEA.apk\` & \`InstitutionalEA.aab\` *(build: ${AND_STATUS})*
-          - **iOS:** Available via TestFlight once Apple Developer Program enrollment & \`EXPO_TOKEN\` are configured (use Expo Go for preview in the meantime).
+          - **Web Production Bundle:** \`InstitutionalEA-Web-*.tar.gz\` *(build: ${WEB_STATUS})*
+          - **iOS:** Native asset catalog verified; signed IPA / TestFlight builds run via EAS once Apple Developer Program enrollment & \`EXPO_TOKEN\` are configured.
 
           ### Security & Read-Only Mobile Guarantee
           - The mobile app is **strictly read-only**: it can never start/stop/pause the bot, place/modify/close orders, or change risk settings.

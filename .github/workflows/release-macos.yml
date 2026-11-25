@@ -21,6 +21,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Python 3.12 & Pillow
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow & validate branding assets
+        run: |
+          python -m pip install --upgrade pip pillow
+          python scripts/verify-brand-assets.py
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -54,6 +64,18 @@ jobs:
           npm run build
           npx electron-builder --mac dmg --universal --publish never
 
+      - name: Verify macOS app bundle & icon.icns inside DMG
+        run: |
+          DMG_FILE=$(ls companion/release/InstitutionalEA-*.dmg | head -n 1)
+          if [ -z "$DMG_FILE" ]; then echo "macOS .dmg not found"; exit 1; fi
+          MOUNT_DIR=$(mktemp -d)
+          hdiutil attach "$DMG_FILE" -mountpoint "$MOUNT_DIR" -nobrowse -readonly
+          test -d "$MOUNT_DIR/Institutional EA.app" || { hdiutil detach "$MOUNT_DIR" -force; echo "Missing Institutional EA.app in DMG"; exit 1; }
+          test -s "$MOUNT_DIR/Institutional EA.app/Contents/Info.plist" || { hdiutil detach "$MOUNT_DIR" -force; echo "Missing Info.plist"; exit 1; }
+          test -s "$MOUNT_DIR/Institutional EA.app/Contents/Resources/icon.icns" || { hdiutil detach "$MOUNT_DIR" -force; echo "Missing icon.icns in app bundle"; exit 1; }
+          hdiutil detach "$MOUNT_DIR" -force
+          echo "Verified Institutional EA.app bundle and icon.icns inside $DMG_FILE"
+
       - name: Prepare macOS assets & upload to existing release with --clobber
         env:
           GH_TOKEN: ${{ github.token }}
@@ -61,7 +83,6 @@ jobs:
         run: |
           mkdir -p release-out/macos
           DMG_FILE=$(ls companion/release/InstitutionalEA-*.dmg | head -n 1)
-          if [ -z "$DMG_FILE" ]; then echo "macOS .dmg not found"; exit 1; fi
           BASENAME=$(basename "$DMG_FILE")
           cp "$DMG_FILE" "release-out/macos/$BASENAME"
           cp "$DMG_FILE" "release-out/macos/InstitutionalEA.dmg"

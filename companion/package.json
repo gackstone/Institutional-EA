@@ -22,7 +22,7 @@
     "electron": "electron electron/main.cjs",
     "electron:dev": "concurrently \"vite\" \"wait-on tcp:5173 && electron electron/main.cjs --dev\"",
     "sidecars": "python packaging/build_sidecars.py",
-    "dist:win": "npm run build && electron-builder --win nsis:x64 && node -e \"const fs=require('fs'),p=require('./package.json');fs.copyFileSync('release/InstitutionalEA-Setup-'+p.version+'.exe','release/InstitutionalEA-Setup.exe')\"",
+    "dist:win": "node ../scripts/build_windows_release.mjs",
     "dist:mac": "npm run build && electron-builder --mac dmg --universal",
     "package:win": "python packaging/build_sidecars.py && npm run dist:win",
     "tauri": "tauri",

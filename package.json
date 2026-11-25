@@ -14,7 +14,10 @@
     "test:packages": "npm test --workspace=@institutional-ea/data-contract --workspace=@institutional-ea/chart-core",
     "test:mobile": "npm test --workspace=@institutional-ea/mobile",
     "test:all": "npm run test:desktop && npm run test:packages && npm run test:mobile",
-    "build:desktop": "npm run build --workspace=companion"
+    "build:desktop": "npm run build --workspace=companion",
+    "build:web": "npm run build --workspace=@institutional-ea/web",
+    "verify:branding": "python scripts/verify-brand-assets.py",
+    "verify:branding:builds": "python scripts/verify-brand-assets.py --check-builds"
   },
   "devDependencies": {
     "@types/node": "^22.13.0"
