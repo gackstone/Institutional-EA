@@ -18,7 +18,7 @@ export interface DownloadPlatformConfig {
 export const RELEASE_REPO = "gackstone/Institutional-EA";
 export const LATEST_RELEASE_API_URL = `https://api.github.com/repos/${RELEASE_REPO}/releases/latest`;
 export const LATEST_RELEASE_BASE_URL = `https://github.com/${RELEASE_REPO}/releases/latest/download`;
-export const DEFAULT_APP_VERSION = "1.3.3";
+export const DEFAULT_APP_VERSION = "1.3.4";
 
 /**
  * Edit links, TestFlight URL, or version defaults in this single file

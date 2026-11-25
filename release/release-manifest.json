@@ -1,7 +1,7 @@
 {
   "productName": "Institutional EA",
-  "version": "1.3.3",
-  "releaseTag": "v1.3.3",
+  "version": "1.3.4",
+  "releaseTag": "v1.3.4",
   "releaseChannel": "production",
   "releaseRepository": "gackstone/Institutional-EA",
   "brandMaster": "assets/brand/institutional-ea-logo-source.jpg",

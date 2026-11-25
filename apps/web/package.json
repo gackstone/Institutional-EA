@@ -1,6 +1,6 @@
 {
   "name": "@institutional-ea/web",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "private": true,
   "type": "module",
   "description": "Institutional EA â€” Official Download & Landing Page (Vercel-ready)",
