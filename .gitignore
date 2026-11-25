@@ -65,6 +65,9 @@ companion/dist/
 dist/
 build/
 companion/release/
+companion/release-staging-*/
+companion/release-out/
+Institutional EA landing page/
 companion/packaging/build/
 companion/packaging/dist/
 companion/packaging/*.spec
