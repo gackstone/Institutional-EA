@@ -1,0 +1,324 @@
+name: Release Multi-Platform Builds
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag name for the release (e.g. v1.3.0-test)"
+        required: false
+        default: "v1.3.0-draft"
+        type: string
+      draft:
+        description: "Publish as a Draft release (recommended for dry-runs)"
+        required: false
+        default: true
+        type: boolean
+      run_ios:
+        description: "Trigger optional iOS EAS build (requires EXPO_TOKEN and paid Apple Developer account)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Windows Installer (.exe)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+
+      - name: Typecheck desktop companion
+        run: npm --workspace=companion exec -- tsc --noEmit
+
+      - name: Run unit tests
+        run: npm run test:desktop && npm run test:packages
+
+      - name: Ensure resources/bin directory exists
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path "companion/resources/bin" | Out-Null
+
+      - name: Build Windows NSIS installer
+        shell: pwsh
+        env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          if (-not $env:WIN_CSC_LINK -and -not $env:CSC_LINK) {
+            Write-Warning "WIN_CSC_LINK secret not configured — building UNSIGNED Windows installer."
+            $env:CSC_IDENTITY_AUTO_DISCOVERY = "false"
+          }
+          npm --prefix companion run build
+          npm --prefix companion exec -- electron-builder --win nsis:x64 --publish never
+
+      - name: Prepare Windows release assets & SHA-256
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "release-out/windows" | Out-Null
+          $exe = Get-ChildItem -Path "companion/release" -Filter "InstitutionalEA-Setup-*.exe" | Select-Object -First 1
+          if (-not $exe) { throw "Windows installer .exe not found in companion/release" }
+          Copy-Item $exe.FullName "release-out/windows/$($exe.Name)"
+          Copy-Item $exe.FullName "release-out/windows/InstitutionalEA-Setup.exe"
+          $hash = (Get-FileHash "release-out/windows/InstitutionalEA-Setup.exe" -Algorithm SHA256).Hash.ToLower()
+          "$hash  InstitutionalEA-Setup.exe" | Set-Content -Encoding ascii "release-out/windows/InstitutionalEA-Setup.exe.sha256"
+          "$hash  $($exe.Name)" | Set-Content -Encoding ascii "release-out/windows/$($exe.Name).sha256"
+          Get-ChildItem "release-out/windows"
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: release-out/windows/*
+          if-no-files-found: error
+
+  macos:
+    name: macOS Universal Installer (.dmg)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+
+      - name: Typecheck desktop companion
+        run: npm --workspace=companion exec -- tsc --noEmit
+
+      - name: Run unit tests
+        run: npm run test:desktop && npm run test:packages
+
+      - name: Ensure resources/bin directory exists
+        run: mkdir -p companion/resources/bin
+
+      - name: Build macOS universal DMG (arm64 + x64)
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$CSC_LINK" ]; then
+            echo "::warning::MAC_CSC_LINK secret not configured — building UNSIGNED macOS .dmg (users will need Right-click > Open)."
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          fi
+          npm --prefix companion run build
+          npm --prefix companion exec -- electron-builder --mac dmg --universal --publish never
+
+      - name: Prepare macOS release assets & SHA-256
+        run: |
+          mkdir -p release-out/macos
+          DMG_FILE=$(ls companion/release/InstitutionalEA-*.dmg | head -n 1)
+          if [ -z "$DMG_FILE" ]; then echo "macOS .dmg not found"; exit 1; fi
+          BASENAME=$(basename "$DMG_FILE")
+          cp "$DMG_FILE" "release-out/macos/$BASENAME"
+          cp "$DMG_FILE" "release-out/macos/InstitutionalEA.dmg"
+          HASH=$(shasum -a 256 "release-out/macos/InstitutionalEA.dmg" | awk '{print $1}')
+          echo "$HASH  InstitutionalEA.dmg" > "release-out/macos/InstitutionalEA.dmg.sha256"
+          echo "$HASH  $BASENAME" > "release-out/macos/$BASENAME.sha256"
+          ls -lh release-out/macos
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: release-out/macos/*
+          if-no-files-found: error
+
+  android:
+    name: Android APK & AAB (API 24+)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+
+      - name: Run mobile & shared package tests
+        run: npm run test:packages && npm run test:mobile
+
+      - name: Prebuild native Android project (minSdk 24)
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --non-interactive
+
+      - name: Configure optional Android release signing
+        working-directory: apps/mobile/android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+            echo "RELEASE_SIGNING=true" >> "$GITHUB_ENV"
+          else
+            echo "::warning::ANDROID_KEYSTORE_* secrets not configured — building UNSIGNED/debug-signed Android APK & AAB."
+            echo "RELEASE_SIGNING=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build Android APK & AAB via Gradle
+        working-directory: apps/mobile/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          if [ "$RELEASE_SIGNING" = "true" ]; then
+            ./gradlew assembleRelease bundleRelease \
+              -Pandroid.injected.signing.store.file="$PWD/app/release.keystore" \
+              -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
+              -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
+              -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD"
+          else
+            ./gradlew assembleRelease bundleRelease
+          fi
+
+      - name: Prepare Android release assets & SHA-256
+        run: |
+          mkdir -p release-out/android
+          VERSION=$(node -p "require('./apps/mobile/package.json').version")
+          APK_SRC=$(find apps/mobile/android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          AAB_SRC=$(find apps/mobile/android/app/build/outputs/bundle/release -name "*.aab" | head -n 1)
+          if [ -z "$APK_SRC" ]; then echo "Android APK not found"; exit 1; fi
+          cp "$APK_SRC" "release-out/android/InstitutionalEA-${VERSION}.apk"
+          cp "$APK_SRC" "release-out/android/InstitutionalEA.apk"
+          APK_HASH=$(sha256sum "release-out/android/InstitutionalEA.apk" | awk '{print $1}')
+          echo "$APK_HASH  InstitutionalEA.apk" > "release-out/android/InstitutionalEA.apk.sha256"
+          echo "$APK_HASH  InstitutionalEA-${VERSION}.apk" > "release-out/android/InstitutionalEA-${VERSION}.apk.sha256"
+          if [ -n "$AAB_SRC" ]; then
+            cp "$AAB_SRC" "release-out/android/InstitutionalEA-${VERSION}.aab"
+            cp "$AAB_SRC" "release-out/android/InstitutionalEA.aab"
+            AAB_HASH=$(sha256sum "release-out/android/InstitutionalEA.aab" | awk '{print $1}')
+            echo "$AAB_HASH  InstitutionalEA.aab" > "release-out/android/InstitutionalEA.aab.sha256"
+          fi
+          ls -lh release-out/android
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-app
+          path: release-out/android/*
+          if-no-files-found: error
+
+  ios:
+    name: iOS TestFlight Build (Optional EAS)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || inputs.run_ios == true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check EXPO_TOKEN availability
+        id: check_secret
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::warning::EXPO_TOKEN secret is not configured. Skipping iOS EAS build until Apple Developer account and EXPO_TOKEN are set."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node.js 22
+        if: steps.check_secret.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Setup Expo & EAS CLI
+        if: steps.check_secret.outputs.enabled == 'true'
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Trigger EAS iOS production build
+        if: steps.check_secret.outputs.enabled == 'true'
+        working-directory: apps/mobile
+        run: eas build --platform ios --profile production --non-interactive --no-wait
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [windows, macos, android]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Assemble combined SHA256SUMS.txt
+        run: |
+          cd release-artifacts
+          sha256sum InstitutionalEA-Setup.exe InstitutionalEA.dmg InstitutionalEA.apk InstitutionalEA.aab 2>/dev/null > SHA256SUMS.txt || true
+          cat SHA256SUMS.txt
+          ls -lh
+
+      - name: Determine release tag and draft mode
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "draft=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ inputs.release_tag || 'v1.3.0-draft' }}" >> "$GITHUB_OUTPUT"
+            echo "draft=${{ inputs.draft }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: "Institutional EA ${{ steps.meta.outputs.tag }}"
+          draft: ${{ steps.meta.outputs.draft == 'true' }}
+          generate_release_notes: true
+          files: |
+            release-artifacts/*
