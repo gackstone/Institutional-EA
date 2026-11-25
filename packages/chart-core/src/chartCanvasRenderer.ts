@@ -6,6 +6,73 @@ import type {
   SmcChartSettings,
 } from "./smcChartSettings";
 
+const DEFAULT_OVERLAY_SMC_SETTINGS: SmcChartSettings = {
+  settingsVersion: 1,
+  mode: "Historical",
+  style: "Colored",
+  colorCandles: false,
+  showInternalStructure: true,
+  internalBullishFilter: "All",
+  internalBullishColor: "#089981",
+  internalBearishFilter: "All",
+  internalBearishColor: "#F23645",
+  internalConfluenceFilter: false,
+  internalLabelSize: "Tiny",
+  showSwingStructure: true,
+  swingBullishFilter: "All",
+  swingBullishColor: "#089981",
+  swingBearishFilter: "All",
+  swingBearishColor: "#F23645",
+  swingLabelSize: "Small",
+  showSwingPoints: false,
+  swingPointsLength: 50,
+  showStrongWeakHL: true,
+  showInternalOB: true,
+  internalOBCount: 5,
+  showSwingOB: false,
+  swingOBCount: 5,
+  obFilter: "Atr",
+  obMitigation: "High/Low",
+  internalBullOBColor: "rgba(49, 121, 245, 0.20)",
+  internalBearOBColor: "rgba(247, 124, 128, 0.20)",
+  swingBullOBColor: "rgba(24, 72, 204, 0.20)",
+  swingBearOBColor: "rgba(178, 40, 51, 0.20)",
+  showEqhEql: true,
+  eqhBarsConfirmation: 3,
+  eqhThreshold: 0.1,
+  eqhLabelSize: "Tiny",
+  showFvg: true,
+  fvgAutoThreshold: true,
+  fvgTimeframe: "Chart",
+  fvgBullColor: "rgba(0, 255, 104, 0.30)",
+  fvgBearColor: "rgba(255, 0, 8, 0.30)",
+  fvgExtend: 1,
+  showDailyHL: true,
+  dailyStyle: "solid",
+  dailyColor: "#2157f3",
+  showWeeklyHL: true,
+  weeklyStyle: "solid",
+  weeklyColor: "#2157f3",
+  showMonthlyHL: false,
+  monthlyStyle: "solid",
+  monthlyColor: "#2157f3",
+  showPremiumDiscount: false,
+  premiumColor: "rgba(242, 54, 69, 0.20)",
+  equilibriumColor: "rgba(135, 139, 148, 0.20)",
+  discountColor: "rgba(8, 153, 129, 0.20)",
+  showIRL: true,
+  showERL: true,
+  showSessions: true,
+  showTrades: true,
+  visibleTimeframes: {
+    M1: true,
+    M5: true,
+    M15: true,
+    H1: true,
+    H4: true,
+  },
+};
+
 const SMC_RENDER_PALETTE = {
   colored: {
     green: "#089981",
@@ -35,6 +102,17 @@ const SMC_RENDER_PALETTE = {
     Normal: 12.5,
   },
 } as const;
+
+export function getLineDashPattern(style: LineStyleOption): number[] {
+  if (style === "dashed") return [5, 3];
+  if (style === "dotted") return [2, 2.5];
+  return [];
+}
+
+export function getLabelFont(size: LabelSizeOption, weight: 500 | 600 | 700 = 600): string {
+  const px = SMC_RENDER_PALETTE.labelSizesPx[size] ?? 10;
+  return `${weight} ${px}px 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif`;
+}
 
 // ============================================================================
 // Shared centered zone label (FVG / OB / IFVG) — used by BOTH the engine
@@ -466,10 +544,94 @@ const SESSION_BORDER: Record<string, string> = {
   NY: "rgba(139, 92, 246, 0.20)",
 };
 
+export interface DrawProjectedOverlaysOptions {
+  clear?: boolean;
+  onlyTypes?: Set<string>;
+  theme?: ChartThemeMode;
+  smcSettings?: SmcChartSettings;
+  digits?: number;
+}
+
+export interface PremiumDiscountZoneInput {
+  kind: "PREMIUM" | "EQUILIBRIUM" | "DISCOUNT";
+  top: number;
+  bottom: number;
+  startTime?: number;
+  label: string;
+  irlErl?: "IRL" | "ERL";
+}
+
+/**
+ * Renders Premium / Equilibrium / Discount shading bands on the 2D canvas.
+ * 20% opacity range shading matching the LuxAlgo SMC reference.
+ */
+export function drawPremiumDiscountZones(
+  ctx: CanvasRenderingContext2D,
+  zones: PremiumDiscountZoneInput[],
+  settings: SmcChartSettings,
+  projector: CoordinateProjector,
+  theme: ChartThemeMode = "light"
+): void {
+  if (!settings.showPremiumDiscount || !zones || zones.length === 0) return;
+  const isMono = settings.style === "Monochrome";
+  const mono = SMC_RENDER_PALETTE.monochrome;
+  const colored = SMC_RENDER_PALETTE.colored;
+  const { plotWidth, plotHeight } = projector;
+  const allowIrlErl = (tag?: "IRL" | "ERL") => (!tag || tag === "IRL" ? settings.showIRL : settings.showERL);
+
+  for (const z of zones) {
+    if (!allowIrlErl(z.irlErl)) continue;
+    const yTop = projector.priceToY(z.top);
+    const yBot = projector.priceToY(z.bottom);
+    if (yTop === null || yBot === null || !Number.isFinite(yTop) || !Number.isFinite(yBot)) continue;
+    const x1Raw = z.startTime ? resolveTimeCoordinate(z.startTime, projector, true) : 0;
+    const x1 = Math.max(0, Math.min(plotWidth - 10, x1Raw ?? 0));
+    const x2 = plotWidth;
+    const top = Math.min(yTop, yBot);
+    const h = Math.max(2, Math.abs(yBot - yTop));
+
+    let fill: string;
+    let textColor: string;
+    if (z.kind === "PREMIUM") {
+      fill = isMono ? mono.premiumZone : settings.premiumColor;
+      textColor = isMono ? mono.bear : colored.red;
+    } else if (z.kind === "DISCOUNT") {
+      fill = isMono ? mono.discountZone : settings.discountColor;
+      textColor = isMono ? mono.bull : colored.green;
+    } else {
+      fill = isMono ? mono.equilibriumZone : settings.equilibriumColor;
+      textColor = isMono ? mono.neutral : colored.gray;
+    }
+
+    ctx.save();
+    ctx.fillStyle = fill;
+    ctx.fillRect(x1, top, x2 - x1, h);
+
+    ctx.font = getLabelFont("Small", 600);
+    ctx.fillStyle = textColor;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const labelX = x1 + (x2 - x1) * 0.5;
+    const labelY =
+      z.kind === "PREMIUM"
+        ? top + Math.min(12, h / 2)
+        : z.kind === "DISCOUNT"
+        ? top + h - Math.min(12, h / 2)
+        : top + h / 2;
+    ctx.fillText(z.label, labelX, labelY);
+    ctx.restore();
+  }
+}
+
 /**
  * Renders all projected drawings onto a crisp high-DPI 2D canvas.
- * Enforces the strict text rule: NO permanent text on the plot except
- * "LONG POSITION" / "SHORT POSITION" and "FVG" / "IFVG" / "OB" inside boxes.
+ * Implements the LuxAlgo SMC styling reference with the bot engine as single source of truth:
+ * - SESS: subtle vertical bands with restored session name prints
+ * - OB: soft tint fill (20%), swing 1px solid border vs internal borderless, centered "OB" label
+ * - FVG: stacked halves with midline, soft tint, centered "FVG" / "IFVG" label
+ * - LIQ: dotted EQH/EQL with restored midpoint tag; Strong/Weak High/Low extended with restored label & axis price tag; MTF levels (PDH, PWL, etc.) with restored label
+ * - STRUCT: internal dashed [4,3] 1px vs swing solid 1.25px, break arrow, centered BOS/CHoCH text colored like line (NO background box)
+ * - TRADE: clean long/short position template without BE/SL/TP text clutter
  */
 export function drawProjectedOverlaysToCanvas(
   ctx: CanvasRenderingContext2D,
@@ -477,9 +639,21 @@ export function drawProjectedOverlaysToCanvas(
   plotWidth: number,
   plotHeight: number,
   highlightedId: string | null,
-  options?: { clear?: boolean; onlyTypes?: Set<string>; theme?: ChartThemeMode }
+  options?: DrawProjectedOverlaysOptions
 ): void {
   const labelTheme: ChartThemeMode = options?.theme ?? "light";
+  const settings = options?.smcSettings ?? DEFAULT_OVERLAY_SMC_SETTINGS;
+  const digits = options?.digits ?? 2;
+  const isMono = settings.style === "Monochrome";
+  const mono = SMC_RENDER_PALETTE.monochrome;
+
+  const allowIrlErl = (tag?: string) => {
+    if (!tag) return true;
+    if (tag === "IRL") return settings.showIRL;
+    if (tag === "ERL") return settings.showERL;
+    return true;
+  };
+
   if (options?.clear !== false) {
     ctx.clearRect(0, 0, plotWidth, plotHeight);
   }
@@ -497,7 +671,20 @@ export function drawProjectedOverlaysToCanvas(
   const filtered = options?.onlyTypes
     ? projected.filter((p) => options.onlyTypes!.has(p.item.type))
     : projected;
-  const sorted = [...filtered].sort(
+
+  // Present mode filtering: only display active/most recent structures and zones
+  let workingList = filtered;
+  if (settings.mode === "Present") {
+    const activeObs = workingList.filter((p) => p.item.type === "OB" && p.item.status === "ACTIVE");
+    const activeFvgs = workingList.filter((p) => p.item.type === "FVG" && p.item.status === "ACTIVE");
+    const recentStructs = workingList.filter((p) => p.item.type === "STRUCT").slice(-6);
+    const otherItems = workingList.filter(
+      (p) => p.item.type !== "OB" && p.item.type !== "FVG" && p.item.type !== "STRUCT"
+    );
+    workingList = [...otherItems, ...activeObs, ...activeFvgs, ...recentStructs];
+  }
+
+  const sorted = [...workingList].sort(
     (a, b) => (order[a.item.type] ?? 9) - (order[b.item.type] ?? 9)
   );
 
@@ -505,7 +692,7 @@ export function drawProjectedOverlaysToCanvas(
     const isHi = highlightedId !== null && p.item.id === highlightedId;
     const { item } = p;
 
-    // 1. SESS: faint vertical session/killzone band (no permanent text)
+    // 1. SESS: faint vertical session/killzone band + restored session name print
     if (item.type === "SESS") {
       ctx.save();
       ctx.fillStyle = isHi
@@ -522,79 +709,292 @@ export function drawProjectedOverlaysToCanvas(
       ctx.moveTo(Math.round(p.x2) + 0.5, 0);
       ctx.lineTo(Math.round(p.x2) + 0.5, plotHeight);
       ctx.stroke();
+
+      // Restored print: session name in small caps at top of band
+      const bandW = p.x2 - p.x1;
+      if (bandW >= 24) {
+        ctx.font = "700 9px 'JetBrains Mono', monospace";
+        ctx.fillStyle = isHi
+          ? "#F59E0B"
+          : labelTheme === "dark"
+          ? "rgba(226, 232, 240, 0.75)"
+          : "rgba(30, 41, 59, 0.70)";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(item.subtype, p.x1 + 4, 14);
+      }
       ctx.restore();
       continue;
     }
 
-    // 2. FVG / OB: filled rectangle with ONLY "FVG"/"IFVG"/"OB" inside
-    if (item.type === "FVG" || item.type === "OB") {
+    // 2. OB: Order Blocks (Internal: no border; Swing: 1px border; soft 20% tint)
+    if (item.type === "OB") {
+      const isSwing = item.subtype.includes("swing") || item.meta?.tier === "swing";
+      if (isSwing && !settings.showSwingOB) continue;
+      if (!isSwing && !settings.showInternalOB) continue;
+      if (!allowIrlErl(item.meta?.irl_erl)) continue;
+
       const mitigated = item.status === "MITIGATED" || item.status === "INVALIDATED";
       const isBear = item.direction === "BEARISH";
       const h = Math.max(4, p.y2 - p.y1);
       const w = Math.max(8, p.x2 - p.x1);
+
+      const fill = isMono
+        ? isSwing
+          ? isBear
+            ? mono.swingBearOb
+            : mono.swingBullOb
+          : isBear
+          ? mono.internalBearOb
+          : mono.internalBullOb
+        : isSwing
+        ? isBear
+          ? settings.swingBearOBColor
+          : settings.swingBullOBColor
+        : isBear
+        ? settings.internalBearOBColor
+        : settings.internalBullOBColor;
+
       ctx.save();
       ctx.globalAlpha = mitigated ? 0.42 : 1;
-      ctx.fillStyle =
-        item.type === "OB"
-          ? isBear
-            ? "rgba(238, 55, 73, 0.14)"
-            : "rgba(10, 153, 125, 0.16)"
-          : isBear
-          ? "rgba(238, 55, 73, 0.11)"
-          : CANVAS_THEME.fvgFill;
+      ctx.fillStyle = fill;
       ctx.fillRect(p.x1, p.y1, w, h);
 
-      ctx.strokeStyle = isHi
-        ? isBear
-          ? "#EE3749"
-          : "#0A997D"
-        : isBear
-        ? "rgba(238, 55, 73, 0.45)"
-        : CANVAS_THEME.fvgBorder;
-      ctx.lineWidth = isHi ? 1.8 : 1;
-      if (mitigated) ctx.setLineDash([4, 3]);
-      ctx.strokeRect(
-        Math.round(p.x1) + 0.5,
-        Math.round(p.y1) + 0.5,
-        Math.max(1, Math.round(w) - 1),
-        Math.max(1, Math.round(h) - 1)
-      );
-      ctx.setLineDash([]);
+      // Swing OB has 1px solid border; Internal OB has NO border (Pine SMC spec)
+      if (isSwing || isHi) {
+        ctx.strokeStyle = isHi
+          ? isBear
+            ? "#F23645"
+            : "#089981"
+          : isMono
+          ? isBear
+            ? mono.swingBearObBorder
+            : mono.swingBullObBorder
+          : deriveBorderColorLocal(fill, 0.85);
+        ctx.lineWidth = isHi ? 1.8 : 1;
+        if (mitigated) ctx.setLineDash([4, 3]);
+        ctx.strokeRect(
+          Math.round(p.x1) + 0.5,
+          Math.round(p.y1) + 0.5,
+          Math.max(1, Math.round(w) - 1),
+          Math.max(1, Math.round(h) - 1)
+        );
+        ctx.setLineDash([]);
+      }
 
-      // Allowed permanent text inside FVG/OB box ONLY (shared centered, clipped label)
-      const boxText: ZoneLabelCode =
-        item.subtype === "IFVG" ? "IFVG" : item.type === "OB" ? "OB" : "FVG";
+      drawCenteredZoneLabel(ctx, "OB", p.x1, p.y1, p.x1 + w, p.y1 + h, plotWidth, plotHeight, labelTheme);
+      ctx.restore();
+      continue;
+    }
+
+    // 3. FVG / IFVG: Fair Value Gaps (stacked halves with midline seam)
+    if (item.type === "FVG") {
+      if (!settings.showFvg) continue;
+      if (!allowIrlErl(item.meta?.irl_erl)) continue;
+
+      const isIfvg = item.subtype === "IFVG";
+      const mitigated = item.status === "MITIGATED" || item.status === "INVALIDATED";
+      const isBear = item.direction === "BEARISH";
+      const h = Math.max(4, p.y2 - p.y1);
+      const w = Math.max(8, p.x2 - p.x1);
+
+      let fill: string;
+      if (isIfvg) {
+        fill = isBear ? "rgba(217, 119, 6, 0.22)" : "rgba(168, 85, 247, 0.22)";
+      } else if (isMono) {
+        fill = isBear ? mono.bearFvg : mono.bullFvg;
+      } else {
+        fill = isBear ? settings.fvgBearColor : settings.fvgBullColor;
+      }
+
+      ctx.save();
+      ctx.globalAlpha = mitigated ? 0.42 : 1;
+
+      // Stacked halves with midline seam (Pine SMC spec)
+      const midY = p.y1 + h / 2;
+      ctx.fillStyle = fill;
+      // Top half
+      ctx.fillRect(p.x1, p.y1, w, Math.max(1, midY - p.y1));
+      // Bottom half
+      ctx.fillRect(p.x1, midY, w, Math.max(1, p.y2 - midY));
+
+      // Midline seam
+      ctx.strokeStyle = deriveBorderColorLocal(fill, 0.35);
+      ctx.lineWidth = 0.75;
+      ctx.beginPath();
+      ctx.moveTo(p.x1, Math.round(midY) + 0.5);
+      ctx.lineTo(p.x1 + w, Math.round(midY) + 0.5);
+      ctx.stroke();
+
+      if (isHi || isIfvg) {
+        ctx.strokeStyle = isHi
+          ? isBear
+            ? "#F23645"
+            : "#089981"
+          : isBear
+          ? "rgba(217, 119, 6, 0.65)"
+          : "rgba(168, 85, 247, 0.65)";
+        ctx.lineWidth = isHi ? 1.8 : 1;
+        if (mitigated) ctx.setLineDash([4, 3]);
+        ctx.strokeRect(
+          Math.round(p.x1) + 0.5,
+          Math.round(p.y1) + 0.5,
+          Math.max(1, Math.round(w) - 1),
+          Math.max(1, Math.round(h) - 1)
+        );
+        ctx.setLineDash([]);
+      }
+
+      const boxText: ZoneLabelCode = isIfvg ? "IFVG" : "FVG";
       drawCenteredZoneLabel(ctx, boxText, p.x1, p.y1, p.x1 + w, p.y1 + h, plotWidth, plotHeight, labelTheme);
       ctx.restore();
       continue;
     }
 
-    // 3. LIQ: thin horizontal line from origin to right edge (or sweep), sweep marker dot
+    // 4. LIQ: Liquidity Levels (EQH/EQL, Strong/Weak H/L, MTF H/L, Sweeps)
     if (item.type === "LIQ") {
+      const yr = Math.round(p.y1) + 0.5;
+
+      // 4a. Equal Highs / Equal Lows (EQH / EQL)
+      if (item.subtype === "EQH" || item.subtype === "EQL") {
+        if (!settings.showEqhEql) continue;
+        if (!allowIrlErl(item.meta?.irl_erl)) continue;
+        const isHigh = item.subtype === "EQH";
+        const color = isMono
+          ? isHigh
+            ? mono.bear
+            : mono.bull
+          : isHigh
+          ? settings.swingBearishColor
+          : settings.swingBullishColor;
+
+        ctx.save();
+        ctx.strokeStyle = isHi ? "#2563EB" : color;
+        ctx.lineWidth = isHi ? 2 : 1;
+        ctx.setLineDash([2, 2.5]);
+        ctx.beginPath();
+        ctx.moveTo(p.x1, yr);
+        ctx.lineTo(p.x2, yr);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Restored print: centered label "EQH" / "EQL"
+        const midX = (p.x1 + p.x2) / 2;
+        ctx.font = getLabelFont(settings.eqhLabelSize, 600);
+        ctx.fillStyle = color;
+        ctx.textAlign = "center";
+        ctx.textBaseline = isHigh ? "bottom" : "top";
+        ctx.fillText(item.subtype, midX, isHigh ? yr - 3 : yr + 3);
+        ctx.restore();
+        continue;
+      }
+
+      // 4b. Strong / Weak High & Low
+      if (item.subtype.startsWith("STRONG_WEAK")) {
+        if (!settings.showStrongWeakHL) continue;
+        if (!allowIrlErl(item.meta?.irl_erl)) continue;
+        const isHigh = item.subtype.includes("HIGH") || item.meta?.kind === "HIGH";
+        const isStrong = item.meta?.is_strong ?? !item.subtype.includes("WEAK");
+        const label =
+          item.meta?.label ||
+          (isStrong ? (isHigh ? "Strong High" : "Strong Low") : isHigh ? "Weak High" : "Weak Low");
+        const color = isMono
+          ? isHigh
+            ? mono.bear
+            : mono.bull
+          : isHigh
+          ? settings.swingBearishColor
+          : settings.swingBullishColor;
+
+        ctx.save();
+        ctx.strokeStyle = isHi ? "#2563EB" : color;
+        ctx.lineWidth = isHi ? 2 : 1;
+        if (!isStrong) ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(p.x1, yr);
+        ctx.lineTo(plotWidth, yr);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Restored print: text label at right end of line
+        ctx.font = getLabelFont("Tiny", 600);
+        ctx.fillStyle = color;
+        ctx.textAlign = "right";
+        ctx.textBaseline = isHigh ? "bottom" : "top";
+        ctx.fillText(label, plotWidth - 46, isHigh ? yr - 3 : yr + 3);
+
+        // Restored print: compact right-axis tag badge (High / Low with price)
+        const priceVal = typeof item.price_levels.price === "number" ? item.price_levels.price : null;
+        if (priceVal !== null) {
+          const tagText = isHigh ? `High ${priceVal.toFixed(digits)}` : `Low ${priceVal.toFixed(digits)}`;
+          ctx.font = "600 9px 'JetBrains Mono', monospace";
+          const tagW = Math.min(86, ctx.measureText(tagText).width + 8);
+          const tagH = 14;
+          const tagX = plotWidth - tagW - 2;
+          const tagY = Math.max(2, Math.min(plotHeight - tagH - 2, yr - tagH / 2));
+          ctx.fillStyle = color;
+          ctx.fillRect(tagX, tagY, tagW, tagH);
+          ctx.fillStyle = "#FFFFFF";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(tagText, tagX + tagW / 2, tagY + tagH / 2 + 0.5);
+        }
+        ctx.restore();
+        continue;
+      }
+
+      // 4c. MTF Highs & Lows (PDH, PDL, PWH, PWL, PMH, PML)
+      const isD = item.subtype.startsWith("PD");
+      const isW = item.subtype.startsWith("PW");
+      const isM = item.subtype.startsWith("PM");
+      if (isD || isW || isM) {
+        const enabled = isD ? settings.showDailyHL : isW ? settings.showWeeklyHL : settings.showMonthlyHL;
+        if (!enabled) continue;
+        if (!allowIrlErl(item.meta?.irl_erl)) continue;
+        const style = isD ? settings.dailyStyle : isW ? settings.weeklyStyle : settings.monthlyStyle;
+        const rawColor = isD ? settings.dailyColor : isW ? settings.weeklyColor : settings.monthlyColor;
+        const color = isMono ? mono.neutral : rawColor;
+
+        ctx.save();
+        ctx.strokeStyle = isHi ? "#2563EB" : color;
+        ctx.lineWidth = isHi ? 2 : 1;
+        ctx.setLineDash(getLineDashPattern(style));
+        ctx.beginPath();
+        ctx.moveTo(p.x1, yr);
+        ctx.lineTo(plotWidth, yr);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Restored print: right-end tag (PDH, PWL, etc.)
+        ctx.font = getLabelFont("Tiny", 600);
+        ctx.fillStyle = color;
+        ctx.textAlign = "right";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(item.subtype, plotWidth - 6, yr - 2);
+        ctx.restore();
+        continue;
+      }
+
+      // 4d. Standard Liquidity / Sweeps
       const swept = item.status === "SWEPT";
-      const y = Math.round(p.y1) + 0.5;
       ctx.save();
       ctx.strokeStyle = isHi
         ? "#2563EB"
         : swept
         ? "rgba(148, 163, 184, 0.72)"
-        : item.subtype.startsWith("PW") || item.subtype.startsWith("PD")
-        ? "rgba(71, 85, 105, 0.72)"
         : "rgba(100, 116, 139, 0.6)";
       ctx.lineWidth = isHi ? 2 : 1;
-      if (item.subtype === "EQH" || item.subtype === "EQL" || swept) {
-        ctx.setLineDash([4, 3]);
-      }
+      if (swept) ctx.setLineDash([4, 3]);
       ctx.beginPath();
-      ctx.moveTo(p.x1, y);
-      ctx.lineTo(p.x2, y);
+      ctx.moveTo(p.x1, yr);
+      ctx.lineTo(p.x2, yr);
       ctx.stroke();
       ctx.setLineDash([]);
 
       // Origin anchor dot
       ctx.fillStyle = isHi ? "#2563EB" : "rgba(100, 116, 139, 0.85)";
       ctx.beginPath();
-      ctx.arc(p.x1, y, isHi ? 3 : 2, 0, Math.PI * 2);
+      ctx.arc(p.x1, yr, isHi ? 3 : 2, 0, Math.PI * 2);
       ctx.fill();
 
       // Sweep marker (small hollow ring + cross) at the sweep candle
@@ -604,7 +1004,7 @@ export function drawProjectedOverlaysToCanvas(
         ctx.fillStyle = "#FEF3C7";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.arc(sx, y, 4.5, 0, Math.PI * 2);
+        ctx.arc(sx, yr, 4.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       }
@@ -612,48 +1012,73 @@ export function drawProjectedOverlaysToCanvas(
       continue;
     }
 
-    // 4. STRUCT: BOS / MSS / CHoCH thin line from swing to break candle + direction triangle
+    // 5. STRUCT: Market Structure (Internal: dashed [4,3] 1px; Swing: solid 1.25px; centered BOS/CHoCH)
     if (item.type === "STRUCT") {
+      const tier = item.meta?.tier || (item.subtype.toLowerCase().includes("internal") ? "internal" : "swing");
+      const isSwing = tier === "swing";
       const isBull = item.direction === "BULLISH";
-      const y = Math.round(p.y1) + 0.5;
-      const stroke = isHi
+
+      if (isSwing && !settings.showSwingStructure) continue;
+      if (!isSwing && !settings.showInternalStructure) continue;
+      if (!allowIrlErl(item.meta?.irl_erl)) continue;
+
+      const bullFilter = isSwing ? settings.swingBullishFilter : settings.internalBullishFilter;
+      const bearFilter = isSwing ? settings.swingBearishFilter : settings.internalBearishFilter;
+      const activeFilter = isBull ? bullFilter : bearFilter;
+      const tag = item.subtype === "CHOCH" ? "CHoCH" : "BOS";
+      if (activeFilter !== "All" && tag !== activeFilter) continue;
+
+      const color = isMono
         ? isBull
-          ? "#0A997D"
-          : "#EE3749"
+          ? mono.bull
+          : mono.bear
         : isBull
-        ? "rgba(10, 153, 125, 0.72)"
-        : "rgba(238, 55, 73, 0.72)";
+        ? isSwing
+          ? settings.swingBullishColor
+          : settings.internalBullishColor
+        : isSwing
+        ? settings.swingBearishColor
+          : settings.internalBearishColor;
+
+      const yr = Math.round(p.y1) + 0.5;
       ctx.save();
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth = isHi ? 2 : 1.15;
-      if (item.subtype === "CHOCH") {
-        ctx.setLineDash([5, 3]);
-      }
+      ctx.strokeStyle = isHi ? (isBull ? "#089981" : "#F23645") : color;
+      ctx.lineWidth = isHi ? 2 : isSwing ? 1.25 : 1;
+      if (!isSwing) ctx.setLineDash([4, 3]);
       ctx.beginPath();
-      ctx.moveTo(p.x1, y);
-      ctx.lineTo(p.x2, y);
+      ctx.moveTo(p.x1, yr);
+      ctx.lineTo(p.x2, yr);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Small direction arrow marker at break candle (no permanent text)
-      ctx.fillStyle = stroke;
+      // Small direction arrow marker at break candle
+      ctx.fillStyle = ctx.strokeStyle;
       ctx.beginPath();
       if (isBull) {
-        ctx.moveTo(p.x2, y - 5);
-        ctx.lineTo(p.x2 - 4, y + 2);
-        ctx.lineTo(p.x2 + 4, y + 2);
+        ctx.moveTo(p.x2, yr - 5);
+        ctx.lineTo(p.x2 - 4, yr + 2);
+        ctx.lineTo(p.x2 + 4, yr + 2);
       } else {
-        ctx.moveTo(p.x2, y + 5);
-        ctx.lineTo(p.x2 - 4, y - 2);
-        ctx.lineTo(p.x2 + 4, y - 2);
+        ctx.moveTo(p.x2, yr + 5);
+        ctx.lineTo(p.x2 - 4, yr - 2);
+        ctx.lineTo(p.x2 + 4, yr - 2);
       }
       ctx.closePath();
       ctx.fill();
+
+      // Restored print: Centered BOS / CHoCH text, NO background, colored same as line
+      const labelSize = isSwing ? settings.swingLabelSize : settings.internalLabelSize;
+      ctx.font = getLabelFont(labelSize, isSwing ? 700 : 600);
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = isBull ? "bottom" : "top";
+      ctx.fillText(tag, (p.x1 + p.x2) / 2, isBull ? yr - 3 : yr + 3);
+
       ctx.restore();
       continue;
     }
 
-    // 5. TRADE: Long/Short position template (profit zone, loss zone, entry, moved SL, dashed path, allowed label)
+    // 6. TRADE: Long/Short position template (profit zone, loss zone, entry, moved SL, dashed path, allowed label)
     if (item.type === "TRADE" && p.entryY !== undefined) {
       const isPending = item.status === "PENDING";
       const isClosed = item.status === "CLOSED";
@@ -742,7 +1167,7 @@ export function drawProjectedOverlaysToCanvas(
         ctx.strokeRect(p.x1, p.y1, w, Math.max(4, p.y2 - p.y1));
       }
 
-      // Allowed permanent label: ONLY "LONG POSITION" or "SHORT POSITION"
+      // Allowed permanent label: ONLY "LONG POSITION" or "SHORT POSITION" (no BE/SL/TP text clutter)
       const label = p.isLong ? "LONG POSITION" : "SHORT POSITION";
       const labelY = p.isLong ? Math.max(12, p.y1 - 8) : Math.min(plotHeight - 10, p.y2 + 10);
       ctx.font = "700 9.5px 'Plus Jakarta Sans', system-ui, sans-serif";
@@ -756,17 +1181,6 @@ export function drawProjectedOverlaysToCanvas(
   }
 
   ctx.restore();
-}
-
-function getLineDashPattern(style: LineStyleOption): number[] {
-  if (style === "dashed") return [5, 3];
-  if (style === "dotted") return [2, 2.5];
-  return [];
-}
-
-function getLabelFont(size: LabelSizeOption, weight: 500 | 600 | 700 = 600): string {
-  const px = SMC_RENDER_PALETTE.labelSizesPx[size] ?? 10;
-  return `${weight} ${px}px 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif`;
 }
 
 export interface MtfLevelInput {

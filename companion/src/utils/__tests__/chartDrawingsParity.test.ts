@@ -305,3 +305,145 @@ test("FVG / OB / IFVG zone labels center, clip to visible bounds, hide when too 
     assert.ok(smcMock.fillTexts.some((t) => t.text === "OB" || t.text === "FVG"));
   }
 });
+
+test("Restored prints parity: BOS, CHoCH, EQH/EQL, Strong/Weak, MTF, SESS, and clean trade templates render accurately", () => {
+  const candles = makeSyntheticCandles("XAUUSD", "M15");
+  const projector = makeLinearProjector(candles, 1000, 500);
+  const t0 = candles[10].time;
+  const t1 = candles[25].time;
+
+  const testItems: any[] = [
+    // SESS
+    {
+      id: "sess-london-1",
+      type: "SESS",
+      subtype: "LONDON",
+      symbol: "XAUUSD",
+      timeframe: "M15",
+      start_time: t0,
+      end_time: t1,
+      price_levels: {},
+      direction: "NEUTRAL",
+      status: "ACTIVE",
+      source: "SessionEngine",
+    },
+    // STRUCT swing BOS
+    {
+      id: "struct-bos-1",
+      type: "STRUCT",
+      subtype: "BOS",
+      symbol: "XAUUSD",
+      timeframe: "M15",
+      start_time: t0,
+      end_time: t1,
+      price_levels: { price: 2655.0 },
+      direction: "BULLISH",
+      status: "ACTIVE",
+      source: "StructureEngine",
+      meta: { tier: "swing", label: "BOS" },
+    },
+    // STRUCT internal CHoCH
+    {
+      id: "struct-choch-1",
+      type: "STRUCT",
+      subtype: "CHOCH",
+      symbol: "XAUUSD",
+      timeframe: "M15",
+      start_time: t0,
+      end_time: t1,
+      price_levels: { price: 2645.0 },
+      direction: "BEARISH",
+      status: "ACTIVE",
+      source: "StructureEngine",
+      meta: { tier: "internal", label: "CHoCH" },
+    },
+    // LIQ EQH
+    {
+      id: "liq-eqh-1",
+      type: "LIQ",
+      subtype: "EQH",
+      symbol: "XAUUSD",
+      timeframe: "M15",
+      start_time: t0,
+      end_time: t1,
+      price_levels: { price: 2660.0 },
+      direction: "BEARISH",
+      status: "ACTIVE",
+      source: "LiquidityEngine",
+    },
+    // LIQ Strong High
+    {
+      id: "liq-strong-high-1",
+      type: "LIQ",
+      subtype: "STRONG_WEAK_HIGH",
+      symbol: "XAUUSD",
+      timeframe: "M15",
+      start_time: t0,
+      end_time: null,
+      price_levels: { price: 2670.0 },
+      direction: "BEARISH",
+      status: "ACTIVE",
+      source: "LiquidityEngine",
+      meta: { kind: "HIGH", is_strong: true, label: "Strong High" },
+    },
+    // LIQ MTF PDH
+    {
+      id: "liq-pdh-1",
+      type: "LIQ",
+      subtype: "PDH",
+      symbol: "XAUUSD",
+      timeframe: "D1",
+      start_time: t0,
+      end_time: null,
+      price_levels: { price: 2665.0 },
+      direction: "BEARISH",
+      status: "ACTIVE",
+      source: "WeeklyDailyEngine",
+    },
+    // TRADE
+    {
+      id: "trade-open-1",
+      type: "TRADE",
+      subtype: "OPEN",
+      symbol: "XAUUSD",
+      timeframe: "M15",
+      start_time: t0,
+      end_time: null,
+      price_levels: { entry: 2650.0, sl: 2640.0, initial_sl: 2640.0, tp: 2670.0 },
+      direction: "BULLISH",
+      status: "OPEN",
+      source: "LiveMT5",
+    },
+  ];
+
+  const projected = projectEngineDrawings(
+    testItems,
+    { liquidity: true, fvgOb: true, structure: true, sessions: true, trades: true },
+    projector
+  );
+
+  const mock = createMockCanvasCtx();
+  drawProjectedOverlaysToCanvas(mock.ctx, projected, 1000, 500, null, {
+    theme: "light",
+    smcSettings: cloneDefaultSmcSettings(),
+    digits: 2,
+  });
+
+  const texts = mock.fillTexts.map((t) => t.text);
+  const textSet = new Set(texts);
+
+  // Assert all restored prints are present
+  assert.ok(textSet.has("LONDON"), "Session print LONDON must be present");
+  assert.ok(textSet.has("BOS"), "Structure midpoint BOS print must be present");
+  assert.ok(textSet.has("CHoCH"), "Structure midpoint CHoCH print must be present");
+  assert.ok(textSet.has("EQH"), "Liquidity midpoint EQH print must be present");
+  assert.ok(textSet.has("Strong High"), "Strong High text label must be present");
+  assert.ok(texts.some((t) => t.startsWith("High 2670")), "Strong High right-axis price badge must be present");
+  assert.ok(textSet.has("PDH"), "MTF right-end PDH label must be present");
+  assert.ok(textSet.has("LONG POSITION"), "Clean Trade Long Position label must be present");
+
+  // Assert NO cluttered text
+  assert.ok(!textSet.has("BE"), "BE text must not clutter the trade position template");
+  assert.ok(!textSet.has("SL"), "SL text must not clutter the trade position template");
+  assert.ok(!textSet.has("TP"), "TP text must not clutter the trade position template");
+});
