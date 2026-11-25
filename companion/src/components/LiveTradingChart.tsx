@@ -48,6 +48,7 @@ import {
 } from "../utils/chartDrawingsSchema";
 import {
   drawLuxAlgoSmcOverlaysToCanvas,
+  drawPremiumDiscountZones,
   drawProjectedOverlaysToCanvas,
   formatZoneLegend,
   hitTestProjectedDrawings,
@@ -415,32 +416,24 @@ export const LiveTradingChart: React.FC<LiveTradingChartProps> = ({
       projectedRef.current = projected;
       const activeHighlightId = pinnedHit?.item.id ?? hoveredHit?.item.id ?? null;
 
-      // 1. Session bands (lowest z-order)
-      drawProjectedOverlaysToCanvas(ctx, projected, plotW, plotH, activeHighlightId, {
-        clear: false,
-        onlyTypes: new Set(["SESS"]),
-        theme,
-      });
+      const isTfVisible = activeSettings.visibleTimeframes[selectedTimeframe] ?? true;
+      const displayProjected = isTfVisible
+        ? projected
+        : projected.filter((p) => p.item.type === "SESS" || p.item.type === "TRADE");
 
-      // 2. LuxAlgo Smart Money Concepts overlays (when enabled for current timeframe)
-      if (activeSettings.visibleTimeframes[selectedTimeframe]) {
-        drawLuxAlgoSmcOverlaysToCanvas(ctx, smcResult, mtfLevels, activeSettings, projector, digits, theme);
+      // 1. Premium / Discount zones (lowest z-order, behind candles & drawings)
+      const pndZones =
+        (drawingsFeed as any)?.smc?.premium_discount_zones ?? smcResult?.premiumDiscountZones ?? [];
+      if (isTfVisible && activeSettings.showPremiumDiscount && pndZones.length > 0) {
+        drawPremiumDiscountZones(ctx, pndZones, activeSettings, projector, theme);
       }
 
-      // 2b. Engine-emitted IFVG overlays (when FVG/OB layer is enabled)
-      const projectedIfvgs = projected.filter((p) => p.item.subtype === "IFVG");
-      if (projectedIfvgs.length > 0) {
-        drawProjectedOverlaysToCanvas(ctx, projectedIfvgs, plotW, plotH, activeHighlightId, {
-          clear: false,
-          theme,
-        });
-      }
-
-      // 3. Trade position templates on top (LONG POSITION / SHORT POSITION)
-      drawProjectedOverlaysToCanvas(ctx, projected, plotW, plotH, activeHighlightId, {
+      // 2. All bot engine drawings rendered with LuxAlgo SMC styling & restored prints
+      drawProjectedOverlaysToCanvas(ctx, displayProjected, plotW, plotH, activeHighlightId, {
         clear: false,
-        onlyTypes: new Set(["TRADE"]),
         theme,
+        smcSettings: activeSettings,
+        digits,
       });
 
       ctx.restore();

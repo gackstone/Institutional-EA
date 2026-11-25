@@ -86,6 +86,17 @@ const numCls =
   "w-14 px-1.5 py-0.5 rounded bg-iea-inset border border-iea-borderDefault text-[11px] font-mono text-iea-textPrimary text-right focus:outline-none focus:ring-1 focus:ring-iea-accent";
 const checkCls = "w-3.5 h-3.5 accent-[var(--iea-accent-primary)] rounded cursor-pointer";
 
+const NaBadge: React.FC<{ tooltip?: string }> = ({
+  tooltip = "Detection setting: determined by bot engine",
+}) => (
+  <span
+    className="px-1 py-0.2 rounded text-[9px] font-mono bg-iea-inset border border-iea-borderSubtle text-iea-textMuted select-none shrink-0"
+    title={tooltip}
+  >
+    n/a
+  </span>
+);
+
 export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
   open,
   settings,
@@ -263,9 +274,10 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
                 type="checkbox"
                 aria-label="Confluence Filter"
                 checked={draft.internalConfluenceFilter}
-                onChange={(e) => update({ internalConfluenceFilter: e.target.checked })}
-                className={checkCls}
+                disabled
+                className={`${checkCls} opacity-40 cursor-not-allowed`}
               />
+              <NaBadge />
             </Row>
             <Row label="Internal Label Size">
               <select
@@ -347,14 +359,11 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
               <input
                 type="number"
                 aria-label="Swing Points Length"
-                min={10}
-                max={200}
                 value={draft.swingPointsLength}
-                onChange={(e) =>
-                  update({ swingPointsLength: Math.max(10, Math.min(200, Number(e.target.value) || 50)) })
-                }
-                className={numCls}
+                disabled
+                className={`${numCls} opacity-40 cursor-not-allowed`}
               />
+              <NaBadge />
             </Row>
             <Row label="Show Strong/Weak High/Low">
               <input
@@ -411,23 +420,25 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
               <select
                 aria-label="Order Block Filter"
                 value={draft.obFilter}
-                onChange={(e) => update({ obFilter: e.target.value as ObFilterOption })}
-                className={selectCls}
+                disabled
+                className={`${selectCls} opacity-40 cursor-not-allowed`}
               >
                 <option value="Atr">Atr</option>
                 <option value="Cumulative Mean Range">Cumulative Mean Range</option>
               </select>
+              <NaBadge />
             </Row>
             <Row label="Order Block Mitigation">
               <select
                 aria-label="Order Block Mitigation"
                 value={draft.obMitigation}
-                onChange={(e) => update({ obMitigation: e.target.value as ObMitigationOption })}
-                className={selectCls}
+                disabled
+                className={`${selectCls} opacity-40 cursor-not-allowed`}
               >
                 <option value="High/Low">High/Low</option>
                 <option value="Close">Close</option>
               </select>
+              <NaBadge />
             </Row>
             <Row label="Internal Bullish OB">
               <ColorAlphaPicker
@@ -476,28 +487,21 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
               <input
                 type="number"
                 aria-label="EQH/EQL Bars Confirmation"
-                min={1}
-                max={20}
                 value={draft.eqhBarsConfirmation}
-                onChange={(e) =>
-                  update({ eqhBarsConfirmation: Math.max(1, Math.min(20, Number(e.target.value) || 3)) })
-                }
-                className={numCls}
+                disabled
+                className={`${numCls} opacity-40 cursor-not-allowed`}
               />
+              <NaBadge />
             </Row>
             <Row label="Threshold">
               <input
                 type="number"
                 aria-label="EQH/EQL Threshold"
-                min={0}
-                max={0.5}
-                step={0.1}
                 value={draft.eqhThreshold}
-                onChange={(e) =>
-                  update({ eqhThreshold: Math.max(0, Math.min(0.5, Number(e.target.value) || 0)) })
-                }
-                className={numCls}
+                disabled
+                className={`${numCls} opacity-40 cursor-not-allowed`}
               />
+              <NaBadge />
             </Row>
             <Row label="Label Size">
               <select
@@ -527,16 +531,17 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
                 type="checkbox"
                 aria-label="FVG Auto Threshold"
                 checked={draft.fvgAutoThreshold}
-                onChange={(e) => update({ fvgAutoThreshold: e.target.checked })}
-                className={checkCls}
+                disabled
+                className={`${checkCls} opacity-40 cursor-not-allowed`}
               />
+              <NaBadge />
             </Row>
             <Row label="Timeframe">
               <select
                 aria-label="FVG Timeframe"
                 value={draft.fvgTimeframe}
-                onChange={(e) => update({ fvgTimeframe: e.target.value as FvgTimeframeOption })}
-                className={selectCls}
+                disabled
+                className={`${selectCls} opacity-40 cursor-not-allowed`}
               >
                 <option value="Chart">Chart</option>
                 <option value="M15">M15</option>
@@ -544,6 +549,7 @@ export const SmcSettingsPopover: React.FC<SmcSettingsPopoverProps> = ({
                 <option value="H4">H4</option>
                 <option value="D1">D1</option>
               </select>
+              <NaBadge />
             </Row>
             <Row label="Bullish FVG">
               <ColorAlphaPicker
