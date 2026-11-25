@@ -22,7 +22,8 @@
     "electron": "electron electron/main.cjs",
     "electron:dev": "concurrently \"vite\" \"wait-on tcp:5173 && electron electron/main.cjs --dev\"",
     "sidecars": "python packaging/build_sidecars.py",
-    "dist:win": "npm run build && electron-builder --win nsis:x64 && node -e \"const fs=require('fs'),p=require('./package.json');fs.copyFileSync('release/Institutional-EA-Setup-'+p.version+'.exe','release/setup.exe')\"",
+    "dist:win": "npm run build && electron-builder --win nsis:x64 && node -e \"const fs=require('fs'),p=require('./package.json');fs.copyFileSync('release/InstitutionalEA-Setup-'+p.version+'.exe','release/InstitutionalEA-Setup.exe')\"",
+    "dist:mac": "npm run build && electron-builder --mac dmg --universal",
     "package:win": "python packaging/build_sidecars.py && npm run dist:win",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
@@ -100,8 +101,49 @@
           ]
         }
       ],
-      "icon": "resources/icon.ico"
+      "icon": "resources/icon.ico",
+      "signAndEditExecutable": true
     },
+    "mac": {
+      "category": "public.app-category.finance",
+      "icon": "resources/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "resources/entitlements.mac.plist",
+      "entitlementsInherit": "resources/entitlements.mac.plist",
+      "artifactName": "InstitutionalEA-${version}.${ext}",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "Institutional EA ${version}",
+      "icon": "resources/icon.icns",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "gackstone",
+        "repo": "Institutional-EA"
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "perMachine": false,
@@ -118,7 +160,7 @@
       "installerSidebar": "resources/installerSidebar.bmp",
       "uninstallerSidebar": "resources/installerSidebar.bmp",
       "include": "resources/installer.nsh",
-      "artifactName": "Institutional-EA-Setup-${version}.${ext}",
+      "artifactName": "InstitutionalEA-Setup-${version}.${ext}",
       "deleteAppDataOnUninstall": false
     }
   }
