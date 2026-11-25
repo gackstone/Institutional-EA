@@ -73,3 +73,26 @@ companion/src-tauri/target/
 companion/src-tauri/binaries/
 *.exe
 release/Institutional-EA-Companion-Setup.exe
+
+# Mobile / Expo / Android / iOS build artifacts & signing credentials
+.expo/
+.gradle/
+apps/mobile/.expo/
+apps/mobile/dist/
+apps/mobile/web-build/
+apps/mobile/android/app/build/
+apps/mobile/ios/build/
+android/app/build/
+ios/build/
+*.jks
+*.keystore
+*.p12
+*.pem
+*.mobileprovision
+*.apk
+*.aab
+*.ipa
+credentials.json
+*service-account*.json
+google-services.json
+GoogleService-Info.plist
