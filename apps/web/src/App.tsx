@@ -81,21 +81,41 @@ export default function App(): React.ReactElement {
     detectedOS === "android" || detectedOS === "ios" ? "mobile" : "desktop"
   );
   const [liveRelease, setLiveRelease] = useState<LiveReleaseData | null>(null);
+  const [releaseFetchFailed, setReleaseFetchFailed] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
 
-  // Fetch latest GitHub Release metadata (version, asset sizes, SHA256SUMS.txt) when published
+  // Fetch latest GitHub Release metadata (version, asset sizes, SHA256SUMS.txt) with 15-min localStorage cache
   useEffect(() => {
     let cancelled = false;
+    const CACHE_KEY = "iea_latest_release_cache_v1";
+    const CACHE_TTL_MS = 15 * 60 * 1000;
+
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.ts && Date.now() - parsed.ts < CACHE_TTL_MS && parsed?.data) {
+          setLiveRelease(parsed.data as LiveReleaseData);
+          return;
+        }
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
     async function loadLatestRelease() {
       try {
         const res = await fetch(LATEST_RELEASE_API_URL, {
           headers: { Accept: "application/vnd.github+json" },
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (!cancelled) setReleaseFetchFailed(true);
+          return;
+        }
         const json = await res.json();
         const tag = typeof json.tag_name === "string" ? json.tag_name.replace(/^v/, "") : DEFAULT_APP_VERSION;
         const assetsMap: Record<string, LiveReleaseAsset> = {};
@@ -134,10 +154,17 @@ export default function App(): React.ReactElement {
         }
 
         if (!cancelled) {
-          setLiveRelease({ version: tag, assets: assetsMap });
+          const payload: LiveReleaseData = { version: tag, assets: assetsMap };
+          setLiveRelease(payload);
+          setReleaseFetchFailed(false);
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: payload }));
+          } catch {
+            // Ignore quota errors
+          }
         }
       } catch {
-        // Fallback to config defaults if no public release exists yet
+        if (!cancelled) setReleaseFetchFailed(true);
       }
     }
     loadLatestRelease();
@@ -305,7 +332,8 @@ export default function App(): React.ReactElement {
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 font-medium text-emerald-600 hover:underline dark:text-emerald-400"
               >
-                All releases & checksums <ExternalLink className="h-3 w-3" />
+                {releaseFetchFailed ? "View all downloads on GitHub" : "All releases & checksums"}{" "}
+                <ExternalLink className="h-3 w-3" />
               </a>
             </p>
           </div>
