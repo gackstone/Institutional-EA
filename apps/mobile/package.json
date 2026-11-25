@@ -1,9 +1,9 @@
 {
   "name": "@institutional-ea/mobile",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "private": true,
   "type": "module",
-  "description": "Institutional EA — Mobile Read-Only Companion App (iOS & Android)",
+  "description": "Institutional EA â€” Mobile Read-Only Companion App (iOS & Android)",
   "main": "./index.js",
   "scripts": {
     "start": "expo start",

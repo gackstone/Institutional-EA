@@ -1,8 +1,8 @@
 {
   "name": "institutional-ea-monorepo",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "private": true,
-  "description": "Institutional EA Monorepo — Desktop Companion, Mobile App, and Shared Packages",
+  "description": "Institutional EA Monorepo â€” Desktop Companion, Mobile App, and Shared Packages",
   "workspaces": [
     "companion",
     "apps/*",

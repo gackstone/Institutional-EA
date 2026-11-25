@@ -94,7 +94,7 @@ export function PositionsList({
   return (
     <FlatList
       data={positions}
-      keyExtractor={(item) => String(item.ticket)}
+      keyExtractor={(item: Position) => String(item.ticket)}
       renderItem={renderPositionItem}
       contentContainerStyle={styles.listContent}
     />

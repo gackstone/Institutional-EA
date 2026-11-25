@@ -1,6 +1,6 @@
 {
   "name": "institutional-ea-companion",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Institutional EA Companion Desktop Application",
   "author": "Institutional EA",
   "homepage": "https://github.com/gackstone/Institutional-EA",
@@ -59,7 +59,7 @@
   "build": {
     "appId": "com.institutionalea.companion",
     "productName": "Institutional EA",
-    "copyright": "Copyright © 2026 Institutional EA",
+    "copyright": "Copyright Â© 2026 Institutional EA",
     "directories": {
       "output": "release",
       "buildResources": "resources"

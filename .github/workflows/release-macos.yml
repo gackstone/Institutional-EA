@@ -48,6 +48,18 @@ jobs:
       - name: Ensure resources/bin directory exists
         run: mkdir -p companion/resources/bin
 
+      - name: Generate Apple-native icon.icns via iconutil
+        run: |
+          ICONSET=$(mktemp -d)/icon.iconset
+          mkdir -p "$ICONSET"
+          SRC="companion/resources/icon.png"
+          for sz in 16 32 128 256 512; do
+            sips -z $sz $sz "$SRC" --out "$ICONSET/icon_${sz}x${sz}.png" >/dev/null
+            sz2=$((sz * 2))
+            sips -z $sz2 $sz2 "$SRC" --out "$ICONSET/icon_${sz}x${sz}@2x.png" >/dev/null
+          done
+          iconutil -c icns "$ICONSET" -o companion/resources/icon.icns
+
       - name: Build macOS universal DMG (arm64 + x64)
         working-directory: companion
         env:
@@ -57,12 +69,14 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          npm run build
           if [ -z "$CSC_LINK" ]; then
             echo "::warning::MAC_CSC_LINK secret not configured — building UNSIGNED macOS .dmg (users will need Right-click > Open)."
             export CSC_IDENTITY_AUTO_DISCOVERY=false
+            npx electron-builder --mac dmg --universal --publish never -c.mac.identity=null -c.mac.hardenedRuntime=false
+          else
+            npx electron-builder --mac dmg --universal --publish never
           fi
-          npm run build
-          npx electron-builder --mac dmg --universal --publish never
 
       - name: Verify macOS app bundle & icon.icns inside DMG
         run: |

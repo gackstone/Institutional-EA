@@ -18,7 +18,7 @@ export interface DownloadPlatformConfig {
 export const RELEASE_REPO = "gackstone/Institutional-EA";
 export const LATEST_RELEASE_API_URL = `https://api.github.com/repos/${RELEASE_REPO}/releases/latest`;
 export const LATEST_RELEASE_BASE_URL = `https://github.com/${RELEASE_REPO}/releases/latest/download`;
-export const DEFAULT_APP_VERSION = "1.3.2";
+export const DEFAULT_APP_VERSION = "1.3.3";
 
 /**
  * Edit links, TestFlight URL, or version defaults in this single file
@@ -36,7 +36,7 @@ export const DOWNLOAD_PLATFORMS: Record<PlatformId, DownloadPlatformConfig> = {
     systemRequirements: "Windows 10 / 11 (64-bit)",
     fallbackSize: "~85 MB",
     architecture: "x64 NSIS Installer",
-    installNote: "If SmartScreen appears on unsigned builds, click More info → Run anyway.",
+    installNote: "If SmartScreen appears on unsigned builds, click More info â†’ Run anyway.",
   },
   macos: {
     id: "macos",
@@ -49,7 +49,7 @@ export const DOWNLOAD_PLATFORMS: Record<PlatformId, DownloadPlatformConfig> = {
     systemRequirements: "macOS 11 Big Sur or later",
     fallbackSize: "~110 MB",
     architecture: "Universal (Apple Silicon + Intel)",
-    installNote: "For unsigned builds, drag to Applications, then Right-click → Open.",
+    installNote: "For unsigned builds, drag to Applications, then Right-click â†’ Open.",
   },
   android: {
     id: "android",

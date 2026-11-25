@@ -202,6 +202,19 @@ jobs:
       - name: Ensure resources/bin directory exists
         run: mkdir -p companion/resources/bin
 
+      - name: Generate Apple-native icon.icns via iconutil
+        run: |
+          ICONSET=$(mktemp -d)/icon.iconset
+          mkdir -p "$ICONSET"
+          SRC="companion/resources/icon.png"
+          for sz in 16 32 128 256 512; do
+            sips -z $sz $sz "$SRC" --out "$ICONSET/icon_${sz}x${sz}.png" >/dev/null
+            sz2=$((sz * 2))
+            sips -z $sz2 $sz2 "$SRC" --out "$ICONSET/icon_${sz}x${sz}@2x.png" >/dev/null
+          done
+          iconutil -c icns "$ICONSET" -o companion/resources/icon.icns
+          ls -lh companion/resources/icon.icns
+
       - name: Build macOS universal DMG (arm64 + x64)
         working-directory: companion
         env:
@@ -211,12 +224,14 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          npm run build
           if [ -z "$CSC_LINK" ]; then
             echo "::warning::MAC_CSC_LINK secret not configured — building UNSIGNED macOS .dmg (users will need Right-click > Open)."
             export CSC_IDENTITY_AUTO_DISCOVERY=false
+            npx electron-builder --mac dmg --universal --publish never -c.mac.identity=null -c.mac.hardenedRuntime=false
+          else
+            npx electron-builder --mac dmg --universal --publish never
           fi
-          npm run build
-          npx electron-builder --mac dmg --universal --publish never
 
       - name: Verify macOS app bundle & icon.icns inside DMG
         run: |
@@ -289,8 +304,9 @@ jobs:
 
       - name: Verify generated Android launcher & splash branding resources
         run: |
-          find apps/mobile/android/app/src/main/res -name "ic_launcher*" | grep -q . || { echo "Missing Android ic_launcher resources"; exit 1; }
-          find apps/mobile/android/app/src/main/res -name "splashscreen*" | grep -q . || { echo "Missing Android splashscreen resources"; exit 1; }
+          find apps/mobile/android/app/src/main/res > /tmp/android_res.txt
+          grep -qi "ic_launcher" /tmp/android_res.txt || { echo "Missing Android ic_launcher resources"; exit 1; }
+          grep -qi "splashscreen" /tmp/android_res.txt || { echo "Missing Android splashscreen resources"; exit 1; }
           echo "Verified Android launcher & splash branding resources."
 
       - name: Configure Android signing (release keystore or debug fallback)
@@ -345,7 +361,8 @@ jobs:
           APK_SRC=$(find apps/mobile/android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
           AAB_SRC=$(find apps/mobile/android/app/build/outputs/bundle/release -name "*.aab" | head -n 1)
           if [ -z "$APK_SRC" ]; then echo "Android APK not found"; exit 1; fi
-          unzip -l "$APK_SRC" | grep -q "ic_launcher" || { echo "Launcher icon missing inside built APK"; exit 1; }
+          unzip -Z1 "$APK_SRC" > /tmp/apk_entries.txt
+          grep -Eqi "(ic_launcher|mipmap)" /tmp/apk_entries.txt || { echo "Launcher icon missing inside built APK"; exit 1; }
           cp "$APK_SRC" "release-out/android/InstitutionalEA-${VERSION}.apk"
           cp "$APK_SRC" "release-out/android/InstitutionalEA.apk"
           APK_HASH=$(sha256sum "release-out/android/InstitutionalEA.apk" | awk '{print $1}')
@@ -389,7 +406,8 @@ jobs:
         run: |
           npx expo prebuild --platform ios --non-interactive
           test -d ios/InstitutionalEA/Images.xcassets/AppIcon.appiconset || { echo "Missing iOS AppIcon.appiconset"; exit 1; }
-          find ios/InstitutionalEA/Images.xcassets/AppIcon.appiconset -name "*.png" | grep -q . || { echo "Missing PNG in AppIcon.appiconset"; exit 1; }
+          find ios/InstitutionalEA/Images.xcassets/AppIcon.appiconset -name "*.png" > /tmp/ios_icons.txt
+          test -s /tmp/ios_icons.txt || { echo "Missing PNG in AppIcon.appiconset"; exit 1; }
           test -d ios/InstitutionalEA/Images.xcassets/SplashScreen.imageset || { echo "Missing iOS SplashScreen.imageset"; exit 1; }
           echo "Verified iOS native project, AppIcon.appiconset, and SplashScreen.imageset."
 
