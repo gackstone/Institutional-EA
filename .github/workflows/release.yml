@@ -130,6 +130,19 @@ jobs:
       - name: Typecheck desktop companion
         run: npm --workspace=companion exec -- tsc --noEmit
 
+      - name: Setup Python 3.12 for MT5 sidecar packaging
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build Windows MT5 Python sidecars
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+          python companion/packaging/build_sidecars.py
+          Get-ChildItem "companion/resources/bin"
+
       - name: Build & verify Windows NSIS installer (safe isolated staging)
         working-directory: companion
         shell: pwsh
