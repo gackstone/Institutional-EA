@@ -556,6 +556,17 @@ class SignalCandidate:
     profit_mode: ProfitManagementMode = ProfitManagementMode.QUICK_SCALP
     lifecycle_state: SignalLifecycleState = SignalLifecycleState.DETECTED
     execution_mode_selected: Optional[str] = None  # "SCALP" or "HOLD"
+    # Video-derived ICT/SMC setup metadata (100% additive, backward-compatible)
+    setup_id: Optional[str] = None
+    context: str = "NONE"  # SILVER_BULLET | NY_KILLZONE | NY_MACRO | JUDAS | ASIAN_SD | SESSION_SWEEP | NONE
+    sweep_kind: str = "UNDECIDED"  # SWEEP | BREAKOUT | UNDECIDED
+    smt_status: str = "UNKNOWN"  # CONFIRMED | FAILED | UNKNOWN
+    three_point_grade: str = "NONE"  # A+ | B | INVALID | NONE
+    draw_on_liquidity: Optional[Dict[str, Any]] = None  # {"price": float, "type": str, "pool_id": str}
+    entry_model: str = "NONE"  # CE | OTE | IFVG_RETEST | BREAKER_OVERLAP | LTF_OB_LIMIT | NONE
+    invalidation_price: Optional[float] = None
+    provenance: List[str] = field(default_factory=list)
+    confluence_breakdown: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
