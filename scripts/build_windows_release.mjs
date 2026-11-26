@@ -119,12 +119,24 @@ function main() {
   const installerSize = assertExistsNonEmpty(stagedInstaller, `NSIS installer (InstitutionalEA-Setup-${version}.exe)`);
   const blockmapSize = assertExistsNonEmpty(stagedBlockmap, "NSIS blockmap");
 
-  // Verify required branding inputs were present during packaging
+  // Verify required branding inputs & public Supabase config were present during packaging
   assertExistsNonEmpty(path.join(COMPANION_DIR, "dist", "institutional-ea-logo.png"), "dist/institutional-ea-logo.png");
   assertExistsNonEmpty(path.join(COMPANION_DIR, "electron", "icon.png"), "electron/icon.png");
+  assertExistsNonEmpty(path.join(COMPANION_DIR, "electron", "publicConfig.generated.cjs"), "electron/publicConfig.generated.cjs");
   assertExistsNonEmpty(path.join(COMPANION_DIR, "resources", "icon.ico"), "resources/icon.ico");
   assertExistsNonEmpty(path.join(COMPANION_DIR, "resources", "installerHeader.bmp"), "resources/installerHeader.bmp");
   assertExistsNonEmpty(path.join(COMPANION_DIR, "resources", "installerSidebar.bmp"), "resources/installerSidebar.bmp");
+
+  // Inspect packaged app.asar: prove public Supabase config is bundled and NO service_role / .env secret leaked
+  const asarBuf = fs.readFileSync(stagedAsar);
+  const asarText = asarBuf.toString("latin1");
+  if (!asarText.includes("publicConfig.generated.cjs")) {
+    throw new Error("Verification failed — publicConfig.generated.cjs not found inside app.asar");
+  }
+  if (asarText.includes("sb_secret_") || asarText.includes("SUPABASE_DB_URL=")) {
+    throw new Error("SECURITY FAILURE — secret key or .env content detected inside app.asar!");
+  }
+  console.log("  [OK] app.asar verified: publicConfig.generated.cjs bundled, zero secret/service_role leakage");
 
   const binDir = path.join(stagingDir, "win-unpacked", "resources", "bin");
   const sidecars = fs.existsSync(binDir)

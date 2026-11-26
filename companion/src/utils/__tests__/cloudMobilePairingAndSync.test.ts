@@ -85,3 +85,20 @@ test("Android SecurityScreen supports Cloud QR & 6-digit pairing without requiri
   assert.match(src, /Advanced: Local Wi-Fi Fallback/);
   assert.match(src, /Waiting for approval/);
 });
+
+test("Build-time public Supabase config generator blocks service_role keys and DesktopPublicEntry deduplicates errors", () => {
+  const genPath = path.join(REPO_ROOT, "scripts/generate_companion_public_config.mjs");
+  const genSrc = fs.readFileSync(genPath, "utf-8");
+  assert.match(genSrc, /sb_secret_/);
+  assert.match(genSrc, /service_role/);
+  assert.match(genSrc, /--require/);
+
+  const entryPath = path.join(REPO_ROOT, "companion/src/components/DesktopPublicEntry.tsx");
+  const entrySrc = fs.readFileSync(entryPath, "utf-8");
+  assert.match(entrySrc, /\/not configured\/i\.test\(formError\)/);
+
+  const authPath = path.join(REPO_ROOT, "companion/electron/cloudAuthManager.cjs");
+  const authSrc = fs.readFileSync(authPath, "utf-8");
+  assert.match(authSrc, /publicConfig\.generated\.cjs/);
+  assert.match(authSrc, /loadUserConfigJson/);
+});

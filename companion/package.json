@@ -1,6 +1,6 @@
 {
   "name": "institutional-ea-companion",
-  "version": "1.3.5",
+  "version": "1.3.6",
   "description": "Institutional EA Companion Desktop Application",
   "author": "Institutional EA",
   "homepage": "https://github.com/gackstone/Institutional-EA",
@@ -15,7 +15,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "node ../scripts/generate_companion_public_config.mjs --require && tsc && vite build",
     "test": "node --experimental-strip-types --test src/utils/__tests__/tradeChartMath.test.ts src/utils/__tests__/chartTvLightFixture.test.ts src/utils/__tests__/topBarControlState.test.ts src/utils/__tests__/chartDrawingsParity.test.ts src/utils/__tests__/startupSafety.test.ts src/utils/__tests__/luxalgoSmc.test.ts src/utils/__tests__/dashboardCleanliness.test.ts src/utils/__tests__/cloudAuthAndSecurity.test.ts src/utils/__tests__/cloudMobilePairingAndSync.test.ts",
     "test:smoke": "node scripts/smoke_test.cjs",
     "preview": "vite preview",

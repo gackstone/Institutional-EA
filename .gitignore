@@ -67,6 +67,7 @@ build/
 companion/release/
 companion/release-staging-*/
 companion/release-out/
+companion/electron/publicConfig.generated.cjs
 Institutional EA landing page/
 companion/packaging/build/
 companion/packaging/dist/
