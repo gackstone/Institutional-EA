@@ -75,36 +75,75 @@ function createCloudAuthManager(options) {
     }
   }
 
+  function loadUserConfigJson(filePath) {
+    try {
+      if (!filePath || !fs.existsSync(filePath)) return {};
+      const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function loadBuildTimePublicConfig() {
+    try {
+      const generatedPath = path.join(__dirname, "publicConfig.generated.cjs");
+      if (fs.existsSync(generatedPath)) {
+        // eslint-disable-next-line global-require, import/no-dynamic-require
+        const mod = require(generatedPath);
+        if (mod && typeof mod === "object") return mod;
+      }
+    } catch {
+      // Optional generated build config not present
+    }
+    return {};
+  }
+
   function getEnvConfig() {
+    // Fallback order:
+    // 1. Build-time injected public config (`publicConfig.generated.cjs`)
+    // 2. Optional user-writable config file (`%APPDATA%\Institutional EA\config.json`)
+    // 3. Runtime `process.env` / local dev `.env`
+    const buildCfg = loadBuildTimePublicConfig();
+    const userCfg = loadUserConfigJson(path.join(path.dirname(credentialsDir), "config.json"));
     const fileEnv = loadDotEnvMap([
       path.join(path.dirname(credentialsDir), ".env"),
       path.join(projectRoot, ".env"),
     ]);
 
-    const supabaseUrl = (
-      process.env.SUPABASE_URL ||
-      process.env.VITE_SUPABASE_URL ||
-      fileEnv.SUPABASE_URL ||
-      fileEnv.VITE_SUPABASE_URL ||
-      ""
+    const supabaseUrl = String(
+      buildCfg.supabaseUrl ||
+        userCfg.supabaseUrl ||
+        userCfg.SUPABASE_URL ||
+        process.env.SUPABASE_URL ||
+        process.env.VITE_SUPABASE_URL ||
+        fileEnv.SUPABASE_URL ||
+        fileEnv.VITE_SUPABASE_URL ||
+        ""
     )
       .trim()
       .replace(/\/+$/, "");
 
-    const supabaseAnonKey = (
-      process.env.SUPABASE_ANON_KEY ||
-      process.env.VITE_SUPABASE_ANON_KEY ||
-      fileEnv.SUPABASE_ANON_KEY ||
-      fileEnv.VITE_SUPABASE_ANON_KEY ||
-      ""
+    const supabaseAnonKey = String(
+      buildCfg.supabaseAnonKey ||
+        userCfg.supabaseAnonKey ||
+        userCfg.SUPABASE_ANON_KEY ||
+        process.env.SUPABASE_ANON_KEY ||
+        process.env.VITE_SUPABASE_ANON_KEY ||
+        fileEnv.SUPABASE_ANON_KEY ||
+        fileEnv.VITE_SUPABASE_ANON_KEY ||
+        ""
     ).trim();
 
-    const webPortalUrl = (
-      process.env.INSTITUTIONAL_EA_WEB_URL ||
-      process.env.VITE_PUBLIC_SITE_URL ||
-      fileEnv.INSTITUTIONAL_EA_WEB_URL ||
-      fileEnv.VITE_PUBLIC_SITE_URL ||
-      "https://arcadefx.live"
+    const webPortalUrl = String(
+      buildCfg.webPortalUrl ||
+        userCfg.webPortalUrl ||
+        userCfg.INSTITUTIONAL_EA_WEB_URL ||
+        process.env.INSTITUTIONAL_EA_WEB_URL ||
+        process.env.VITE_PUBLIC_SITE_URL ||
+        fileEnv.INSTITUTIONAL_EA_WEB_URL ||
+        fileEnv.VITE_PUBLIC_SITE_URL ||
+        "https://arcadefx.live"
     )
       .trim()
       .replace(/\/+$/, "");
@@ -113,7 +152,7 @@ function createCloudAuthManager(options) {
       Boolean(supabaseUrl) &&
       Boolean(supabaseAnonKey) &&
       !supabaseUrl.includes("your-project-ref") &&
-      !supabaseAnonKey.includes("your-supabase-anon-key");
+      !supabaseAnonKey.includes("your-supabase");
 
     return { supabaseUrl, supabaseAnonKey, webPortalUrl, configured };
   }

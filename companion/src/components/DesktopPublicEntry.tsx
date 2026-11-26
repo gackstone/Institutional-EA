@@ -576,17 +576,19 @@ export const DesktopPublicEntry: React.FC<DesktopPublicEntryProps> = ({
 
             {cloudState && !cloudState.configured && (
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-                Supabase environment variables (<code className="font-mono">SUPABASE_URL</code>,{" "}
-                <code className="font-mono">SUPABASE_ANON_KEY</code>) are not configured.
+                Cloud sign-in is not configured in this build. Install the latest Institutional EA release or add{" "}
+                <code className="font-mono">supabaseUrl</code> and <code className="font-mono">supabaseAnonKey</code> to{" "}
+                <code className="font-mono">%APPDATA%\Institutional EA\config.json</code>.
               </div>
             )}
 
-            {formError && (
-              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300 flex items-start space-x-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{formError}</span>
-              </div>
-            )}
+            {formError &&
+              !(cloudState && !cloudState.configured && /not configured/i.test(formError)) && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300 flex items-start space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{formError}</span>
+                </div>
+              )}
 
             {formSuccess && (
               <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300 flex items-start space-x-2">
