@@ -68,6 +68,7 @@ companion/release/
 companion/release-staging-*/
 companion/release-out/
 companion/electron/publicConfig.generated.cjs
+apps/mobile/src/generated/supabasePublicConfig.ts
 Institutional EA landing page/
 companion/packaging/build/
 companion/packaging/dist/

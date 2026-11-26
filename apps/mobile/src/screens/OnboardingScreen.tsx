@@ -23,20 +23,20 @@ export function OnboardingScreen({
       <Image source={BRAND_LOGO} style={styles.logo} resizeMode="contain" accessibilityLabel="Institutional EA Logo" />
       <Text style={[styles.title, { color: tokens.text }]}>Pair Your Companion</Text>
       <Text style={[styles.subtitle, { color: tokens.textMuted }]}>
-        Connect to your Windows Institutional EA Companion on the same Wi-Fi network for real-time read-only monitoring.
+        Connect securely to your Windows Institutional EA Companion from any Wi-Fi or mobile data network for real-time read-only monitoring.
       </Text>
 
       <View style={[styles.stepsCard, { backgroundColor: tokens.card, borderColor: tokens.border }]}>
         <StepRow
           num="1"
-          title="Enable Mobile Sync on PC"
-          desc="Open Windows Companion → Settings → Mobile Sync and turn it on."
+          title="Start Cloud Pairing on PC"
+          desc="Open Windows Companion → Settings → PAIR NEW ANDROID DEVICE."
           tokens={tokens}
         />
         <StepRow
           num="2"
           title="Scan QR or Enter 6-Digit Code"
-          desc="Use your phone camera or type the Host IP, port, and 6-digit pairing code."
+          desc="Use your phone camera or enter the 6-digit code — no IP address or shared Wi-Fi needed."
           tokens={tokens}
         />
         <StepRow
