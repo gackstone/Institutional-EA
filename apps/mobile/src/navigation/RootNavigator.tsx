@@ -1,307 +1,453 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { type ThemeMode, getThemeTokens } from "../theme/themeTokens.ts";
-import { ConnectionBanner, type ConnectionState } from "../components/ConnectionBanner.tsx";
-import { KpiCards, type KpiData } from "../components/KpiCards.tsx";
-import { PositionsList } from "../components/PositionsList.tsx";
-import { ChartWebView } from "../components/ChartWebView.tsx";
-import type { Position, Candle, SmcZone } from "@institutional-ea/data-contract";
+import {
+  ConnectionBanner,
+  type ConnectionState,
+} from "../components/ConnectionBanner.tsx";
+import {
+  ChartTabIcon,
+  MoonIcon,
+  OverviewIcon,
+  SecurityTabIcon,
+  SunIcon,
+  TradesTabIcon,
+} from "../components/Icons.tsx";
+import { OnboardingScreen } from "../screens/OnboardingScreen.tsx";
+import { OverviewScreen } from "../screens/OverviewScreen.tsx";
+import { ChartsScreen } from "../screens/ChartsScreen.tsx";
+import { TradesScreen } from "../screens/TradesScreen.tsx";
+import { SecurityScreen } from "../screens/SecurityScreen.tsx";
+import { triggerSelectionHaptic } from "../services/haptics.ts";
+import type { EquityRange } from "../components/EquityCurveCard.tsx";
+import type { MobileSyncClient } from "../services/MobileSyncClient.ts";
+import type { PairingCredentials } from "../services/SecureStorage.ts";
+import type { ChartLayerPreferences } from "../services/OfflineCache.ts";
+import type {
+  MobileAccount,
+  MobileActivityEvent,
+  MobileBotState,
+  MobileCandlesResponse,
+  MobileDrawingsResponse,
+  MobileEquityResponse,
+  MobilePosition,
+  MobileStats,
+  MobileSymbolSpec,
+  MobileTradeRecord,
+} from "@institutional-ea/data-contract";
 
 const BRAND_LOGO = require("../../assets/logo.png");
 
-export type MobileTab = "DASHBOARD" | "CHARTS" | "POSITIONS" | "SETTINGS";
+export type MobileTab = "OVERVIEW" | "CHARTS" | "TRADES" | "SECURITY";
 
 interface RootNavigatorProps {
   theme: ThemeMode;
   onToggleTheme: () => void;
+  currentTab: MobileTab;
+  onSelectTab: (tab: MobileTab) => void;
   connectionState: ConnectionState;
-  kpiData?: KpiData;
-  positions?: Position[];
-  candles?: Candle[];
-  zones?: SmcZone[];
-  activeSymbol?: string;
+  botState: MobileBotState | null;
+  lastSyncedMs: number | null;
+  isShowingCache: boolean;
+  onRetryConnection: () => void;
+  credentials: PairingCredentials | null;
+  client: MobileSyncClient | null;
+  account: MobileAccount | null;
+  stats: MobileStats | null;
+  positions: MobilePosition[];
+  equity: MobileEquityResponse | null;
+  equityRange: EquityRange;
+  onSelectEquityRange: (r: EquityRange) => void;
+  symbols: MobileSymbolSpec[];
+  timeframes: string[];
+  selectedSymbol: string | null;
+  selectedTimeframe: string;
+  onSelectSymbol: (sym: string) => void;
+  onSelectTimeframe: (tf: string) => void;
+  candlesData: MobileCandlesResponse | null;
+  drawings: MobileDrawingsResponse | null;
+  layers: ChartLayerPreferences;
+  onToggleLayer: (key: keyof ChartLayerPreferences) => void;
+  activity: MobileActivityEvent[];
+  isLoading: boolean;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  chartFullscreen: boolean;
+  onToggleChartFullscreen: () => void;
+  focusChartTime: number | null;
+  onShowPositionOnChart: (pos: MobilePosition) => void;
+  onShowTradeOnChart: (trade: MobileTradeRecord) => void;
+  onLoadMoreHistory: (beforeTime: number) => void;
+  biometricEnabled: boolean;
+  onToggleBiometric: (enabled: boolean) => void;
+  onPaired: (creds: PairingCredentials) => void;
+  onUnpair: () => Promise<void>;
+  onClearCache: () => Promise<void>;
 }
 
-export function RootNavigator({
-  theme,
-  onToggleTheme,
-  connectionState,
-  kpiData,
-  positions = [],
-  candles = [],
-  zones = [],
-  activeSymbol = "XAUUSD",
-}: RootNavigatorProps): React.ReactElement {
-  const [currentTab, setCurrentTab] = useState<MobileTab>("DASHBOARD");
+export function RootNavigator(props: RootNavigatorProps): React.ReactElement {
+  const {
+    theme,
+    onToggleTheme,
+    currentTab,
+    onSelectTab,
+    connectionState,
+    botState,
+    lastSyncedMs,
+    isShowingCache,
+    onRetryConnection,
+    credentials,
+    chartFullscreen,
+  } = props;
+
+  const insets = useSafeAreaInsets();
   const tokens = getThemeTokens(theme);
+  const isPaired = credentials !== null;
+  const hideChrome = chartFullscreen && currentTab === "CHARTS";
+
+  const botChipColor =
+    botState === "RUNNING"
+      ? tokens.profit
+      : botState === "PAUSED"
+      ? tokens.warning
+      : botState === "ERROR" || botState === "EMERGENCY_STOP"
+      ? tokens.loss
+      : tokens.textDim;
+
+  const botChipBg =
+    botState === "RUNNING"
+      ? tokens.profitBg
+      : botState === "PAUSED"
+      ? tokens.warningBg
+      : botState === "ERROR" || botState === "EMERGENCY_STOP"
+      ? tokens.lossBg
+      : tokens.cardSecondary;
+
+  const connDotColor =
+    connectionState === "LIVE"
+      ? tokens.profit
+      : connectionState === "CONNECTING" ||
+        connectionState === "RECONNECTING" ||
+        connectionState === "STALE"
+      ? tokens.warning
+      : connectionState === "NOT_PAIRED"
+      ? tokens.textDim
+      : tokens.loss;
+
+  const connShortLabel =
+    connectionState === "LIVE"
+      ? "Live"
+      : connectionState === "RECONNECTING"
+      ? "Reconnecting"
+      : connectionState === "STALE"
+      ? "Stale"
+      : connectionState === "COMPANION_OFFLINE"
+      ? "Offline"
+      : connectionState === "MT5_DISCONNECTED"
+      ? "MT5 Off"
+      : connectionState === "NOT_PAIRED"
+      ? "Unpaired"
+      : connectionState === "BOT_PAUSED"
+      ? "Paused"
+      : connectionState === "BOT_STOPPED"
+      ? "Stopped"
+      : "Syncing";
 
   return (
     <View style={[styles.screen, { backgroundColor: tokens.background }]}>
       {/* Top Header */}
-      <View style={[styles.header, { backgroundColor: tokens.surface, borderColor: tokens.border }]}>
-        <View style={styles.titleRow}>
-          <View style={styles.brandRow}>
-            <Image
-              source={BRAND_LOGO}
-              style={[styles.brandLogo, { borderColor: tokens.border }]}
-              resizeMode="contain"
-              accessibilityLabel="Institutional EA Logo"
-            />
-            <Text style={[styles.appTitle, { color: tokens.text }]}>Institutional EA</Text>
-          </View>
-          <View style={styles.headerRight}>
-            <View style={[styles.liveBadge, { backgroundColor: tokens.profitBg }]}>
-              <Text style={[styles.liveText, { color: tokens.profit }]}>READ-ONLY</Text>
+      {!hideChrome && (
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: tokens.surface,
+              borderBottomColor: tokens.borderSubtle,
+              paddingTop: Math.max(insets.top, 10) + 4,
+            },
+          ]}
+        >
+          <View style={styles.titleRow}>
+            <View style={styles.brandRow}>
+              <Image
+                source={BRAND_LOGO}
+                style={[styles.brandLogo, { borderColor: tokens.border }]}
+                resizeMode="contain"
+                accessibilityLabel="Institutional EA Logo"
+              />
+              <View>
+                <Text style={[styles.appTitle, { color: tokens.text }]}>
+                  Institutional EA
+                </Text>
+                <View style={styles.statusInlineRow}>
+                  <View style={[styles.connDot, { backgroundColor: connDotColor }]} />
+                  <Text style={[styles.connText, { color: tokens.textMuted }]}>
+                    {connShortLabel}
+                  </Text>
+                  {botState && isPaired && (
+                    <View style={[styles.botChip, { backgroundColor: botChipBg }]}>
+                      <Text style={[styles.botChipText, { color: botChipColor }]}>
+                        {botState}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
             </View>
-            <TouchableOpacity onPress={onToggleTheme} style={styles.themeToggleBtn}>
-              <Text style={{ fontSize: 16 }}>{theme === "dark" ? "🌙" : "☀️"}</Text>
-            </TouchableOpacity>
+
+            <View style={styles.headerRight}>
+              <View style={[styles.roBadge, { backgroundColor: tokens.accentLight, borderColor: tokens.border }]}>
+                <Text style={[styles.roText, { color: tokens.accent }]}>READ-ONLY</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  triggerSelectionHaptic();
+                  onToggleTheme();
+                }}
+                style={[styles.themeBtn, { backgroundColor: tokens.cardSecondary }]}
+                accessibilityRole="button"
+                accessibilityLabel={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+              >
+                {theme === "dark" ? (
+                  <SunIcon size={16} color={tokens.warning} />
+                ) : (
+                  <MoonIcon size={16} color={tokens.accent} />
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
+
+          <ConnectionBanner
+            state={connectionState}
+            lastSyncedMs={lastSyncedMs}
+            isShowingCache={isShowingCache}
+            theme={theme}
+            onRetry={onRetryConnection}
+          />
         </View>
+      )}
 
-        <ConnectionBanner state={connectionState} theme={theme} />
-      </View>
-
-      {/* Main Tab Content */}
-      <View style={styles.content}>
-        {currentTab === "DASHBOARD" && (
-          <View style={styles.tabScroll}>
-            <View style={{ marginVertical: 8 }}>
-              <KpiCards data={kpiData} theme={theme} />
-            </View>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: tokens.textMuted }]}>
-                Live Execution Chart ({activeSymbol})
-              </Text>
-            </View>
-            <ChartWebView
-              candles={candles}
-              zones={zones}
-              positions={positions}
-              symbol={activeSymbol}
-              theme={theme}
-            />
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: tokens.textMuted }]}>
-                Active Positions ({positions.length})
-              </Text>
-            </View>
-            <PositionsList positions={positions} theme={theme} />
-          </View>
-        )}
-
-        {currentTab === "CHARTS" && (
-          <View style={styles.fullscreenChart}>
-            <View style={styles.chartControlBar}>
-              <Text style={[styles.symbolPill, { color: tokens.text, backgroundColor: tokens.card }]}>
-                {activeSymbol} • M5
-              </Text>
-              <Text style={[styles.legendPill, { color: tokens.textDim }]}>
-                SMC: FVG • OB • IFVG
-              </Text>
-            </View>
-            <ChartWebView
-              candles={candles}
-              zones={zones}
-              positions={positions}
-              symbol={activeSymbol}
-              theme={theme}
-            />
-          </View>
-        )}
-
-        {currentTab === "POSITIONS" && (
-          <View style={styles.positionsTab}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: tokens.textMuted }]}>
-                Open Trades ({positions.length})
-              </Text>
-            </View>
-            <PositionsList positions={positions} theme={theme} />
-          </View>
-        )}
-
-        {currentTab === "SETTINGS" && (
-          <View style={styles.settingsTab}>
-            <View style={[styles.settingsCard, { backgroundColor: tokens.card, borderColor: tokens.border }]}>
-              <Text style={[styles.cardHeading, { color: tokens.text }]}>Security & Pairing</Text>
-              <Text style={[styles.cardText, { color: tokens.textDim }]}>
-                This device is paired in strict READ-ONLY mode. Trading executions and account mutations are blocked at both client and server protocol levels.
-              </Text>
-              <View style={styles.securityItem}>
-                <Text style={[styles.securityLabel, { color: tokens.textMuted }]}>Scope</Text>
-                <Text style={[styles.securityValue, { color: tokens.accent }]}>telemetry:read</Text>
-              </View>
-              <View style={styles.securityItem}>
-                <Text style={[styles.securityLabel, { color: tokens.textMuted }]}>Biometric Lock</Text>
-                <Text style={[styles.securityValue, { color: tokens.profit }]}>Hardware Enclave Active</Text>
-              </View>
-            </View>
-          </View>
+      {/* Main Content */}
+      <View
+        style={[
+          styles.content,
+          hideChrome && { paddingTop: Math.max(insets.top, 4) },
+        ]}
+      >
+        {!isPaired && currentTab !== "SECURITY" ? (
+          <OnboardingScreen
+            theme={theme}
+            onStartPairing={() => onSelectTab("SECURITY")}
+          />
+        ) : currentTab === "OVERVIEW" ? (
+          <OverviewScreen
+            theme={theme}
+            account={props.account}
+            stats={props.stats}
+            positions={props.positions}
+            equity={props.equity}
+            equityRange={props.equityRange}
+            onSelectEquityRange={props.onSelectEquityRange}
+            candlesData={props.candlesData}
+            drawings={props.drawings}
+            activeSymbol={props.selectedSymbol}
+            activeTimeframe={props.selectedTimeframe}
+            layers={props.layers}
+            activity={props.activity}
+            isLoading={props.isLoading}
+            isRefreshing={props.isRefreshing}
+            onRefresh={props.onRefresh}
+            onOpenCharts={() => onSelectTab("CHARTS")}
+            onShowPositionOnChart={props.onShowPositionOnChart}
+          />
+        ) : currentTab === "CHARTS" ? (
+          <ChartsScreen
+            theme={theme}
+            symbols={props.symbols}
+            timeframes={props.timeframes}
+            selectedSymbol={props.selectedSymbol}
+            selectedTimeframe={props.selectedTimeframe}
+            onSelectSymbol={props.onSelectSymbol}
+            onSelectTimeframe={props.onSelectTimeframe}
+            candlesData={props.candlesData}
+            drawings={props.drawings}
+            layers={props.layers}
+            onToggleLayer={props.onToggleLayer}
+            isLive={connectionState === "LIVE" && !isShowingCache}
+            isLoading={props.isLoading}
+            focusTime={props.focusChartTime}
+            isFullscreen={chartFullscreen}
+            onToggleFullscreen={props.onToggleChartFullscreen}
+            onLoadMoreHistory={props.onLoadMoreHistory}
+          />
+        ) : currentTab === "TRADES" ? (
+          <TradesScreen
+            theme={theme}
+            client={props.client}
+            symbols={props.symbols}
+            onShowTradeOnChart={props.onShowTradeOnChart}
+          />
+        ) : (
+          <SecurityScreen
+            theme={theme}
+            credentials={credentials}
+            connectionLabel={connShortLabel}
+            lastSyncedMs={lastSyncedMs}
+            biometricEnabled={props.biometricEnabled}
+            onToggleBiometric={props.onToggleBiometric}
+            onPaired={props.onPaired}
+            onUnpair={props.onUnpair}
+            onClearCache={props.onClearCache}
+          />
         )}
       </View>
 
       {/* Bottom Tab Navigation */}
-      <View style={[styles.tabBar, { backgroundColor: tokens.surface, borderColor: tokens.border }]}>
-        {(["DASHBOARD", "CHARTS", "POSITIONS", "SETTINGS"] as MobileTab[]).map((tab) => {
-          const isActive = currentTab === tab;
-          return (
-            <TouchableOpacity
-              key={tab}
-              onPress={() => setCurrentTab(tab)}
-              style={styles.tabBtn}
-            >
-              <Text
-                style={[
-                  styles.tabLabel,
-                  { color: isActive ? tokens.accent : tokens.textDim },
-                ]}
+      {!hideChrome && (
+        <View
+          style={[
+            styles.tabBar,
+            {
+              backgroundColor: tokens.surface,
+              borderTopColor: tokens.borderSubtle,
+              paddingBottom: Math.max(insets.bottom, 10),
+            },
+          ]}
+        >
+          {(
+            [
+              { id: "OVERVIEW", label: "Overview", Icon: OverviewIcon },
+              { id: "CHARTS", label: "Charts", Icon: ChartTabIcon },
+              { id: "TRADES", label: "Trades", Icon: TradesTabIcon },
+              { id: "SECURITY", label: "Security", Icon: SecurityTabIcon },
+            ] as const
+          ).map(({ id, label, Icon }) => {
+            const active = currentTab === id;
+            const tint = active ? tokens.accent : tokens.textDim;
+            return (
+              <TouchableOpacity
+                key={id}
+                onPress={() => {
+                  triggerSelectionHaptic();
+                  onSelectTab(id);
+                }}
+                style={styles.tabBtn}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={label}
               >
-                {tab === "DASHBOARD" ? "Overview" : tab === "CHARTS" ? "Charts" : tab === "POSITIONS" ? "Trades" : "Security"}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+                <Icon size={20} color={tint} />
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    { color: tint, fontWeight: active ? "700" : "500" },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
+  screen: { flex: 1 },
   header: {
-    paddingTop: 48,
-    paddingBottom: 8,
     borderBottomWidth: 1,
   },
   titleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    marginBottom: 4,
+    paddingHorizontal: 14,
+    paddingBottom: 8,
   },
   brandRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
   },
   brandLogo: {
-    width: 28,
-    height: 28,
-    borderRadius: 7,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: "#000000",
     borderWidth: 1,
   },
   appTitle: {
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  statusInlineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 1,
+  },
+  connDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  connText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  botChip: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginLeft: 2,
+  },
+  botChipText: {
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.3,
   },
   headerRight: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  liveBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+  roBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
+    borderWidth: 1,
   },
-  liveText: {
+  roText: {
     fontSize: 9,
-    fontWeight: "700",
+    fontWeight: "800",
     letterSpacing: 0.5,
   },
-  themeToggleBtn: {
-    padding: 4,
+  themeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
   },
   content: {
     flex: 1,
   },
-  tabScroll: {
-    flex: 1,
-  },
-  sectionHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  fullscreenChart: {
-    flex: 1,
-    padding: 12,
-  },
-  chartControlBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  symbolPill: {
-    fontSize: 12,
-    fontWeight: "700",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  legendPill: {
-    fontSize: 11,
-    paddingVertical: 4,
-  },
-  positionsTab: {
-    flex: 1,
-    paddingTop: 8,
-  },
-  settingsTab: {
-    flex: 1,
-    padding: 16,
-  },
-  settingsCard: {
-    borderRadius: 10,
-    borderWidth: 1,
-    padding: 16,
-  },
-  cardHeading: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 8,
-  },
-  cardText: {
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 16,
-  },
-  securityItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.05)",
-  },
-  securityLabel: {
-    fontSize: 12,
-  },
-  securityValue: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
   tabBar: {
     flexDirection: "row",
     borderTopWidth: 1,
-    paddingBottom: 24,
     paddingTop: 8,
   },
   tabBtn: {
     flex: 1,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
+    gap: 3,
   },
   tabLabel: {
     fontSize: 11,
-    fontWeight: "600",
   },
 });

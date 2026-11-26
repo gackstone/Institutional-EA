@@ -15,15 +15,16 @@ import {
   ReadOnlyViolationError,
 } from "../services/ReadOnlyGuard.ts";
 
-test("mobile theme tokens synchronize with desktop palette and switch modes", () => {
-  assert.equal(DARK_THEME.background, "#0D0E11");
-  assert.equal(LIGHT_THEME.background, "#F5F6F8");
+test("mobile theme tokens synchronize with brand palette and switch modes", () => {
+  assert.equal(DARK_THEME.background, "#0B0F19");
+  assert.equal(DARK_THEME.accent, "#6FF2C4");
+  assert.equal(LIGHT_THEME.background, "#F4F7FA");
   assert.equal(DARK_THEME.bullCandle, "#0A997D");
   assert.equal(LIGHT_THEME.bearCandle, "#EE3749");
 
   const darkTokens = getThemeTokens("dark");
   const lightTokens = getThemeTokens("light");
-  assert.equal(darkTokens.surface, "#14171F");
+  assert.equal(darkTokens.surface, "#111827");
   assert.equal(lightTokens.surface, "#FFFFFF");
 });
 

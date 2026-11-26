@@ -52,6 +52,7 @@ import {
 } from "./components/screens/SignalsAlertsScreens";
 import { PairingModal } from "./components/PairingModal";
 import { TelegramPairingModal } from "./components/TelegramPairingModal";
+import { MobileSyncModal } from "./components/MobileSyncModal";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
 import { TradeReplayModal } from "./components/TradeReplayModal";
 
@@ -283,6 +284,7 @@ export const App: React.FC = () => {
 
   const [isPairingOpen, setIsPairingOpen] = useState<boolean>(false);
   const [isTelegramOpen, setIsTelegramOpen] = useState<boolean>(false);
+  const [isMobileSyncOpen, setIsMobileSyncOpen] = useState<boolean>(false);
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState<boolean>(false);
 
   // Authoritative Cloud Authentication & Subscription State (Electron Main Process + Windows DPAPI)
@@ -1503,6 +1505,7 @@ export const App: React.FC = () => {
                   onOpenDiagnostics={() => setIsDiagnosticsOpen(true)}
                   onOpenInstitutionalEa={() => setIsPairingOpen(true)}
                   onOpenTelegram={() => setIsTelegramOpen(true)}
+                  onOpenMobileSync={() => setIsMobileSyncOpen(true)}
                 />
               )}
             </div>
@@ -1563,6 +1566,11 @@ export const App: React.FC = () => {
       <DiagnosticsModal
         isOpen={isDiagnosticsOpen}
         onClose={() => setIsDiagnosticsOpen(false)}
+      />
+
+      <MobileSyncModal
+        isOpen={isMobileSyncOpen}
+        onClose={() => setIsMobileSyncOpen(false)}
       />
       </>
       )}

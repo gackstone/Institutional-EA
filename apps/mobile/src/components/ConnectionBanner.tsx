@@ -1,53 +1,131 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { type ThemeMode, getThemeTokens } from "../theme/themeTokens.ts";
+import { formatClockTime } from "../utils/formatters.ts";
 
-export type ConnectionState = "CONNECTED" | "SYNCING" | "RECONNECTING" | "OFFLINE";
+export type ConnectionState =
+  | "NOT_PAIRED"
+  | "CONNECTING"
+  | "LIVE"
+  | "RECONNECTING"
+  | "STALE"
+  | "COMPANION_OFFLINE"
+  | "MT5_DISCONNECTED"
+  | "BOT_PAUSED"
+  | "BOT_STOPPED";
 
 interface ConnectionBannerProps {
   state: ConnectionState;
-  lastSyncedAt?: string;
+  lastSyncedMs?: number | null;
+  isShowingCache?: boolean;
   theme?: ThemeMode;
+  onRetry?: () => void;
 }
 
 export function ConnectionBanner({
   state,
-  lastSyncedAt,
+  lastSyncedMs,
+  isShowingCache = false,
   theme = "dark",
+  onRetry,
 }: ConnectionBannerProps): React.ReactElement | null {
   const tokens = getThemeTokens(theme);
 
-  if (state === "CONNECTED") {
-    return null; // Silent when fully synchronized
+  if (state === "LIVE" && !isShowingCache) {
+    return null;
   }
 
-  const stateConfig = {
-    SYNCING: {
-      label: "Syncing live telemetry...",
+  const timeLabel = lastSyncedMs ? formatClockTime(lastSyncedMs) : null;
+
+  const configMap: Record<
+    Exclude<ConnectionState, "LIVE">,
+    { label: string; bg: string; color: string; showRetry?: boolean }
+  > = {
+    NOT_PAIRED: {
+      label: "Not paired — pair with Windows Companion to view live data",
       bg: tokens.accentLight,
       color: tokens.accent,
-      dotColor: tokens.accent,
+    },
+    CONNECTING: {
+      label: isShowingCache && timeLabel
+        ? `Connecting… showing cached snapshot (Last synced ${timeLabel})`
+        : "Connecting to Windows Companion…",
+      bg: tokens.accentLight,
+      color: tokens.accent,
     },
     RECONNECTING: {
-      label: "Reconnecting to host stream...",
+      label: timeLabel
+        ? `Reconnecting… Last synced ${timeLabel}`
+        : "Reconnecting to Windows Companion…",
       bg: tokens.warningBg,
       color: tokens.warning,
-      dotColor: tokens.warning,
+      showRetry: true,
     },
-    OFFLINE: {
-      label: lastSyncedAt ? `Offline • Last synced ${lastSyncedAt}` : "Host offline • No connection",
+    STALE: {
+      label: timeLabel
+        ? `Data stale · Last updated ${timeLabel}`
+        : "Data stale · Waiting for heartbeat",
+      bg: tokens.warningBg,
+      color: tokens.warning,
+      showRetry: true,
+    },
+    COMPANION_OFFLINE: {
+      label: timeLabel
+        ? `Companion offline · Last synced ${timeLabel}`
+        : "Companion offline · Check PC & Wi-Fi",
       bg: tokens.lossBg,
       color: tokens.loss,
-      dotColor: tokens.loss,
+      showRetry: true,
     },
-  }[state];
+    MT5_DISCONNECTED: {
+      label: "MT5 terminal disconnected on PC",
+      bg: tokens.lossBg,
+      color: tokens.loss,
+    },
+    BOT_PAUSED: {
+      label: "Bot paused — monitoring active positions",
+      bg: tokens.warningBg,
+      color: tokens.warning,
+    },
+    BOT_STOPPED: {
+      label: "Bot stopped — live market feed active",
+      bg: tokens.cardSecondary,
+      color: tokens.textMuted,
+    },
+  };
+
+  const cfg =
+    state === "LIVE"
+      ? {
+          label: timeLabel ? `Last synced ${timeLabel}` : "Cached snapshot",
+          bg: tokens.cardSecondary,
+          color: tokens.textMuted,
+          showRetry: false,
+        }
+      : configMap[state];
 
   return (
-    <View style={[styles.banner, { backgroundColor: stateConfig.bg }]}>
-      <View style={[styles.dot, { backgroundColor: stateConfig.dotColor }]} />
-      <Text style={[styles.label, { color: stateConfig.color }]}>
-        {stateConfig.label}
-      </Text>
+    <View
+      style={[styles.banner, { backgroundColor: cfg.bg }]}
+      accessibilityRole="alert"
+      accessibilityLabel={cfg.label}
+    >
+      <View style={styles.left}>
+        <View style={[styles.dot, { backgroundColor: cfg.color }]} />
+        <Text style={[styles.label, { color: cfg.color }]} numberOfLines={1}>
+          {cfg.label}
+        </Text>
+      </View>
+      {cfg.showRetry && onRetry ? (
+        <TouchableOpacity
+          onPress={onRetry}
+          style={[styles.retryBtn, { borderColor: cfg.color }]}
+          accessibilityRole="button"
+          accessibilityLabel="Retry connection"
+        >
+          <Text style={[styles.retryText, { color: cfg.color }]}>Retry</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -56,18 +134,35 @@ const styles = StyleSheet.create({
   banner: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
     paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
+  },
+  left: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: 8,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: 8,
   },
   label: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
+    flexShrink: 1,
+  },
+  retryBtn: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  retryText: {
+    fontSize: 11,
+    fontWeight: "700",
   },
 });

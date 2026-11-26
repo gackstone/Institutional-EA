@@ -3,33 +3,35 @@
     "name": "Institutional EA",
     "slug": "institutional-ea-mobile",
     "version": "1.3.4",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#0B0F19"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.institutionalea.monitor",
       "buildNumber": "1.3.4",
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Use FaceID to unlock your read-only monitoring dashboard."
+        "NSFaceIDUsageDescription": "Use FaceID to unlock your read-only monitoring dashboard.",
+        "NSCameraUsageDescription": "Use the camera to scan your Windows Companion pairing QR code."
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#0B0F19"
       },
       "package": "com.institutionalea.monitor",
       "versionCode": 10304,
       "permissions": [
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
-        "INTERNET"
+        "INTERNET",
+        "CAMERA"
       ]
     },
     "plugins": [
@@ -39,11 +41,21 @@
           "android": {
             "minSdkVersion": 24,
             "compileSdkVersion": 34,
-            "targetSdkVersion": 34
+            "targetSdkVersion": 34,
+            "usesCleartextTraffic": true,
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
           },
           "ios": {
             "deploymentTarget": "15.0"
           }
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Institutional EA to scan your Windows Companion QR pairing code."
         }
       ]
     ],

@@ -497,7 +497,8 @@ export const SettingsScreen: React.FC<{
   onOpenDiagnostics: () => void;
   onOpenInstitutionalEa: () => void;
   onOpenTelegram: () => void;
-}> = ({ onOpenDiagnostics, onOpenInstitutionalEa, onOpenTelegram }) => {
+  onOpenMobileSync?: () => void;
+}> = ({ onOpenDiagnostics, onOpenInstitutionalEa, onOpenTelegram, onOpenMobileSync }) => {
   return (
     <div className="space-y-4">
       <div className="iea-card p-5 space-y-4">
@@ -534,6 +535,14 @@ export const SettingsScreen: React.FC<{
           >
             Telegram Setup
           </button>
+          {onOpenMobileSync && (
+            <button
+              onClick={onOpenMobileSync}
+              className="iea-pill-control px-4 py-2 text-xs text-iea-accent font-semibold border border-iea-accentBorder"
+            >
+              Mobile Sync
+            </button>
+          )}
         </div>
       </div>
 

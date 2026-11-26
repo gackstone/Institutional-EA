@@ -12,6 +12,10 @@ import {
   assertReadOnlyScope,
   assertOperationPermitted,
   FORBIDDEN_OPERATIONS,
+  MOBILE_SYNC_SCHEMA_VERSION,
+  MobileStatusSchema,
+  MobilePairingQrPayloadSchema,
+  assertMobileHttpReadOnly,
 } from "../src/index.ts";
 
 test("AccountStateSchema validates valid account and rejects negative balance", () => {
@@ -149,4 +153,61 @@ test("TelemetrySnapshotSchema validates complete sanitized state snapshot", () =
 
   const parsed = TelemetrySnapshotSchema.parse(snapshot);
   assert.equal(parsed.kpis.winRate, 68.5);
+});
+
+test("MobileStatusSchema enforces readOnlyEnforced=true and validates v1 sync contract", () => {
+  const status = {
+    schemaVersion: MOBILE_SYNC_SCHEMA_VERSION,
+    appVersion: "1.3.4",
+    botState: "RUNNING",
+    mt5Connected: true,
+    mt5Status: "CONNECTED",
+    demoMode: true,
+    broker: "JustMarkets-Demo",
+    accountMasked: "200***89",
+    lastHeartbeat: new Date().toISOString(),
+    serverTime: new Date().toISOString(),
+    readOnlyEnforced: true as const,
+  };
+  assert.equal(MobileStatusSchema.parse(status).readOnlyEnforced, true);
+  assert.throws(() =>
+    MobileStatusSchema.parse({ ...status, readOnlyEnforced: false })
+  );
+});
+
+test("MobilePairingQrPayloadSchema validates 6-digit code and port bounds", () => {
+  const qr = {
+    v: 1 as const,
+    host: "192.168.1.42",
+    port: 8766,
+    code: "482910",
+    expiresAt: Math.floor(Date.now() / 1000) + 300,
+    companionName: "DESKTOP-WIN11",
+  };
+  assert.equal(MobilePairingQrPayloadSchema.parse(qr).code, "482910");
+  assert.throws(() =>
+    MobilePairingQrPayloadSchema.parse({ ...qr, code: "ABC123" })
+  );
+  assert.throws(() =>
+    MobilePairingQrPayloadSchema.parse({ ...qr, port: 80 })
+  );
+});
+
+test("assertMobileHttpReadOnly allows GET and pair/unpair POST only, blocks all mutations", () => {
+  assert.doesNotThrow(() => assertMobileHttpReadOnly("GET", "/api/mobile/v1/status"));
+  assert.doesNotThrow(() => assertMobileHttpReadOnly("GET", "/api/mobile/v1/candles?symbol=XAUUSD&tf=M5"));
+  assert.doesNotThrow(() => assertMobileHttpReadOnly("POST", "/api/mobile/v1/pair"));
+  assert.doesNotThrow(() => assertMobileHttpReadOnly("POST", "/api/mobile/v1/unpair"));
+
+  for (const [method, path] of [
+    ["POST", "/api/engine/start"],
+    ["POST", "/api/engine/stop"],
+    ["POST", "/api/trades/close"],
+    ["POST", "/api/mobile/v1/status"],
+    ["PUT", "/api/mobile/v1/account"],
+    ["PATCH", "/api/config/apply"],
+    ["DELETE", "/api/mobile/v1/positions"],
+  ]) {
+    assert.throws(() => assertMobileHttpReadOnly(method, path), /READ_ONLY_ENFORCED/);
+  }
 });

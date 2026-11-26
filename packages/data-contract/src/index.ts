@@ -7,3 +7,4 @@ export * from "./kpi.ts";
 export * from "./pairing.ts";
 export * from "./security.ts";
 export * from "./telemetry.ts";
+export * from "./mobileSync.ts";

@@ -21,6 +21,7 @@ from companion.database.repository import CompanionRepository
 from companion.service.configuration.config_service import ConfigurationService, ConfigurationValidationError
 from companion.service.events.event_bus import EventBus
 from companion.service.market.drawings_engine import ChartDrawingsService
+from companion.service.mobile.sync_server import MobileSyncManager
 from companion.service.mt5.ea_deployer import deploy_ea_pipeline, extract_ea_version
 from companion.service.mt5.sync_service import MT5SyncService
 from companion.service.operations.ps_runner import OperationsRunner
@@ -69,6 +70,7 @@ class ControlServiceContext:
         self.btcusd_sample = btcusd_sample
         self.telegram_notifier = telegram_notifier
         self.ati = ati
+        self.mobile_sync = MobileSyncManager(self)
 
     def run_self_check(self) -> Dict[str, Any]:
         """Runs real end-to-end readiness & health checks for System Health UI."""
@@ -381,6 +383,8 @@ def create_request_handler(ctx: ControlServiceContext):
                 self._send_json(200, ctx.ati.reporter.generate_daily_report() if ctx.ati else {})
             elif path == "/api/ati/reports/weekly":
                 self._send_json(200, ctx.ati.reporter.generate_weekly_report() if ctx.ati else {})
+            elif path == "/api/mobile-sync/status":
+                self._send_json(200, ctx.mobile_sync.get_status())
             else:
                 self._send_json(404, {"error": f"Unknown endpoint: {path}"})
 
@@ -588,6 +592,21 @@ def create_request_handler(ctx: ControlServiceContext):
                     reason = str(body.get("reason", "Operator requested rollback"))
                     ok, msg = ctx.ati.rollback_config(reason)
                     self._send_json(200 if ok else 400, {"success": ok, "message": msg})
+            elif path == "/api/mobile-sync/enable":
+                port = body.get("port")
+                self._send_json(200, ctx.mobile_sync.enable(port=int(port) if port else None))
+            elif path == "/api/mobile-sync/disable":
+                self._send_json(200, ctx.mobile_sync.disable())
+            elif path == "/api/mobile-sync/pairing-code":
+                self._send_json(200, ctx.mobile_sync.generate_pairing_code())
+            elif path == "/api/mobile-sync/devices/revoke":
+                dev_id = str(body.get("deviceId", "")).strip()
+                if not dev_id:
+                    self._send_json(400, {"error": "deviceId is required"})
+                else:
+                    self._send_json(200, ctx.mobile_sync.revoke_device(dev_id))
+            elif path == "/api/mobile-sync/devices/revoke-all":
+                self._send_json(200, ctx.mobile_sync.revoke_all_devices())
             else:
                 self._send_json(404, {"error": f"Unknown endpoint: {path}"})
 
