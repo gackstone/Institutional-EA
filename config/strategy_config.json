@@ -143,5 +143,47 @@
       "bollinger_bands": 0.05
     },
     "regime_adaptation_enabled": true
+  },
+  "video_setups": {
+    "enabled": true,
+    "execution_mode_for_new_setups": "DEMO_EXECUTE",
+    "reference_symbols": [
+      "USDJPY",
+      "XAGUSD",
+      "DXY",
+      "ETHUSD",
+      "EURUSD"
+    ],
+    "smt_pairs": {
+      "XAUUSD": {
+        "symbol": "USDJPY",
+        "inverse": true,
+        "fallback_reference": "XAGUSD"
+      },
+      "BTCUSD": {
+        "symbol": "ETHUSD",
+        "inverse": false,
+        "fallback_reference": null
+      }
+    },
+    "default_min_rr_demo": 2.0,
+    "default_min_rr_prop": 2.5,
+    "fvg_min_atr": 0.15,
+    "eqh_tolerance_atr": 0.10,
+    "min_pierce_atr": 0.05,
+    "max_bars_to_reclaim": 3,
+    "stop_buffer_atr": 0.05,
+    "setups": {
+      "S1_RAID_SHIFT_FVG_CE": { "enabled": true, "min_rr": 2.0, "allow_b_grade": false, "partial_pct": 0.5, "cancel_on_window_end": false },
+      "S2_SILVER_BULLET": { "enabled": true, "min_rr": 2.0, "allow_b_grade": false, "partial_pct": 0.5, "cancel_on_window_end": true },
+      "S3_NY_MACRO": { "enabled": true, "min_rr": 2.0, "allow_b_grade": false, "partial_pct": 0.5, "cancel_on_window_end": true },
+      "S4_LONDON_JUDAS_SWING": { "enabled": true, "min_rr": 2.0, "allow_b_grade": false, "partial_pct": 0.5, "cancel_on_window_end": false },
+      "S5_ASIAN_SD_REVERSAL": { "enabled": true, "min_rr": 2.0, "allow_b_grade": false, "partial_pct": 0.5, "cancel_on_window_end": false },
+      "S6_IFVG_STOP_HUNT": { "enabled": true, "min_rr": 2.0, "allow_b_grade": false, "partial_pct": 0.5, "cancel_on_window_end": false },
+      "S7_STACKED_BREAKER_IFVG": { "enabled": true, "min_rr": 2.0, "allow_b_grade": false, "partial_pct": 0.5, "cancel_on_window_end": false },
+      "S8_OTE_STOP_HUNT_BOS": { "enabled": true, "min_rr": 2.0, "allow_b_grade": false, "partial_pct": 0.5, "cancel_on_window_end": false, "ote_entry_level": 0.705 },
+      "S9_HIDDEN_DEMAND_SUPPLY": { "enabled": true, "min_rr": 2.0, "allow_b_grade": false, "partial_pct": 0.5, "cancel_on_window_end": false },
+      "S10_SESSION_SWEEP_REVERSAL": { "enabled": true, "min_rr": 2.0, "allow_b_grade": false, "partial_pct": 0.5, "cancel_on_window_end": false }
+    }
   }
 }

@@ -47,6 +47,55 @@ class ManualPositionAssessor:
             tr_list.append(tr)
         return sum(tr_list) / len(tr_list) if tr_list else 0.0010
 
+    @staticmethod
+    def _detect_nearby_sweep_stop(
+        candles: List[Candle],
+        direction: OrderType,
+        open_px: float,
+        atr: float,
+    ) -> Optional[float]:
+        """Returns structural stop beyond a nearby confirmed sweep extreme if detected."""
+        if len(candles) < 6:
+            return None
+        try:
+            from src.core.contracts import Timeframe
+            from src.smc.video_primitives import detect_confirmed_sweep, detect_equal_clusters
+
+            pools = detect_equal_clusters("MANUAL", Timeframe.M15, candles[-25:])
+            target_types = ("EQL", "SSL") if direction == OrderType.BUY else ("EQH", "BSL")
+            for p in reversed([x for x in pools if x.level_type in target_types]):
+                sw = detect_confirmed_sweep(candles[-25:], p.price, p.level_type, start_index=p.formation_index + 1)
+                if not sw:
+                    continue
+                buf = 0.05 * max(atr, 1e-9)
+                if direction == OrderType.BUY and sw.sweep_extreme < open_px and (open_px - sw.sweep_extreme) <= 4.0 * atr:
+                    return sw.sweep_extreme - buf
+                if direction == OrderType.SELL and sw.sweep_extreme > open_px and (sw.sweep_extreme - open_px) <= 4.0 * atr:
+                    return sw.sweep_extreme + buf
+        except Exception:
+            return None
+        return None
+
+    @staticmethod
+    def _suggest_draw_on_liquidity_tp(
+        symbol: str,
+        candles: List[Candle],
+        direction: OrderType,
+        open_px: float,
+    ) -> Optional[float]:
+        """Uses P9 get_draw_on_liquidity to suggest nearest untapped opposing pool as TP."""
+        if len(candles) < 6:
+            return None
+        try:
+            from src.core.contracts import Timeframe
+            from src.smc.video_primitives import detect_equal_clusters, get_draw_on_liquidity
+
+            pools = detect_equal_clusters(symbol, Timeframe.M15, candles[-40:])
+            draw = get_draw_on_liquidity(direction, open_px, pools)
+            return draw.price if draw else None
+        except Exception:
+            return None
+
     def assess(
         self,
         pos: Position,
@@ -83,7 +132,12 @@ class ManualPositionAssessor:
             rec_sl = 0.0
             if is_buy:
                 prot_low = res_prot.metadata.get("protected_low") or res_prot.level_prices.get("protected_low")
-                if prot_low and prot_low < open_px:
+                # Prefer nearby confirmed sweep extreme when detected [VIDEO: keepssy_fx]
+                sweep_extreme_sl = self._detect_nearby_sweep_stop(candles_m15, OrderType.BUY, open_px, atr)
+                if sweep_extreme_sl is not None:
+                    rec_sl = sweep_extreme_sl
+                    skills_used.append("video_sweep_extreme_stop")
+                elif prot_low and prot_low < open_px:
                     rec_sl = prot_low - (0.5 * atr)
                 else:
                     # Fallback to recent candle lows or ATR
@@ -91,7 +145,11 @@ class ManualPositionAssessor:
                     rec_sl = min(lowest_low - (0.2 * atr), open_px - (1.0 * atr))
             else:
                 prot_high = res_prot.metadata.get("protected_high") or res_prot.level_prices.get("protected_high")
-                if prot_high and prot_high > open_px:
+                sweep_extreme_sl = self._detect_nearby_sweep_stop(candles_m15, OrderType.SELL, open_px, atr)
+                if sweep_extreme_sl is not None:
+                    rec_sl = sweep_extreme_sl
+                    skills_used.append("video_sweep_extreme_stop")
+                elif prot_high and prot_high > open_px:
                     rec_sl = prot_high + (0.5 * atr)
                 else:
                     highest_high = max(c.high for c in candles_m15[-5:]) if len(candles_m15) >= 5 else (open_px + 1.5 * atr)
@@ -100,12 +158,17 @@ class ManualPositionAssessor:
             if symbol_info:
                 rec_sl = symbol_info.round_price(rec_sl)
 
-            # Check if Take Profit should also be calculated
+            # Check if Take Profit should also be calculated (prefer P9 draw on liquidity if available)
             rec_tp: Optional[float] = None
             if self.config.auto_tp_enabled and current_tp <= 0.0:
                 skills_used.append("take_profit_calculator")
+                draw_tp = self._suggest_draw_on_liquidity_tp(symbol, candles_m15, pos.order_type, open_px)
                 risk_dist = abs(open_px - rec_sl) if abs(open_px - rec_sl) > 0 else (1.5 * atr)
-                raw_tp = (open_px + risk_dist * self.config.tp_target_r) if is_buy else (open_px - risk_dist * self.config.tp_target_r)
+                if draw_tp is not None and abs(draw_tp - open_px) >= risk_dist:
+                    raw_tp = draw_tp
+                    skills_used.append("draw_on_liquidity_target")
+                else:
+                    raw_tp = (open_px + risk_dist * self.config.tp_target_r) if is_buy else (open_px - risk_dist * self.config.tp_target_r)
                 if symbol_info:
                     raw_tp = symbol_info.round_price(raw_tp)
                 rec_tp = raw_tp
