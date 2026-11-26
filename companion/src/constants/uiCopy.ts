@@ -35,6 +35,7 @@ export const UI_COPY = {
       operations: { label: "Operations", tooltip: "Allowlisted operations runner" },
       logs: { label: "Event Logs", tooltip: "Structured runtime event logs" },
       health: { label: "System Health", tooltip: "SQLite, MT5 & audit trail health" },
+      account: { label: "Account & Billing", tooltip: "Cloud account, Institutional EA Pro subscription & devices" },
       settings: { label: "Settings", tooltip: "Diagnostics, pairing & short-form glossary" },
     } satisfies Record<ScreenId, { label: string; tooltip: string }>,
   },

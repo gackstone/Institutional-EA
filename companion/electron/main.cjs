@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, safeStorage, shell } = require("electron");
+const { createCloudAuthManager } = require("./cloudAuthManager.cjs");
 const path = require("path");
 const fs = require("fs");
 const net = require("net");
@@ -3211,6 +3212,94 @@ ipcMain.handle("fallback-open-logs", () => {
     return { ok: false, error: err?.message };
   }
 });
+
+// Cloud Authentication, OS-Backed Credential Storage & Subscription Manager
+const cloudAuthManager = createCloudAuthManager({
+  credentialsDir: APP_CREDENTIALS_DIR,
+  projectRoot: PROJECT_ROOT,
+  appVersion: app.getVersion ? app.getVersion() : "1.3.4",
+  safeStorage,
+  shell,
+  getMainWindow: () => mainWindow,
+  logEvent: logStartupEvent,
+});
+
+ipcMain.handle("cloud-get-state", () => cloudAuthManager.getSanitizedState());
+ipcMain.handle("cloud-sign-in-browser", async () => {
+  try {
+    return await cloudAuthManager.signInViaSystemBrowser();
+  } catch (err) {
+    return { ok: false, error: err?.message || "Failed to launch browser sign-in." };
+  }
+});
+ipcMain.handle("cloud-sign-in-password", async (_e, email, password) => {
+  try {
+    const state = await cloudAuthManager.signInWithPassword(email, password);
+    return { ok: true, state };
+  } catch (err) {
+    return { ok: false, error: err?.message || "Sign in failed." };
+  }
+});
+ipcMain.handle("cloud-sign-up", async (_e, fullName, email, password) => {
+  try {
+    return await cloudAuthManager.signUp(fullName, email, password);
+  } catch (err) {
+    return { ok: false, error: err?.message || "Registration failed." };
+  }
+});
+ipcMain.handle("cloud-sign-out", async () => {
+  try {
+    const state = await cloudAuthManager.signOut();
+    return { ok: true, state };
+  } catch (err) {
+    return { ok: false, error: err?.message || "Sign out failed." };
+  }
+});
+ipcMain.handle("cloud-refresh", async () => {
+  try {
+    const state = await cloudAuthManager.refresh();
+    return { ok: true, state };
+  } catch (err) {
+    return { ok: false, error: err?.message || "Failed to refresh cloud entitlement." };
+  }
+});
+ipcMain.handle("cloud-get-payments", async () => {
+  try {
+    const payments = await cloudAuthManager.getPayments();
+    return { ok: true, payments };
+  } catch (err) {
+    return { ok: false, payments: [], error: err?.message || "Failed to fetch payments." };
+  }
+});
+ipcMain.handle("cloud-submit-payment", async (_e, payload) => {
+  try {
+    const payment = await cloudAuthManager.submitPayment(payload);
+    const state = cloudAuthManager.getSanitizedState();
+    return { ok: true, payment, state };
+  } catch (err) {
+    return { ok: false, error: err?.message || "Payment submission failed." };
+  }
+});
+ipcMain.handle("cloud-get-devices", async () => {
+  try {
+    const devices = await cloudAuthManager.getDevices();
+    return { ok: true, devices };
+  } catch (err) {
+    return { ok: false, devices: [], error: err?.message || "Failed to fetch devices." };
+  }
+});
+ipcMain.handle("cloud-revoke-device", async (_e, deviceId) => {
+  try {
+    await cloudAuthManager.revokeDevice(deviceId);
+    const devices = await cloudAuthManager.getDevices();
+    return { ok: true, devices };
+  } catch (err) {
+    return { ok: false, error: err?.message || "Failed to revoke device." };
+  }
+});
+ipcMain.handle("cloud-open-external-portal", (_e, routePath) =>
+  cloudAuthManager.openExternalPortal(routePath)
+);
 
 // Window controls
 ipcMain.handle("minimize-window", () => mainWindow?.minimize());

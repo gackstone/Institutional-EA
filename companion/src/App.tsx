@@ -22,9 +22,11 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Terminal,
+  User,
   X,
   Zap,
 } from "lucide-react";
+import { AccountSubscriptionScreen } from "./components/screens/AccountSubscriptionScreen";
 import { DashboardScreen } from "./components/screens/CoreTradingScreens";
 import {
   PositionsScreen,
@@ -118,6 +120,7 @@ const VALID_SCREENS = new Set<ScreenId>([
   "operations",
   "logs",
   "health",
+  "account",
   "settings",
 ]);
 
@@ -534,6 +537,15 @@ export const App: React.FC = () => {
     []
   );
 
+  const accountItem: NavScreenItem = useMemo(
+    () => ({
+      id: "account",
+      ...UI_COPY.nav.screens.account,
+      icon: User,
+    }),
+    []
+  );
+
   const settingsItem: NavScreenItem = useMemo(
     () => ({
       id: "settings",
@@ -612,8 +624,8 @@ export const App: React.FC = () => {
   }, []);
 
   const allScreenItems = useMemo(
-    () => [dashboardItem, ...navGroups.flatMap((g) => g.items), settingsItem],
-    [dashboardItem, navGroups, settingsItem]
+    () => [dashboardItem, ...navGroups.flatMap((g) => g.items), accountItem, settingsItem],
+    [dashboardItem, navGroups, accountItem, settingsItem]
   );
 
   const isElectron = useMemo(() => IPC.isElectron(), []);
@@ -973,8 +985,57 @@ export const App: React.FC = () => {
           </nav>
         </div>
 
-        {/* Bottom Group Pinned Behind a Divider: Settings, Sign Out & DEMO Safety Lock */}
+        {/* Bottom Group Pinned Behind a Divider: Account & Billing, Settings, Sign Out & DEMO Safety Lock */}
         <div className="px-3 py-3 border-t border-iea-borderSubtle space-y-1 shrink-0">
+          {/* Account & Billing Item */}
+          {(() => {
+            const Icon = accountItem.icon;
+            const active = activeScreen === accountItem.id;
+            return (
+              <button
+                type="button"
+                onClick={(e) => handleSelectNavItem(accountItem.id, e)}
+                aria-current={active ? "page" : undefined}
+                aria-label={accountItem.label}
+                title={`${accountItem.label} — ${accountItem.tooltip}`}
+                className={`group relative w-full flex items-center rounded-[11px] transition-all duration-200 ${
+                  isSidebarExpanded ? "h-10 px-3 justify-between" : "h-10 justify-center"
+                } ${
+                  active
+                    ? isSidebarExpanded
+                      ? "bg-iea-accentSoft text-iea-accent font-semibold border border-iea-accentBorder"
+                      : "text-iea-accent"
+                    : "text-iea-textSecondary hover:text-iea-textPrimary hover:bg-[var(--iea-hover-bg)] border border-transparent"
+                }`}
+              >
+                {isSidebarExpanded ? (
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <Icon
+                      className={`w-[18px] h-[18px] shrink-0 ${
+                        active
+                          ? "text-iea-accent"
+                          : "text-iea-textSecondary group-hover:text-iea-textPrimary"
+                      }`}
+                    />
+                    <span className="iea-sidebar-label text-[13px] whitespace-nowrap truncate">
+                      {accountItem.label}
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    className={`w-10 h-10 rounded-[11px] flex items-center justify-center transition-colors ${
+                      active
+                        ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
+                        : "text-iea-textSecondary group-hover:text-iea-textPrimary group-hover:bg-[var(--iea-hover-bg)]"
+                    }`}
+                  >
+                    <Icon className="w-[18px] h-[18px]" />
+                  </div>
+                )}
+              </button>
+            );
+          })()}
+
           {/* Settings Item */}
           {(() => {
             const Icon = settingsItem.icon;
@@ -1257,6 +1318,10 @@ export const App: React.FC = () => {
                   audits={audits}
                   onReload={reloadAudits}
                 />
+              )}
+
+              {activeScreen === "account" && (
+                <AccountSubscriptionScreen onActionMessage={handleActionMessage} />
               )}
 
               {activeScreen === "settings" && (

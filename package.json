@@ -11,7 +11,7 @@
   "scripts": {
     "test": "npm test --workspace=companion",
     "test:desktop": "npm test --workspace=companion",
-    "test:packages": "npm test --workspace=@institutional-ea/data-contract --workspace=@institutional-ea/chart-core",
+    "test:packages": "npm test --workspace=@institutional-ea/data-contract --workspace=@institutional-ea/chart-core --workspace=@institutional-ea/cloud-contract",
     "test:mobile": "npm test --workspace=@institutional-ea/mobile",
     "test:all": "npm run test:desktop && npm run test:packages && npm run test:mobile",
     "build:desktop": "npm run build --workspace=companion",

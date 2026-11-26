@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@institutional-ea/cloud-contract": path.resolve(__dirname, "../packages/cloud-contract/src/index.ts"),
     },
   },
   base: "./",

@@ -96,6 +96,24 @@ contextBridge.exposeInMainWorld("electronAPI", {
   fallbackResetSettings: () => ipcRenderer.invoke("fallback-reset-settings"),
   fallbackOpenLogs: () => ipcRenderer.invoke("fallback-open-logs"),
 
+  // Cloud Account, Subscription & Device Management (OS-encrypted in main process)
+  cloudGetState: () => ipcRenderer.invoke("cloud-get-state"),
+  cloudSignInBrowser: () => ipcRenderer.invoke("cloud-sign-in-browser"),
+  cloudSignInPassword: (email, password) => ipcRenderer.invoke("cloud-sign-in-password", email, password),
+  cloudSignUp: (fullName, email, password) => ipcRenderer.invoke("cloud-sign-up", fullName, email, password),
+  cloudSignOut: () => ipcRenderer.invoke("cloud-sign-out"),
+  cloudRefresh: () => ipcRenderer.invoke("cloud-refresh"),
+  cloudGetPayments: () => ipcRenderer.invoke("cloud-get-payments"),
+  cloudSubmitPayment: (payload) => ipcRenderer.invoke("cloud-submit-payment", payload),
+  cloudGetDevices: () => ipcRenderer.invoke("cloud-get-devices"),
+  cloudRevokeDevice: (deviceId) => ipcRenderer.invoke("cloud-revoke-device", deviceId),
+  cloudOpenExternalPortal: (routePath) => ipcRenderer.invoke("cloud-open-external-portal", routePath),
+  onCloudStateChanged: (callback) => {
+    const handler = (_event, state) => callback(state);
+    ipcRenderer.on("cloud-state-changed", handler);
+    return () => ipcRenderer.removeListener("cloud-state-changed", handler);
+  },
+
   // Window control
   minimizeWindow: () => ipcRenderer.invoke("minimize-window"),
   maximizeWindow: () => ipcRenderer.invoke("maximize-window"),

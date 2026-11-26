@@ -173,6 +173,7 @@ export type ScreenId =
   | "operations"
   | "logs"
   | "health"
+  | "account"
   | "settings";
 
 export type OperatingMode =

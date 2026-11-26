@@ -2,6 +2,25 @@
 
 All notable changes to the Institutional Multi-Timeframe Algorithmic Trading Bot (`Institutional EA`) are documented in this file.
 
+## [3.12.0] - 2026-11-26
+
+### Added - Public Website, Authentication, $50/mo Binance USDT Subscription, Admin Console & Supabase Integration
+- **Shared Cloud & Payment Contract (`packages/cloud-contract/`)**:
+  - Centralized `INSTITUTIONAL_EA_PRO_PLAN` ($50 USD / month), `BINANCE_USDT_TRC20_CONFIG` (`TPP26iUrsJmstHVGh38rHYBipo6drZvj9D`, TRON TRC20, supplied Binance QR asset), UTC entitlement evaluation, 72-hour offline grace window policy, TXID validation, and strong password validation.
+- **Public Website, Pricing, Auth, Checkout & Admin Portal (`apps/web/`)**:
+  - Institutional dark landing page with responsive navigation, Hero, verified Platform Overview, Architecture separation diagram, Windows Companion Downloads, Documentation, Terms of Service, Privacy Policy, Risk Disclosure, and Contact pages.
+  - Dedicated `/pricing` page (`Institutional EA Pro` — `$50 USD / month`) and `/account/subscription` portal with Binance USDT (TRC20) QR code, Copy Address, network/NFT warnings, TXID & receipt submission form, transaction history, and device management.
+  - Full `/auth/*` flows (`sign-in`, `sign-up`, `forgot-password`, `verify-email`, `callback`) including validated loopback desktop sign-in handoff for the Windows Companion App.
+  - Modular `/admin` dashboard gated by server-verified `role === 'admin'` for payment approval/rejection, subscription management, device revocation, and audit log review.
+- **Supabase Backend Migrations, RLS & Edge Functions (`supabase/`)**:
+  - Added `20261126000001_initial_cloud_schema.sql` and `20261126000002_rls_and_storage.sql` covering `profiles`, `plans`, `subscriptions`, `payments`, `devices`, `audit_logs`, and private `payment-proofs` storage with strict Row Level Security, anti-role-escalation triggers, duplicate TXID prevention, and server-side 3-device limits.
+  - Added server-side Deno Edge Functions: `admin-review-payment`, `admin-manage-subscription`, and `device-heartbeat`.
+- **Windows Companion Cloud Integration (`companion/`)**:
+  - Added `companion/electron/cloudAuthManager.cjs` with Electron `safeStorage` (Windows DPAPI) encrypted credential & entitlement caching, privacy-conscious SHA-256 device fingerprinting, and system-browser loopback auth.
+  - Added `AccountSubscriptionScreen.tsx` integrated cleanly alongside all existing Companion screens while preserving strict trading safety isolation (subscription state never closes MT5 positions or blocks local emergency controls).
+- **Documentation & Tests**:
+  - Updated `.env.example`, authored `docs/SUPABASE_AND_SUBSCRIPTION_DEPLOYMENT.md`, and added unit/security tests in `packages/cloud-contract/tests/cloudContract.test.ts` and `companion/src/utils/__tests__/cloudAuthAndSecurity.test.ts`.
+
 ## [3.11.0] - 2026-11-22
 
 ### Added - Companion App Institutional Trading-Terminal Dashboard Redesign (`companion/`)
