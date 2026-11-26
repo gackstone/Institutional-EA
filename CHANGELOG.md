@@ -2,6 +2,21 @@
 
 All notable changes to the Institutional Multi-Timeframe Algorithmic Trading Bot (`Institutional EA`) are documented in this file.
 
+## [3.14.0] - 2026-11-26
+
+### Added - Advanced ICT/SMC Market Intelligence Upgrade (Videos 0010–0019)
+- **Audit, Specification & Rollback Runbook (`docs/ICT_INTELLIGENCE_AUDIT_AND_SPEC.md`, `docs/STRATEGY.md`)**:
+  - Audited existing SMC/learning modules and specified Modules A–H, anti-double-counting scoring, Shadow Mode deployment, promotion gates, and instant rollback procedure.
+- **ICT Market Intelligence Engine (`src/smc/ict_intelligence.py`, `config/strategy_config.json`)**:
+  - **Module A**: 60-day highs/lows (`D60_HIGH`/`D60_LOW`), 3–4 month `QuarterlyContext`, and enriched `EnrichedLiquidityLevel` metadata.
+  - **Module B & C**: 4-way closed-candle sweep classifier (`CONFIRMED_SWEEP`, `POTENTIAL_SWEEP`, `GENUINE_BREAKOUT`, `UNCONFIRMED_RAID`) and structure transition classifier separating body-close `MSS`/`BOS` from `WICK_ONLY_PENETRATION` and `TEMPORARY_PULLBACK`.
+  - **Module D**: 7-factor `DisplacementAssessment` rejecting weak candles without imbalance.
+  - **Module E**: Distinct lifecycles for `OrderBlock`, `BreakerBlock` (0019), `MitigationBlock` (0018), `PropulsionBlock` (0016, 50% mean threshold), `RejectionBlock` (0017), and `FailedSetupTransition` tracking.
+  - **Module F, G & H**: True ICT `UnicornSetup` (0011), displacement-gated `OTESetup` (0014), and liquidity-first take-profit selection with `-2.0` Fibonacci extension projections (0012, 0013).
+  - **Shadow Mode, Explainable Scoring & Per-Model Tracker**: Defaults to `mode: "SHADOW"`, `allow_live_orders: false`, `never_scale_lot_by_score: true`, with 5 lifecycle stages, 11 explicit `RejectionCode`s, duplicate-signal prevention, and `ICTModelPerformanceTracker`.
+- **Automated Tests & Walk-Forward Validation (`tests/test_ict_intelligence_0010_0019.py`, `scripts/run_ict_intelligence_backtest.py`, `reports/ict_intelligence_validation_2026-11-26.md`)**:
+  - Added comprehensive unit, anti-look-ahead, anti-repainting, precision, shadow-mode, and fail-closed safety tests plus chronological 60/40 IS/OOS walk-forward comparison with spread, commission, slippage, and Deflated Sharpe Ratio (DSR).
+
 ## [3.13.0] - 2026-11-26
 
 ### Added - Video-derived updates (2026-11)
