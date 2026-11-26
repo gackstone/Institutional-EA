@@ -280,3 +280,16 @@ All ICT time-window setups evaluate broker timestamps converted to UTC and then 
 ### 12.4 Source Limitations & Audit Reference
 - See [`docs/VIDEO_SKILLS_AUDIT.md`](./VIDEO_SKILLS_AUDIT.md) and [`knowledge/exports/video_skills_2026-11.json`](../knowledge/exports/video_skills_2026-11.json) for full per-video provenance and documented failure modes.
 - Clip `keepssy_fx-20261126-0012` was absent from the source bundle and is explicitly marked skipped/missing.
+
+---
+
+## 13. Advanced ICT/SMC Market Intelligence Upgrade (Videos 0010–0019)
+
+> **Shadow-Mode Default & Risk Authority:** Deployed in `SHADOW` mode by default (`config/strategy_config.json["ict_intelligence"]["mode"] = "SHADOW"`, `allow_live_orders: false`, `never_scale_lot_by_score: true`). See [`docs/ICT_INTELLIGENCE_AUDIT_AND_SPEC.md`](./ICT_INTELLIGENCE_AUDIT_AND_SPEC.md) for the complete module audit, scoring weights, limitations, and promotion/rollback procedure.
+
+- **Module A — HTF Liquidity & Quarterly Context (`src/smc/ict_intelligence.py:HTFLiquidityAnalyzer`)**: Tracks PDH/PDL, PWH/PWL, 60-day highs/lows (`D60_HIGH`/`D60_LOW`), external/internal pools, swept flags, ATR distances, and 3–4 month `QuarterlyContext` (contextual bias/quadrant only; never auto-triggers entries).
+- **Module B & C — Sweep & Market Structure Differentiation**: Distinguishes `CONFIRMED_SWEEP`, `POTENTIAL_SWEEP`, `GENUINE_BREAKOUT`, and `UNCONFIRMED_RAID`, and separates body-close displacement `MSS` (`DIRECTIONAL_TRANSITION`) from `BOS`, `TEMPORARY_PULLBACK`, and `WICK_ONLY_PENETRATION` using closed candles only.
+- **Module D — 7-Factor Displacement & FVG/CE**: Scores body/range, ATR expansion, directional consistency, close location, range expansion, resulting 3-candle FVG, and structural break; rejects weak candles (`WEAK_CANDLES_NO_IMBALANCE`).
+- **Module E — 5 Distinct Institutional Zones & Failed-Setup Transitions**: Separates `OrderBlock`, `BreakerBlock` (external sweep + smashed OB + trapped traders), `MitigationBlock` (failed OB without external sweep + trapped traders), `PropulsionBlock` (opposing dip into parent OB + displacement + 50% mean threshold), and `RejectionBlock` (pronounced wick zone + midpoint entry).
+- **Module F, G & H — ICT Unicorn, BOS-Anchored OTE & Fib `-2.0` Extensions**: True Unicorn (sweep + displacement through OB → Breaker/FVG overlap), displacement-gated OTE (`62%–79%`, `70.5%`), and liquidity-first take-profit selection with Fibonacci `-2.0` extension projections.
+- **Explainable Anti-Double-Counting Scoring, 11 Rejection Codes & Per-Model Tracking**: Classifies setups into `POTENTIAL`, `DEVELOPING`, `CONFIRMED`, `HIGH_QUALITY`, or `INVALIDATED`, shares one structural-break budget across MSS/BOS, logs explicit `RejectionCode`s, prevents duplicate signals, and tracks performance separately per model, session, and volatility regime (`ICTModelPerformanceTracker`).
