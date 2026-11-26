@@ -235,3 +235,48 @@ Every setup is scored across 9 dimensions:
 - **Graceful Shutdown**: Cancels orphaned pending orders while leaving open positions protected by server-side SL/TP.
 - **Telegram Commands**: `/fastmode on|off`, `/pause`, `/resume`, `/flatten` (strictly authenticated by `chat_id`), `/fastquality`, and `/margin`.
 - **Walk-Forward Verdict (`reports/fast_mode_performance.json`)**: Fast Mode improved net expectancy after spread, commission, slippage, and `25ms` latency from `+0.144R` to `+0.358R` (`+0.214R` gain), increased Profit Factor from `1.37` to `6.21`, and reduced Max Drawdown from `12.06R` to `1.61R`.
+
+---
+
+## 12. Video-Derived SMC/ICT Primitives & Named Setups (2026-11)
+
+> **Calibration & Educational Disclaimer:** All numeric defaults in this section (`eqh_tolerance_atr=0.10`, `min_pierce_atr=0.05`, `fvg_min_atr=0.15`, `min_rr=2.0`, etc.) are **starting hypotheses derived from educational video clips** for replay calibration—not proven edge or profitability claims. Existing unfiltered execution behavior, DEMO locks, and Rule R9.3 (tighten-only stops) remain untouched.
+
+### 12.1 NY `zoneinfo` Time Windows (`config/sessions.json`, `src/core/sessions.py`)
+All ICT time-window setups evaluate broker timestamps converted to UTC and then to `America/New_York` (`zoneinfo`) so US EST/EDT transitions are handled deterministically:
+- **Silver Bullet Windows**: London `03:00–04:00 NY`, NY AM `10:00–11:00 NY`, NY PM `14:00–15:00 NY`.
+- **NY Killzone**: `07:00–10:00 NY`.
+- **NY Algorithmic Macros**: Macro 1 `09:50–10:10 NY`, Macro 2 `10:50–11:10 NY` (unfilled pending orders expire at window end).
+
+### 12.2 Core Primitives `P1–P11` (`src/smc/video_primitives.py`)
+- **P1 Equal Clusters (`EQH`/`EQL`)**: Tolerance `0.10 * ATR(14)`, tracked as `untapped` vs `taken`.
+- **P2 Sweep vs Breakout Classifier**: Combines candle rejection formation + approach overlap/body/slope + an optional 3rd HTF-bias confluence slot (*explicitly flagged as configurable and not from source clip `chart__tactix-20261113-0001`*).
+- **P3 Confirmed Sweep**: Requires pierce $\ge 0.05 \times \text{ATR}$, reclaim within 3 bars, and rejects `BREAKOUT` classifications.
+- **P4 MSS with Displacement + FVG**: Structural shift accompanied by a displacement candle (`body >= 1.0x avg_body` or `>= 0.8x ATR`) leaving an FVG.
+- **P5 FVG with Consequent Encroachment (CE)**: Tracks 50% midpoint (`ce_price`) for limit refinement.
+- **P6 Inverted FVG (IFVG)**: Requires decisive candle close through an opposing FVG; prioritizes the first FVG formed immediately prior to a stop hunt.
+- **P7 Bidirectional Flipped Breaker Blocks**: Failed Bullish OB closed below becomes a Bearish Breaker (and vice versa).
+- **P8 BOS-Anchored Fibonacci OTE**: Anchors strictly to the major origin-to-extreme BOS leg (rejecting minor pullbacks), computing standard levels plus OTE (`0.62–0.79`, sweet spot `0.705`) and tap+directional-close confirmation.
+- **P9–P10 Draw on Liquidity**: Selects the nearest untapped opposing liquidity pool (`SessionKeyLevels` + clusters) and enforces "no draw, no trade" + `min_rr`.
+- **P11 SMT Divergence & 3-Point Turn Grading**: Uses the existing `GoldUSDJPYCoordinator` (gated by `INVERSE_STRONG` / `INVERSE_MODERATE` regime) plus optional data-only `reference_symbols` (`USDJPY`, `XAGUSD`, `DXY`, `USDX`, `ETHUSD`, `EURUSD` — never tradable):
+  - `A+`: Sweep + MSS + SMT confirmed -> eligible for `DEMO_EXECUTE`.
+  - `B`: Sweep + MSS confirmed, SMT unavailable (`UNKNOWN`) -> logged in `SHADOW` unless `allow_b_grade: true`.
+  - `INVALID`: Missing sweep/MSS or SMT explicitly `FAILED` -> rejected.
+
+### 12.3 Named Setups `S1–S10` (`src/smc/video_setups.py`, `config/strategy_config.json`)
+| ID | Setup Name | Primary Model / Context |
+|---|---|---|
+| `S1_RAID_SHIFT_FVG_CE` | Core Raid -> Shift -> FVG -> CE | Sweep -> MSS+FVG -> CE entry |
+| `S2_SILVER_BULLET` | ICT Silver Bullet | S1 gated inside London / NY AM / NY PM Silver Bullet windows |
+| `S3_NY_MACRO` | NY Macro Algorithmic Window | S1 gated inside `09:50–10:10` / `10:50–11:10` NY (`cancel_on_window_end: true`) |
+| `S4_LONDON_JUDAS_SWING` | London Judas Swing | Sweep of Asian High/Low targeting opposing Asian extreme |
+| `S5_ASIAN_SD_REVERSAL` | Asian Standard Deviation Reversal | Sweep into $\pm 2.0\text{–}2.5$ Asian range SD with partial + runner |
+| `S6_IFVG_STOP_HUNT` | IFVG After Stop Hunt | First FVG before stop hunt inverted by close-through + retest |
+| `S7_STACKED_BREAKER_IFVG` | Stacked Breaker + IFVG Overlap | Overlapping flipped Breaker Block + IFVG zone midpoint |
+| `S8_OTE_STOP_HUNT_BOS` | BOS-Anchored OTE Entry | Major BOS leg retracement into `0.62–0.79` (`0.705`) + tap/close |
+| `S9_HIDDEN_DEMAND_SUPPLY` | Hidden Demand/Supply (H1 -> M5) | HTF wick-to-wick gap behind BOS refined to LTF Order Block |
+| `S10_SESSION_SWEEP_REVERSAL` | Session Key-Level Sweep Reversal | Sweep of PDH/PDL/Asian/London levels targeting opposing key level |
+
+### 12.4 Source Limitations & Audit Reference
+- See [`docs/VIDEO_SKILLS_AUDIT.md`](./VIDEO_SKILLS_AUDIT.md) and [`knowledge/exports/video_skills_2026-11.json`](../knowledge/exports/video_skills_2026-11.json) for full per-video provenance and documented failure modes.
+- Clip `keepssy_fx-20261126-0012` was absent from the source bundle and is explicitly marked skipped/missing.

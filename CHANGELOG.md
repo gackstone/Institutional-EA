@@ -2,6 +2,29 @@
 
 All notable changes to the Institutional Multi-Timeframe Algorithmic Trading Bot (`Institutional EA`) are documented in this file.
 
+## [3.13.0] - 2026-11-26
+
+### Added - Video-derived updates (2026-11)
+- **Audit & Provenance (`docs/VIDEO_SKILLS_AUDIT.md`, `knowledge/exports/video_skills_2026-11.json`, `knowledge/forex_kb.json`)**:
+  - Audited all 16 forex-video strategies against the existing engine (`a` already exists / `b` partial / `c` missing) and exported machine-readable primitives (`P1–P11`), named setups (`S1–S10`), 4 documented failure modes, provenance tags, and explicit educational/calibration disclaimers.
+  - Documented source limitations: `keepssy_fx-20261126-0012` was missing from the source set; the 3rd HTF-bias confluence slot in `P2` (`chart__tactix-20261113-0001`) is explicitly flagged as configurable and *not from the video*.
+- **NY `zoneinfo` Windows & Session Key Levels (`config/sessions.json`, `src/core/sessions.py`, `src/smc/session_liquidity.py`)**:
+  - Added editable `ict_ny_windows` evaluated strictly in `America/New_York` (`zoneinfo`) for DST correctness: `silver_bullet_london` (`03:00–04:00`), `silver_bullet_ny_am` (`10:00–11:00`), `silver_bullet_ny_pm` (`14:00–15:00`), `ny_killzone` (`07:00–10:00`), `ny_macro_1` (`09:50–10:10`), and `ny_macro_2` (`10:50–11:10`), plus `broker_time_to_utc()`, `to_ny_time()`, `get_active_ict_windows()`, and `is_window_expired()`.
+  - Added `SessionKeyLevels` (`Asian H/L/Mid`, `London H/L`, `PDH/PDL/PD Mid`, `NY Morning H/L`) and `compute_session_key_levels()`.
+- **Core Video Primitives `P1–P11` & Data-Only Reference Symbols (`src/smc/video_primitives.py`, `src/core/symbol_universe.py`)**:
+  - Implemented `P1` equal-cluster liquidity (`0.10 * ATR(14)`), `P2` sweep-vs-breakout classifier (candle formation + approach overlap/body/slope + optional HTF slot), `P3` confirmed sweep (`min_pierce_atr=0.05`, `max_bars_to_reclaim=3`), `P4` MSS with displacement + FVG, `P5` FVG with Consequent Encroachment (CE), `P6` IFVG close-through inversion + "first FVG before stop hunt" priority, `P7` bidirectional flipped breaker blocks, `P8` BOS-anchored Fibonacci OTE (`0.62–0.79`, sweet spot `0.705`, rejecting minor pullbacks), `P9–P10` draw-on-liquidity target & "no draw, no trade" gate, and `P11` SMT divergence + 3-point turn grading (`A+` / `B` / `INVALID`) wired into the existing XAUUSD/USDJPY inverse coordination engine.
+  - Added `DATA_ONLY_REFERENCE_SYMBOLS` (`USDJPY`, `XAGUSD`, `DXY`, `USDX`, `ETHUSD`, `EURUSD`) for SMT reference only; `APPROVED_CANONICAL_SYMBOLS` (`XAUUSD`, `BTCUSD`) remains strictly enforced for order execution.
+- **Named Setups `S1–S10` & Monotonic Scoring (`src/smc/video_setups.py`, `src/core/contracts.py`, `config/strategy_config.json`)**:
+  - Extended `SignalCandidate` with backward-compatible optional fields (`setup_id`, `context`, `sweep_kind`, `smt_status`, `three_point_grade`, `draw_on_liquidity`, `entry_model`, `invalidation_price`, `provenance`, `confluence_breakdown`).
+  - Implemented `VideoSetupEngine` covering `S1`–`S10` (`S1_RAID_SHIFT_FVG_CE`, `S2_SILVER_BULLET`, `S3_NY_MACRO`, `S4_LONDON_JUDAS_SWING`, `S5_ASIAN_SD_REVERSAL`, `S6_IFVG_STOP_HUNT`, `S7_STACKED_BREAKER_IFVG`, `S8_OTE_STOP_HUNT_BOS`, `S9_HIDDEN_DEMAND_SUPPLY`, `S10_SESSION_SWEEP_REVERSAL`), fail-closed config validation (`validate_video_setups_config`), and monotonic confluence scoring without adding global filters that veto existing entries.
+- **Tighten-Only Trade Management, Manual Adoption, Telegram & Companion (`src/risk/trade_management.py`, `src/manual_mgmt/assessor.py`, `src/notifications/`, `companion/src/components/screens/SignalsAlertsScreens.tsx`)**:
+  - Added strictly tighten-only (R9.3) runner management (`evaluate_video_runner_management`: partial TP1 + BE+cost buffer + structural trail), `evaluate_invalidation_exit()`, and `should_cancel_window_expired_order()`.
+  - Updated `ManualPositionAssessor` to prefer nearby confirmed sweep extremes for naked-position SL and P9 draw-on-liquidity for suggested TP while preserving User Supremacy and R9.3.
+  - Added single `<b>Model:</b>` line to existing Telegram `TradeSetupEvent` template and surfaced `setup_id`, `three_point_grade`, and `provenance` in the Companion Signals table.
+- **Tests & Historical Replay (`tests/test_video_skills_2026_11.py`, `scripts/run_video_skills_replay.py`, `reports/video_skills_replay_2026-11-26.md`)**:
+  - Added unit, DST/timezone, mirror (long/short), negative, config-validation, and safety tests proving reference symbols cannot be traded and stops can never be widened.
+  - Added historical replay script generating an in-sample, unvalidated calibration report across local XAUUSD/USDJPY/BTCUSD M15 candles.
+
 ## [3.12.0] - 2026-11-26
 
 ### Added - Public Website, Authentication, $50/mo Binance USDT Subscription, Admin Console & Supabase Integration
