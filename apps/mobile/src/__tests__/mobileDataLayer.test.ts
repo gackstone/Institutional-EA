@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   computeBackoffMs,
   isSnapshotStale,
+  mapCloudPairingError,
+  parseAnyPairingQrPayload,
   parsePairingQrPayload,
 } from "../services/MobileSyncClient.ts";
 import {
@@ -156,4 +158,66 @@ test("Offline TradingView Lightweight Charts + chart-core bundle is generated an
   assert.ok(CHART_WEBVIEW_BUNDLE_JS.length > 50_000);
   assert.ok(!CHART_WEBVIEW_BUNDLE_JS.includes("https://unpkg.com"));
   assert.ok(!CHART_WEBVIEW_BUNDLE_JS.includes("https://cdn.jsdelivr.net"));
+});
+
+test("parseAnyPairingQrPayload accepts Cloud v2 QR, LAN v1 QR, and rejects garbage", () => {
+  const cloudQr = parseAnyPairingQrPayload(
+    JSON.stringify({
+      v: 2,
+      mode: "cloud",
+      cloudUrl: "https://itnxilvehaeokxvauujk.supabase.co",
+      sessionId: "11111111-2222-3333-4444-555555555555",
+      sessionToken: "0123456789abcdef0123456789abcdef",
+      code: "654321",
+      expiresAt: 1999999999,
+      companionName: "DESKTOP-WIN",
+    })
+  );
+  assert.equal(cloudQr.v, 2);
+  if (cloudQr.v === 2) {
+    assert.equal(cloudQr.mode, "cloud");
+    assert.equal(cloudQr.code, "654321");
+  }
+
+  const lanQr = parseAnyPairingQrPayload(
+    JSON.stringify({
+      v: 1,
+      host: "192.168.1.42",
+      port: 8766,
+      code: "123456",
+      expiresAt: 1999999999,
+    })
+  );
+  assert.equal(lanQr.v, 1);
+
+  assert.throws(() => parseAnyPairingQrPayload("not-json-at-all"));
+  assert.throws(() => parseAnyPairingQrPayload(JSON.stringify({ v: 99, foo: "bar" })));
+});
+
+test("mapCloudPairingError maps wrong code, expired, consumed, 429, 404, and offline cleanly", () => {
+  assert.match(mapCloudPairingError(404, "INVALID_PAIRING_CODE", ""), /not recognized/i);
+  assert.match(mapCloudPairingError(410, "PAIRING_EXPIRED", ""), /expired/i);
+  assert.match(mapCloudPairingError(409, "PAIRING_CONSUMED", ""), /already used/i);
+  assert.match(mapCloudPairingError(429, "RATE_LIMITED", ""), /Too many attempts/i);
+  assert.match(mapCloudPairingError(404, "NOT_FOUND", "Requested function was not found"), /Local Wi-Fi/i);
+  assert.match(mapCloudPairingError(0, "NETWORK_ERROR", "Failed to fetch"), /No internet/i);
+});
+
+test("SecureStorage stores and retrieves Cloud PairingCredentials", async () => {
+  await SecureStorage.setPairingCredentials({
+    mode: "cloud",
+    cloudUrl: "https://itnxilvehaeokxvauujk.supabase.co",
+    host: "itnxilvehaeokxvauujk.supabase.co",
+    hosts: ["itnxilvehaeokxvauujk.supabase.co"],
+    port: 443,
+    deviceId: "dev_cloud_1",
+    deviceToken: "iea_ro_cloud_token_0123456789abcdef",
+    companionName: "WIN-OFFICE",
+    pairedAt: "2026-11-26T20:00:00Z",
+  });
+  const loaded = await SecureStorage.getPairingCredentials();
+  assert.equal(loaded?.mode, "cloud");
+  assert.equal(loaded?.cloudUrl, "https://itnxilvehaeokxvauujk.supabase.co");
+  assert.equal(loaded?.deviceId, "dev_cloud_1");
+  await SecureStorage.clearPairingCredentials();
 });

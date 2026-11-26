@@ -18,7 +18,7 @@ export interface DownloadPlatformConfig {
 export const RELEASE_REPO = "gackstone/Institutional-EA";
 export const LATEST_RELEASE_API_URL = `https://api.github.com/repos/${RELEASE_REPO}/releases/latest`;
 export const LATEST_RELEASE_BASE_URL = `https://github.com/${RELEASE_REPO}/releases/latest/download`;
-export const DEFAULT_APP_VERSION = "1.3.5";
+export const DEFAULT_APP_VERSION = "1.3.6";
 
 /**
  * Edit links, TestFlight URL, or version defaults in this single file
@@ -60,9 +60,9 @@ export const DOWNLOAD_PLATFORMS: Record<PlatformId, DownloadPlatformConfig> = {
     assetName: "InstitutionalEA.apk",
     downloadUrl: `${LATEST_RELEASE_BASE_URL}/InstitutionalEA.apk`,
     systemRequirements: "Android 7.0+ (API 24)",
-    fallbackSize: "77.1 MB",
+    fallbackSize: "78.4 MB",
     architecture: "Universal APK (Read-Only)",
-    installNote: "If you have v1.3.4 or older installed, uninstall it first before installing v1.3.5 (one-time signing key upgrade); allow \"Install unknown apps\" if prompted.",
+    installNote: "Updates in place over v1.3.5 (same release signing key). Supports Cloud Pairing across Wi-Fi & 4G/5G; allow \"Install unknown apps\" if prompted.",
   },
   ios: {
     id: "ios",

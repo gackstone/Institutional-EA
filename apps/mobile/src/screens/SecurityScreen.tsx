@@ -28,7 +28,7 @@ import { formatClockTime, formatShortDateTime } from "../utils/formatters.ts";
 import { triggerLightHaptic } from "../services/haptics.ts";
 import type { PairingCredentials } from "../services/SecureStorage.ts";
 
-const APP_VERSION = "1.3.5";
+const APP_VERSION = "1.3.6";
 
 interface SecurityScreenProps {
   theme: ThemeMode;
@@ -270,7 +270,21 @@ export function SecurityScreen({
         {credentials ? (
           <View>
             <InfoRow label="Companion" value={credentials.companionName} tokens={tokens} />
-            <InfoRow label="Address" value={`${credentials.host}:${credentials.port}`} tokens={tokens} />
+            <InfoRow
+              label="Mode"
+              value={credentials.mode === "cloud" ? "Cloud (Cross-Network)" : "Local Wi-Fi"}
+              tokens={tokens}
+              valueColor={tokens.accent}
+            />
+            <InfoRow
+              label="Address"
+              value={
+                credentials.mode === "cloud"
+                  ? credentials.cloudUrl || "Cloud Relay"
+                  : `${credentials.host}:${credentials.port}`
+              }
+              tokens={tokens}
+            />
             <InfoRow label="Device ID" value={credentials.deviceId} tokens={tokens} />
             <InfoRow label="Status" value={connectionLabel} tokens={tokens} valueColor={tokens.accent} />
             <InfoRow label="Paired" value={formatShortDateTime(credentials.pairedAt)} tokens={tokens} />
@@ -378,7 +392,7 @@ export function SecurityScreen({
                   <TextInput
                     value={host}
                     onChangeText={setHost}
-                    placeholder="LAN Host IP (optional)"
+                    placeholder="LAN Host IP (e.g. 192.168.x.x)"
                     placeholderTextColor={tokens.textDim}
                     autoCapitalize="none"
                     keyboardType="numbers-and-punctuation"
