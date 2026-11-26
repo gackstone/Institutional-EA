@@ -484,3 +484,183 @@ class TradingSessionEngine:
         session_low = min(c.low for c in candles)
         session_open = candles[0].open
         return session_high, session_low, session_open
+
+    # ========================================================================
+    # 5. ICT NEW YORK LOCAL TIME WINDOWS (DST-AWARE VIA ZONEINFO)
+    # ========================================================================
+
+    DEFAULT_ICT_NY_WINDOWS: Dict[str, Dict[str, Any]] = {
+        "silver_bullet_london": {
+            "enabled": True,
+            "start_ny": "03:00",
+            "end_ny": "04:00",
+            "context": "SILVER_BULLET",
+            "source_video": "keepssy_fx-20261126-0001",
+        },
+        "silver_bullet_ny_am": {
+            "enabled": True,
+            "start_ny": "10:00",
+            "end_ny": "11:00",
+            "context": "SILVER_BULLET",
+            "source_video": "keepssy_fx-20261126-0001",
+        },
+        "silver_bullet_ny_pm": {
+            "enabled": True,
+            "start_ny": "14:00",
+            "end_ny": "15:00",
+            "context": "SILVER_BULLET",
+            "source_video": "keepssy_fx-20261126-0001",
+        },
+        "ny_killzone": {
+            "enabled": True,
+            "start_ny": "07:00",
+            "end_ny": "10:00",
+            "context": "NY_KILLZONE",
+            "source_video": "keepssy_fx-20261126-0007",
+        },
+        "ny_macro_1": {
+            "enabled": True,
+            "start_ny": "09:50",
+            "end_ny": "10:10",
+            "context": "NY_MACRO",
+            "source_video": "keepssy_fx-20261126-0010",
+        },
+        "ny_macro_2": {
+            "enabled": True,
+            "start_ny": "10:50",
+            "end_ny": "11:10",
+            "context": "NY_MACRO",
+            "source_video": "keepssy_fx-20261126-0010",
+        },
+    }
+
+    @staticmethod
+    def _parse_hhmm(hhmm: str) -> time:
+        parts = str(hhmm).strip().split(":")
+        return time(int(parts[0]), int(parts[1]))
+
+    @staticmethod
+    def broker_time_to_utc(
+        broker_dt: datetime,
+        broker_utc_offset_sec: int = 0,
+    ) -> datetime:
+        """
+        Converts a broker-server timestamp to UTC using the detected broker UTC offset
+        (in seconds). If `broker_dt` is already timezone-aware and `broker_utc_offset_sec == 0`,
+        converts directly to UTC.
+        """
+        if broker_utc_offset_sec != 0:
+            naive = broker_dt.replace(tzinfo=None)
+            return (naive - timedelta(seconds=int(broker_utc_offset_sec))).replace(tzinfo=timezone.utc)
+        if broker_dt.tzinfo is None:
+            return broker_dt.replace(tzinfo=timezone.utc)
+        return broker_dt.astimezone(timezone.utc)
+
+    @classmethod
+    def to_ny_time(
+        cls,
+        current_dt: Optional[datetime] = None,
+        broker_utc_offset_sec: int = 0,
+        tz_name: str = "America/New_York",
+    ) -> datetime:
+        """
+        Converts a UTC or broker-server timestamp to America/New_York local time
+        using zoneinfo (automatically handles US March & November DST transitions).
+        """
+        dt_utc = cls.broker_time_to_utc(
+            current_dt or datetime.now(timezone.utc),
+            broker_utc_offset_sec=broker_utc_offset_sec,
+        )
+        ny_tz = zoneinfo.ZoneInfo(tz_name)
+        return dt_utc.astimezone(ny_tz)
+
+    def get_ict_ny_windows_config(self) -> Tuple[str, Dict[str, Dict[str, Any]]]:
+        raw = self._raw_cfg.get("ict_ny_windows") or {}
+        tz_name = str(raw.get("timezone") or "America/New_York")
+        merged: Dict[str, Dict[str, Any]] = {}
+        for name, default_spec in self.DEFAULT_ICT_NY_WINDOWS.items():
+            user_spec = raw.get(name) if isinstance(raw.get(name), dict) else {}
+            merged[name] = {**default_spec, **user_spec}
+        return tz_name, merged
+
+    def get_active_ict_windows(
+        self,
+        current_dt: Optional[datetime] = None,
+        broker_utc_offset_sec: int = 0,
+    ) -> Dict[str, Any]:
+        """
+        Evaluates all configured ICT New York local-time windows (Silver Bullet London/NY AM/NY PM,
+        NY Killzone, NY Macro 1 & 2) using zoneinfo DST rules.
+        Returns active window names, contexts, NY local timestamp, and per-window UTC end times.
+        """
+        tz_name, windows_cfg = self.get_ict_ny_windows_config()
+        ny_dt = self.to_ny_time(current_dt, broker_utc_offset_sec=broker_utc_offset_sec, tz_name=tz_name)
+        ny_t = ny_dt.time()
+        ny_tz = zoneinfo.ZoneInfo(tz_name)
+
+        active_windows: List[str] = []
+        active_contexts: List[str] = []
+        window_ends_utc: Dict[str, datetime] = {}
+
+        for name, spec in windows_cfg.items():
+            if not spec.get("enabled", True):
+                continue
+            start_t = self._parse_hhmm(spec["start_ny"])
+            end_t = self._parse_hhmm(spec["end_ny"])
+            # Inclusive start, exclusive end (e.g. 10:00:00 .. 10:59:59 is inside 10:00-11:00)
+            if start_t <= ny_t < end_t:
+                active_windows.append(name)
+                ctx = str(spec.get("context") or "NONE")
+                if ctx not in active_contexts:
+                    active_contexts.append(ctx)
+                end_ny = datetime.combine(ny_dt.date(), end_t, tzinfo=ny_tz)
+                window_ends_utc[name] = end_ny.astimezone(timezone.utc)
+
+        is_silver_bullet = any(w.startswith("silver_bullet_") for w in active_windows)
+        is_ny_macro = any(w.startswith("ny_macro_") for w in active_windows)
+        is_ny_killzone = "ny_killzone" in active_windows
+
+        # Priority context: NY_MACRO > SILVER_BULLET > NY_KILLZONE > NONE
+        primary_context = "NONE"
+        if is_ny_macro:
+            primary_context = "NY_MACRO"
+        elif is_silver_bullet:
+            primary_context = "SILVER_BULLET"
+        elif is_ny_killzone:
+            primary_context = "NY_KILLZONE"
+
+        return {
+            "ny_time": ny_dt,
+            "utc_time": ny_dt.astimezone(timezone.utc),
+            "timezone": tz_name,
+            "is_dst": bool(ny_dt.dst() and ny_dt.dst().total_seconds() != 0),
+            "active_windows": active_windows,
+            "active_contexts": active_contexts,
+            "primary_context": primary_context,
+            "is_silver_bullet": is_silver_bullet,
+            "is_ny_macro": is_ny_macro,
+            "is_ny_killzone": is_ny_killzone,
+            "window_ends_utc": window_ends_utc,
+        }
+
+    def is_window_expired(
+        self,
+        window_name: str,
+        order_placed_dt: datetime,
+        current_dt: datetime,
+        broker_utc_offset_sec: int = 0,
+    ) -> bool:
+        """
+        Returns True if the ICT NY window in which `order_placed_dt` occurred has closed
+        by `current_dt` (used to cancel unfilled S2 Silver Bullet / S3 NY Macro limits).
+        """
+        tz_name, windows_cfg = self.get_ict_ny_windows_config()
+        spec = windows_cfg.get(window_name)
+        if not spec:
+            return False
+        ny_tz = zoneinfo.ZoneInfo(tz_name)
+        placed_ny = self.to_ny_time(order_placed_dt, broker_utc_offset_sec=broker_utc_offset_sec, tz_name=tz_name)
+        end_t = self._parse_hhmm(spec["end_ny"])
+        end_utc = datetime.combine(placed_ny.date(), end_t, tzinfo=ny_tz).astimezone(timezone.utc)
+        now_utc = self.broker_time_to_utc(current_dt, broker_utc_offset_sec=broker_utc_offset_sec)
+        return now_utc >= end_utc

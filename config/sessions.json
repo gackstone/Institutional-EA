@@ -119,5 +119,50 @@
     "start_utc": "13:00",
     "end_utc": "16:00"
   },
+  "ict_ny_windows": {
+    "timezone": "America/New_York",
+    "silver_bullet_london": {
+      "enabled": true,
+      "start_ny": "03:00",
+      "end_ny": "04:00",
+      "context": "SILVER_BULLET",
+      "source_video": "keepssy_fx-20261126-0001"
+    },
+    "silver_bullet_ny_am": {
+      "enabled": true,
+      "start_ny": "10:00",
+      "end_ny": "11:00",
+      "context": "SILVER_BULLET",
+      "source_video": "keepssy_fx-20261126-0001"
+    },
+    "silver_bullet_ny_pm": {
+      "enabled": true,
+      "start_ny": "14:00",
+      "end_ny": "15:00",
+      "context": "SILVER_BULLET",
+      "source_video": "keepssy_fx-20261126-0001"
+    },
+    "ny_killzone": {
+      "enabled": true,
+      "start_ny": "07:00",
+      "end_ny": "10:00",
+      "context": "NY_KILLZONE",
+      "source_video": "keepssy_fx-20261126-0007"
+    },
+    "ny_macro_1": {
+      "enabled": true,
+      "start_ny": "09:50",
+      "end_ny": "10:10",
+      "context": "NY_MACRO",
+      "source_video": "keepssy_fx-20261126-0010"
+    },
+    "ny_macro_2": {
+      "enabled": true,
+      "start_ny": "10:50",
+      "end_ny": "11:10",
+      "context": "NY_MACRO",
+      "source_video": "keepssy_fx-20261126-0010"
+    }
+  },
   "filter_spread_max_pips": 3.0
 }
