@@ -230,6 +230,11 @@ class TradeSetupEvent(BaseNotificationEvent):
     confidence_score: float = 84.0
     digits: int = 2
     trade_id: str = ""
+    setup_id: str = ""
+    context: str = ""
+    three_point_grade: str = ""
+    entry_model: str = ""
+    draw_on_liquidity: str = ""
 
     def __post_init__(self) -> None:
         self.event_type = NotificationEventType.TRADE_SETUP

@@ -284,6 +284,17 @@ class TemplateRenderer:
             "",
             f"<b>Setup:</b> {esc(e.reason)}",
         ]
+        if getattr(e, "setup_id", ""):
+            parts = [esc(e.setup_id)]
+            if getattr(e, "context", ""):
+                parts.append(esc(e.context))
+            if getattr(e, "three_point_grade", ""):
+                parts.append(f"Grade {esc(e.three_point_grade)}")
+            if getattr(e, "entry_model", ""):
+                parts.append(esc(e.entry_model))
+            if getattr(e, "draw_on_liquidity", ""):
+                parts.append(f"Draw {esc(e.draw_on_liquidity)}")
+            lines.append(f"<b>Model:</b> {' · '.join(parts)}")
         if getattr(e, "htf_bias", None):
             lines.append(f"<b>Bias:</b> {esc(e.htf_bias)}")
         if getattr(e, "confidence_score", None):
