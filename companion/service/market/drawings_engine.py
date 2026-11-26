@@ -790,12 +790,28 @@ def compute_drawings_from_candles(
         )
         final_drawings.extend(items[:cap])
 
+    liq_count = len([d for d in final_drawings if d["type"] == "LIQ"])
+    fvg_count = len([d for d in final_drawings if d["type"] == "FVG"])
+    ob_count = len([d for d in final_drawings if d["type"] == "OB"])
+    fvg_ob_count = fvg_count + ob_count
+    struct_count = len([d for d in final_drawings if d["type"] == "STRUCT"])
+    sess_count = len([d for d in final_drawings if d["type"] == "SESS"])
+    trades_count = len([d for d in final_drawings if d["type"] == "TRADE"])
+
     counts = {
-        "liquidity": len([d for d in final_drawings if d["type"] == "LIQ"]),
-        "fvgOb": len([d for d in final_drawings if d["type"] in ("FVG", "OB")]),
-        "structure": len([d for d in final_drawings if d["type"] == "STRUCT"]),
-        "sessions": len([d for d in final_drawings if d["type"] == "SESS"]),
-        "trades": len([d for d in final_drawings if d["type"] == "TRADE"]),
+        "liquidity": liq_count,
+        "fvgOb": fvg_ob_count,
+        "structure": struct_count,
+        "sessions": sess_count,
+        "trades": trades_count,
+        "LIQ": liq_count,
+        "FVG": fvg_count,
+        "OB": ob_count,
+        "FVG_OB": fvg_ob_count,
+        "STRUCT": struct_count,
+        "SESS": sess_count,
+        "TRADE": trades_count,
+        "TRADES": trades_count,
     }
 
     return {
@@ -808,6 +824,7 @@ def compute_drawings_from_candles(
         "dropped_count": dropped_count,
         "counts": counts,
         "drawings": final_drawings,
+        "items": final_drawings,
         "smc": {
             "swing_trend": smc.swing_trend,
             "internal_trend": smc.internal_trend,

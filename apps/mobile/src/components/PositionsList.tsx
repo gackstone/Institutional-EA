@@ -50,6 +50,8 @@ export const PositionsList = memo(function PositionsList({
         const durationSec = item.openTime > 0 ? Math.max(0, nowSec - item.openTime) : null;
         const slDist = computeSlTpDistance(item.currentPrice, item.sl, item.digits);
         const tpDist = computeSlTpDistance(item.currentPrice, item.tp, item.digits);
+        const hasSl = typeof item.sl === "number" && item.sl > 0;
+        const hasTp = typeof item.tp === "number" && item.tp > 0;
 
         return (
           <TouchableOpacity
@@ -91,6 +93,11 @@ export const PositionsList = memo(function PositionsList({
                     {formatDuration(durationSec)}
                   </Text>
                 )}
+                {!hasSl && (
+                  <View style={[styles.typeTag, { backgroundColor: tokens.lossBg }]}>
+                    <Text style={[styles.typeText, { color: tokens.loss }]}>NO SL</Text>
+                  </View>
+                )}
               </View>
 
               <Text
@@ -111,10 +118,10 @@ export const PositionsList = memo(function PositionsList({
                 Now {formatPrice(item.currentPrice, item.digits)}
               </Text>
               <Text style={[styles.detailText, { color: tokens.loss }]}>
-                SL {item.sl ? `${formatPrice(item.sl, item.digits)} (${slDist})` : "—"}
+                SL {hasSl ? `${formatPrice(item.sl, item.digits)} (${slDist})` : "NO SL"}
               </Text>
-              <Text style={[styles.detailText, { color: tokens.profit }]}>
-                TP {item.tp ? `${formatPrice(item.tp, item.digits)} (${tpDist})` : "—"}
+              <Text style={[styles.detailText, { color: hasTp ? tokens.profit : tokens.textDim }]}>
+                TP {hasTp ? `${formatPrice(item.tp, item.digits)} (${tpDist})` : "NO TP"}
               </Text>
             </View>
           </TouchableOpacity>
@@ -157,8 +164,24 @@ export const PositionsList = memo(function PositionsList({
                   <Row label="Side / Lots" value={`${selected.type} · ${selected.volume} lots`} tokens={tokens} />
                   <Row label="Entry Price" value={formatPrice(selected.openPrice, selected.digits)} tokens={tokens} />
                   <Row label="Current Price" value={formatPrice(selected.currentPrice, selected.digits)} tokens={tokens} />
-                  <Row label="Stop Loss" value={formatPrice(selected.sl, selected.digits)} tokens={tokens} />
-                  <Row label="Take Profit" value={formatPrice(selected.tp, selected.digits)} tokens={tokens} />
+                  <Row
+                    label="Stop Loss"
+                    value={
+                      typeof selected.sl === "number" && selected.sl > 0
+                        ? formatPrice(selected.sl, selected.digits)
+                        : "NO SL (Unprotected)"
+                    }
+                    tokens={tokens}
+                  />
+                  <Row
+                    label="Take Profit"
+                    value={
+                      typeof selected.tp === "number" && selected.tp > 0
+                        ? formatPrice(selected.tp, selected.digits)
+                        : "NO TP"
+                    }
+                    tokens={tokens}
+                  />
                   <Row label="Swap" value={formatSignedPnl(selected.swap, currency)} tokens={tokens} />
                   <Row label="Ownership" value={selected.ownership} tokens={tokens} />
                   {selected.comment ? (

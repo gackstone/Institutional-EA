@@ -15,6 +15,10 @@ import {
   MOBILE_SYNC_SCHEMA_VERSION,
   MobileStatusSchema,
   MobilePairingQrPayloadSchema,
+  MobileTradesPageSchema,
+  MobileDrawingsResponseSchema,
+  checkSyncSchemaCompatibility,
+  normalizeDrawingsCounts,
   assertMobileHttpReadOnly,
 } from "../src/index.ts";
 
@@ -210,4 +214,72 @@ test("assertMobileHttpReadOnly allows GET and pair/unpair POST only, blocks all 
   ]) {
     assert.throws(() => assertMobileHttpReadOnly(method, path), /READ_ONLY_ENFORCED/);
   }
+});
+
+
+test("v1.0.0 <-> v1.1.0 schema version negotiation and major version updateNeeded detection", () => {
+  assert.equal(MOBILE_SYNC_SCHEMA_VERSION, "1.1.0");
+  const c1 = checkSyncSchemaCompatibility("1.0.0", "1.1.0");
+  assert.equal(c1.compatible, true);
+  assert.equal(c1.updateNeeded, false);
+
+  const c2 = checkSyncSchemaCompatibility("1.1.0", "1.0.0");
+  assert.equal(c2.compatible, true);
+  assert.equal(c2.updateNeeded, false);
+
+  const c3 = checkSyncSchemaCompatibility("2.0.0", "1.1.0");
+  assert.equal(c3.compatible, false);
+  assert.equal(c3.updateNeeded, true);
+  assert.match(c3.reason, /update required/i);
+});
+
+test("MobileTradesPageSchema validates empty state and v1.1.0 nextCursor", () => {
+  const emptyPage = MobileTradesPageSchema.parse({
+    page: 1,
+    limit: 25,
+    total: 0,
+    hasMore: false,
+    nextCursor: null,
+    currency: "USD",
+    summary: { count: 0, netPnl: 0, winRate: 0, wins: 0, losses: 0 },
+    items: [],
+  });
+  assert.equal(emptyPage.summary.count, 0);
+  assert.equal(emptyPage.items.length, 0);
+  assert.equal(emptyPage.nextCursor, null);
+});
+
+test("normalizeDrawingsCounts populates both camelCase and uppercase layer keys for ChartsScreen parity", () => {
+  const items = [
+    { type: "LIQ" },
+    { type: "LIQ" },
+    { type: "FVG" },
+    { type: "OB" },
+    { type: "SESS" },
+    { type: "TRADE" },
+  ];
+  const counts = normalizeDrawingsCounts(items);
+  assert.equal(counts.liquidity, 2);
+  assert.equal(counts.LIQ, 2);
+  assert.equal(counts.fvgOb, 2);
+  assert.equal(counts.FVG, 1);
+  assert.equal(counts.OB, 1);
+  assert.equal(counts.FVG_OB, 2);
+  assert.equal(counts.structure, 0);
+  assert.equal(counts.STRUCT, 0);
+  assert.equal(counts.sessions, 1);
+  assert.equal(counts.SESS, 1);
+  assert.equal(counts.trades, 1);
+  assert.equal(counts.TRADE, 1);
+
+  const parsed = MobileDrawingsResponseSchema.parse({
+    schema_version: "1.1.0",
+    symbol: "XAUUSD",
+    timeframe: "M5",
+    items: [],
+    drawings: [],
+    counts,
+  });
+  assert.equal(parsed.counts?.LIQ, 2);
+  assert.equal(parsed.counts?.fvgOb, 2);
 });

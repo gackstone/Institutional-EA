@@ -542,32 +542,128 @@ export const App: React.FC = () => {
     const pushSnapshot = async () => {
       if (!active) return;
       try {
-        const sigRes = await controlClient.getSignals().catch(() => ({ signals: [] }));
         cloudSyncSeqRef.current += 1;
+        const seq = cloudSyncSeqRef.current;
+
+        // Primary path: fetch authoritative v1.1.0 cloud bundle from Python Control Service
+        // (includes status, account with marginLevel, single-source stats, positions,
+        // closed trades only, symbols, multi-TF candles, SMC drawings/overlays, and equityPoints).
+        const bundle = await controlClient.getMobileCloudBundle({ limit: 80 }).catch(() => null);
+        if (bundle && typeof bundle === "object" && bundle.status && bundle.account) {
+          await api.cloudMobilePushSnapshot({
+            sequenceNo: seq,
+            ...bundle,
+            meta: {
+              ...(bundle.meta || {}),
+              sequenceNo: seq,
+            },
+          });
+          return;
+        }
+
+        // Fallback if Control Service is restarting: build complete v1.1.0 shape from local state
+        const sigRes = await controlClient.getSignals().catch(() => ({ signals: [] }));
+        const closedTrades = normalized.recentTrades.filter(
+          (t) => String(t.status || "").toUpperCase() === "CLOSED" || Boolean(t.closed_at)
+        );
+        const todayUtc = new Date().toISOString().slice(0, 10);
+        const closedToday = closedTrades.filter(
+          (t) => t.closed_at && String(t.closed_at).slice(0, 10) === todayUtc
+        );
+        const winsCount = closedTrades.filter((t) => Number(t.profit || 0) > 0).length;
+        const lossesCount = closedTrades.filter((t) => Number(t.profit || 0) < 0).length;
+        const decided = winsCount + lossesCount;
+        const winRate = decided > 0 ? Number(((winsCount / decided) * 100).toFixed(2)) : 0;
+        const realizedTotal = closedTrades.reduce((acc, t) => acc + Number(t.profit || 0), 0);
+        const realizedToday = closedToday.reduce((acc, t) => acc + Number(t.profit || 0), 0);
+        const floatingPnl = Number(
+          (effectiveStatus.mt5.account.equity - effectiveStatus.mt5.account.balance).toFixed(2)
+        );
+        const todayPnl = Number((realizedToday + floatingPnl).toFixed(2));
+        const totalProfit = closedTrades.length > 0 ? Number(realizedTotal.toFixed(2)) : todayPnl;
+        const accountMasked = effectiveStatus.mt5.account.account_number
+          ? `****${String(effectiveStatus.mt5.account.account_number).slice(-4)}`
+          : "DEMO";
+
+        const symbolsList = Object.entries(effectiveStatus.mt5.symbols || {}).map(([brokerSym, spec]) => ({
+          symbol: spec.canonical || brokerSym.split(".")[0],
+          brokerSymbol: brokerSym,
+          digits: spec.digits ?? 2,
+          point: spec.point ?? 0.01,
+          bid: spec.bid > 0 ? spec.bid : null,
+          ask: spec.ask > 0 ? spec.ask : null,
+          spreadPoints: spec.spread_points ?? null,
+        }));
+
+        const baseBal = balanceSnapshots.length > 0 ? balanceSnapshots[0].balance : effectiveStatus.mt5.account.balance;
+        const equityPoints = balanceSnapshots.slice(-200).map((s) => {
+          const ts = Math.floor(new Date(s.created_at).getTime() / 1000);
+          return {
+            time: Number.isFinite(ts) && ts > 0 ? ts : Math.floor(Date.now() / 1000),
+            balance: Number(s.balance || 0),
+            equity: Number(s.equity || 0),
+            pnl: Number(((s.equity || 0) - baseBal).toFixed(2)),
+          };
+        });
+
         await api.cloudMobilePushSnapshot({
-          sequenceNo: cloudSyncSeqRef.current,
+          sequenceNo: seq,
+          meta: {
+            schemaVersion: "1.1.0",
+            minClientSchemaVersion: "1.0.0",
+            supportedVersions: ["1.0.0", "1.1.0"],
+            producerVersion: "1.3.7",
+            generatedAt: new Date().toISOString(),
+            sequenceNo: seq,
+            timezoneRule: "UTC_00_00",
+          },
           status: {
+            schemaVersion: "1.1.0",
+            appVersion: "1.3.7",
             botState: effectiveStatus.engine.state,
             mt5Connected: effectiveStatus.mt5.connection_status === "CONNECTED",
+            mt5Status: effectiveStatus.mt5.connection_status === "CONNECTED" ? "CONNECTED" : "DISCONNECTED",
             demoMode: effectiveStatus.mt5.account.demo_verified,
             broker: effectiveStatus.mt5.account.broker,
-            accountMasked: effectiveStatus.mt5.account.account_number
-              ? `****${String(effectiveStatus.mt5.account.account_number).slice(-4)}`
-              : "DEMO",
+            accountMasked,
+            lastHeartbeat: effectiveStatus.mt5.last_sync_at,
+            serverTime: new Date().toISOString(),
             readOnlyEnforced: true,
           },
           account: {
             balance: effectiveStatus.mt5.account.balance,
             equity: effectiveStatus.mt5.account.equity,
-            floatingPnl: Number(
-              (effectiveStatus.mt5.account.equity - effectiveStatus.mt5.account.balance).toFixed(2)
-            ),
+            margin: effectiveStatus.mt5.account.margin || 0,
+            freeMargin: effectiveStatus.mt5.account.free_margin || 0,
+            marginLevel: effectiveStatus.mt5.account.margin_level || 0,
+            floatingPnl,
             currency: effectiveStatus.mt5.account.currency || "USD",
+            leverage: effectiveStatus.mt5.account.leverage || 0,
+            tradeMode: effectiveStatus.mt5.account.trade_mode || "DEMO",
+            broker: effectiveStatus.mt5.account.broker || "",
+            accountMasked,
             openPositionsCount: effectiveStatus.mt5.positions.length,
+            updatedAt: effectiveStatus.mt5.last_sync_at,
+          },
+          stats: {
+            todayPnl,
+            todayRealizedPnl: Number(realizedToday.toFixed(2)),
+            todayClosedCount: closedToday.length,
+            openPositionsCount: effectiveStatus.mt5.positions.length,
+            totalProfit,
+            winRate,
+            dealsCount: closedTrades.length,
+            tradesToday: closedToday.length + effectiveStatus.mt5.positions.length,
+            winsCount,
+            lossesCount,
+            currency: effectiveStatus.mt5.account.currency || "USD",
+            computedAt: new Date().toISOString(),
           },
           positions: effectiveStatus.mt5.positions,
-          trades: normalized.recentTrades.slice(0, 50),
+          trades: closedTrades.slice(0, 150),
           signals: (sigRes.signals || []).slice(0, 40),
+          symbols: symbolsList,
+          equityPoints,
         });
       } catch {
         // Silent retry on next interval; never disrupts local MT5 execution
@@ -580,7 +676,7 @@ export const App: React.FC = () => {
       active = false;
       clearInterval(timer);
     };
-  }, [cloudState?.authenticated, effectiveStatus, normalized.recentTrades]);
+  }, [cloudState?.authenticated, effectiveStatus, normalized.recentTrades, balanceSnapshots]);
 
   // Existing error/warning count from controlLogs for peach attention badge
   const warningErrorLogCount = useMemo(

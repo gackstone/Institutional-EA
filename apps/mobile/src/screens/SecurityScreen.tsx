@@ -23,18 +23,20 @@ import {
   parseAnyPairingQrPayload,
   pollCloudPairingApproval,
   type CloudClaimResult,
+  type SyncDiagnosticsState,
 } from "../services/MobileSyncClient.ts";
 import { formatClockTime, formatShortDateTime } from "../utils/formatters.ts";
 import { triggerLightHaptic } from "../services/haptics.ts";
 import type { PairingCredentials } from "../services/SecureStorage.ts";
 
-const APP_VERSION = "1.3.6";
+const APP_VERSION = "1.3.7";
 
 interface SecurityScreenProps {
   theme: ThemeMode;
   credentials: PairingCredentials | null;
   connectionLabel: string;
   lastSyncedMs: number | null;
+  syncDiagnostics?: SyncDiagnosticsState | null;
   biometricEnabled: boolean;
   onToggleBiometric: (enabled: boolean) => void;
   onPaired: (creds: PairingCredentials) => void;
@@ -47,6 +49,7 @@ export function SecurityScreen({
   credentials,
   connectionLabel,
   lastSyncedMs,
+  syncDiagnostics = null,
   biometricEnabled,
   onToggleBiometric,
   onPaired,
@@ -477,6 +480,101 @@ export function SecurityScreen({
         <InfoRow label="Protocol Scope" value="GET + SSE only (telemetry:read)" tokens={tokens} valueColor={tokens.profit} />
         <InfoRow label="App Version" value={`v${APP_VERSION}`} tokens={tokens} />
         <InfoRow label="Sync Schema" value={`v${MOBILE_SYNC_SCHEMA_VERSION}`} tokens={tokens} />
+      </View>
+
+      {/* Sync Diagnostics Card (Read-Only, Zero Secrets) */}
+      <View style={[styles.card, { backgroundColor: tokens.card, borderColor: tokens.border }]}>
+        <Text style={[styles.cardTitle, { color: tokens.text }]}>Sync Diagnostics (Read-Only)</Text>
+        <InfoRow
+          label="Client Schema"
+          value={`v${syncDiagnostics?.schemaVersion || MOBILE_SYNC_SCHEMA_VERSION}`}
+          tokens={tokens}
+        />
+        <InfoRow
+          label="Producer Schema"
+          value={`v${syncDiagnostics?.producerSchemaVersion || MOBILE_SYNC_SCHEMA_VERSION}`}
+          tokens={tokens}
+          valueColor={syncDiagnostics?.updateNeeded ? tokens.warning : tokens.profit}
+        />
+        <InfoRow
+          label="Producer Version"
+          value={`v${syncDiagnostics?.producerVersion || APP_VERSION}`}
+          tokens={tokens}
+        />
+        <InfoRow
+          label="Sequence #"
+          value={String(syncDiagnostics?.sequenceNo ?? 0)}
+          tokens={tokens}
+        />
+        <InfoRow
+          label="Producer Snapshot Time"
+          value={
+            syncDiagnostics?.producerUpdatedAt
+              ? formatClockTime(syncDiagnostics.producerUpdatedAt)
+              : lastSyncedMs
+              ? formatClockTime(lastSyncedMs)
+              : "—"
+          }
+          tokens={tokens}
+        />
+        <InfoRow
+          label="Last Client Poll"
+          value={
+            syncDiagnostics?.lastClientPollAt
+              ? formatClockTime(syncDiagnostics.lastClientPollAt)
+              : "—"
+          }
+          tokens={tokens}
+        />
+        <InfoRow
+          label="Stream: Account & Stats"
+          value={
+            syncDiagnostics?.streamTimes.account
+              ? formatClockTime(syncDiagnostics.streamTimes.account)
+              : "—"
+          }
+          tokens={tokens}
+        />
+        <InfoRow
+          label="Stream: Positions"
+          value={
+            syncDiagnostics?.streamTimes.positions
+              ? formatClockTime(syncDiagnostics.streamTimes.positions)
+              : "—"
+          }
+          tokens={tokens}
+        />
+        <InfoRow
+          label="Stream: Charts & SMC"
+          value={
+            syncDiagnostics?.streamTimes.charts
+              ? formatClockTime(syncDiagnostics.streamTimes.charts)
+              : "—"
+          }
+          tokens={tokens}
+        />
+        <InfoRow
+          label="Stream: Trades & Equity"
+          value={
+            syncDiagnostics?.streamTimes.trades || syncDiagnostics?.streamTimes.equity
+              ? formatClockTime(
+                  syncDiagnostics?.streamTimes.trades || syncDiagnostics?.streamTimes.equity
+                )
+              : "—"
+          }
+          tokens={tokens}
+        />
+        <InfoRow
+          label="Queue Depth"
+          value={String(syncDiagnostics?.queueDepth ?? 0)}
+          tokens={tokens}
+        />
+        <InfoRow
+          label="Last Error Code"
+          value={syncDiagnostics?.lastErrorCode || "NONE"}
+          tokens={tokens}
+          valueColor={syncDiagnostics?.lastErrorCode ? tokens.loss : tokens.profit}
+        />
       </View>
 
       {/* QR Scanner Modal */}

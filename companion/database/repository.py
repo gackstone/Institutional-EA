@@ -408,6 +408,24 @@ class CompanionRepository:
             finally:
                 conn.close()
 
+    def cleanup_stale_open_trade_records(self, active_open_tickets: List[int]) -> int:
+        """Removes stale status='OPEN' rows whose tickets are no longer open in MT5."""
+        with self._lock:
+            conn = self._conn()
+            try:
+                with conn:
+                    if not active_open_tickets:
+                        cur = conn.execute("DELETE FROM trade_records WHERE status = 'OPEN'")
+                    else:
+                        placeholders = ",".join("?" for _ in active_open_tickets)
+                        cur = conn.execute(
+                            f"DELETE FROM trade_records WHERE status = 'OPEN' AND ticket NOT IN ({placeholders})",
+                            tuple(int(t) for t in active_open_tickets),
+                        )
+                    return int(cur.rowcount)
+            finally:
+                conn.close()
+
     # ------------------------------------------------------------------
     # Real Balance Snapshots, Screenshots, Signals & Alerts (Migration 002)
     # ------------------------------------------------------------------

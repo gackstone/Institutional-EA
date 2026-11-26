@@ -385,6 +385,20 @@ def create_request_handler(ctx: ControlServiceContext):
                 self._send_json(200, ctx.ati.reporter.generate_weekly_report() if ctx.ati else {})
             elif path == "/api/mobile-sync/status":
                 self._send_json(200, ctx.mobile_sync.get_status())
+            elif path == "/api/mobile-sync/cloud-bundle":
+                inc_candles = query.get("candles", ["1"])[0] != "0"
+                inc_drawings = query.get("drawings", ["1"])[0] != "0"
+                limit = int(query.get("limit", ["80"])[0] or "80")
+                self._send_json(
+                    200,
+                    ctx.mobile_sync.build_cloud_bundle(
+                        include_candles=inc_candles,
+                        include_drawings=inc_drawings,
+                        candles_limit=limit,
+                    ),
+                )
+            elif path == "/api/sync/health":
+                self._send_json(200, ctx.mobile_sync.get_sync_health())
             else:
                 self._send_json(404, {"error": f"Unknown endpoint: {path}"})
 

@@ -1,22 +1,25 @@
 /**
- * Non-sensitive Offline Snapshot Cache & Chart Preferences Store.
+ * Non-sensitive Offline Snapshot Cache, Chart Preferences & Trade Filter Store.
  * Uses AsyncStorage in React Native (never stores tokens or secrets) with
  * an injectable backend for tests.
  *
- * Every cached snapshot records `cachedAt` so UI always labels offline/cached
- * views as "Last synced <time>" and never presents stale cache as live.
+ * Cache Invalidation Guarantee (E5/E6):
+ * - Every cached snapshot records `cacheScopeKey = "${deviceId}:${accountMasked}:${schemaVersion}"`.
+ * - When loading a snapshot, if `schemaVersion !== MOBILE_SYNC_SCHEMA_VERSION` or the paired
+ *   `deviceId` / `accountMasked` has changed, the stale cache is invalidated and cleared.
  */
 
-import type {
-  MobileAccount,
-  MobileActivityEvent,
-  MobileCandlesResponse,
-  MobileDrawingsResponse,
-  MobileEquityResponse,
-  MobilePosition,
-  MobileStats,
-  MobileStatus,
-  MobileSymbolsResponse,
+import {
+  MOBILE_SYNC_SCHEMA_VERSION,
+  type MobileAccount,
+  type MobileActivityEvent,
+  type MobileCandlesResponse,
+  type MobileDrawingsResponse,
+  type MobileEquityResponse,
+  type MobilePosition,
+  type MobileStats,
+  type MobileStatus,
+  type MobileSymbolsResponse,
 } from "@institutional-ea/data-contract";
 
 export interface ICacheBackend {
@@ -39,8 +42,19 @@ export interface ChartPreferences {
   layers: ChartLayerPreferences;
 }
 
+export interface TradeFilterPreferences {
+  symbolFilter: string;
+  outcome: "ALL" | "WIN" | "LOSS";
+  dateRange: "ALL" | "1D" | "1W" | "1M";
+  sort: "time_desc" | "time_asc" | "pnl_desc" | "pnl_asc";
+  search: string;
+}
+
 export interface CachedTelemetrySnapshot {
   cachedAt: number; // epoch ms
+  deviceId?: string;
+  accountMasked?: string;
+  schemaVersion?: string;
   status: MobileStatus | null;
   account: MobileAccount | null;
   stats: MobileStats | null;
@@ -58,6 +72,14 @@ export const DEFAULT_LAYER_PREFS: ChartLayerPreferences = {
   structure: true,
   sessions: true,
   trades: true,
+};
+
+export const DEFAULT_TRADE_FILTER_PREFS: TradeFilterPreferences = {
+  symbolFilter: "ALL",
+  outcome: "ALL",
+  dateRange: "ALL",
+  sort: "time_desc",
+  search: "",
 };
 
 class MemoryCacheBackend implements ICacheBackend {
@@ -101,15 +123,46 @@ export function setCustomCacheBackend(backend: ICacheBackend): void {
 
 const SNAPSHOT_KEY = "iea_mobile_offline_snapshot_v1";
 const CHART_PREFS_KEY = "iea_mobile_chart_prefs_v1";
+const TRADE_FILTER_PREFS_KEY = "iea_mobile_trade_filter_prefs_v1";
 
 export const OfflineCache = {
-  async loadSnapshot(): Promise<CachedTelemetrySnapshot | null> {
+  async loadSnapshot(expectedScope?: {
+    deviceId?: string | null;
+    accountMasked?: string | null;
+    schemaVersion?: string | null;
+  }): Promise<CachedTelemetrySnapshot | null> {
     const b = await resolveBackend();
     const raw = await b.getItem(SNAPSHOT_KEY);
     if (!raw) return null;
     try {
       const parsed = JSON.parse(raw) as CachedTelemetrySnapshot;
       if (typeof parsed.cachedAt !== "number") return null;
+
+      // Invalidate cache if schemaVersion changed (when schemaVersion was recorded or expected)
+      const targetSchema = expectedScope?.schemaVersion ?? null;
+      if (targetSchema && parsed.schemaVersion && parsed.schemaVersion !== targetSchema) {
+        await b.removeItem(SNAPSHOT_KEY);
+        return null;
+      }
+      if (
+        expectedScope?.deviceId &&
+        parsed.deviceId &&
+        parsed.deviceId !== expectedScope.deviceId
+      ) {
+        await b.removeItem(SNAPSHOT_KEY);
+        return null;
+      }
+      if (
+        expectedScope?.accountMasked &&
+        parsed.accountMasked &&
+        parsed.accountMasked !== "DEMO" &&
+        expectedScope.accountMasked !== "DEMO" &&
+        parsed.accountMasked !== expectedScope.accountMasked
+      ) {
+        await b.removeItem(SNAPSHOT_KEY);
+        return null;
+      }
+
       return parsed;
     } catch {
       return null;
@@ -118,7 +171,6 @@ export const OfflineCache = {
 
   async saveSnapshot(snapshot: CachedTelemetrySnapshot): Promise<void> {
     const b = await resolveBackend();
-    // Keep cache compact: at most 3 recent symbol/tf candle caches
     const trimmedCandles: Record<string, MobileCandlesResponse> = {};
     for (const [k, v] of Object.entries(snapshot.candlesByKey || {}).slice(-3)) {
       trimmedCandles[k] = {
@@ -132,6 +184,12 @@ export const OfflineCache = {
     }
     const payload: CachedTelemetrySnapshot = {
       ...snapshot,
+      schemaVersion: snapshot.schemaVersion || MOBILE_SYNC_SCHEMA_VERSION,
+      accountMasked:
+        snapshot.accountMasked ||
+        snapshot.account?.accountMasked ||
+        snapshot.status?.accountMasked ||
+        undefined,
       candlesByKey: trimmedCandles,
       drawingsByKey: trimmedDrawings,
       activity: (snapshot.activity || []).slice(0, 40),
@@ -176,5 +234,35 @@ export const OfflineCache = {
   async saveChartPreferences(prefs: ChartPreferences): Promise<void> {
     const b = await resolveBackend();
     await b.setItem(CHART_PREFS_KEY, JSON.stringify(prefs));
+  },
+
+  async loadTradeFilterPreferences(): Promise<TradeFilterPreferences> {
+    const b = await resolveBackend();
+    const raw = await b.getItem(TRADE_FILTER_PREFS_KEY);
+    if (!raw) return { ...DEFAULT_TRADE_FILTER_PREFS };
+    try {
+      const parsed = JSON.parse(raw) as Partial<TradeFilterPreferences>;
+      return {
+        symbolFilter: typeof parsed.symbolFilter === "string" ? parsed.symbolFilter : "ALL",
+        outcome:
+          parsed.outcome === "WIN" || parsed.outcome === "LOSS" ? parsed.outcome : "ALL",
+        dateRange:
+          parsed.dateRange === "1D" || parsed.dateRange === "1W" || parsed.dateRange === "1M"
+            ? parsed.dateRange
+            : "ALL",
+        sort:
+          parsed.sort === "time_asc" || parsed.sort === "pnl_desc" || parsed.sort === "pnl_asc"
+            ? parsed.sort
+            : "time_desc",
+        search: typeof parsed.search === "string" ? parsed.search : "",
+      };
+    } catch {
+      return { ...DEFAULT_TRADE_FILTER_PREFS };
+    }
+  },
+
+  async saveTradeFilterPreferences(prefs: TradeFilterPreferences): Promise<void> {
+    const b = await resolveBackend();
+    await b.setItem(TRADE_FILTER_PREFS_KEY, JSON.stringify(prefs));
   },
 };

@@ -21,7 +21,10 @@ import { TradesScreen } from "../screens/TradesScreen.tsx";
 import { SecurityScreen } from "../screens/SecurityScreen.tsx";
 import { triggerSelectionHaptic } from "../services/haptics.ts";
 import type { EquityRange } from "../components/EquityCurveCard.tsx";
-import type { MobileSyncClient } from "../services/MobileSyncClient.ts";
+import type {
+  MobileSyncClient,
+  SyncDiagnosticsState,
+} from "../services/MobileSyncClient.ts";
 import type { PairingCredentials } from "../services/SecureStorage.ts";
 import type { ChartLayerPreferences } from "../services/OfflineCache.ts";
 import type {
@@ -49,6 +52,7 @@ interface RootNavigatorProps {
   connectionState: ConnectionState;
   botState: MobileBotState | null;
   lastSyncedMs: number | null;
+  syncDiagnostics?: SyncDiagnosticsState | null;
   isShowingCache: boolean;
   onRetryConnection: () => void;
   credentials: PairingCredentials | null;
@@ -129,7 +133,8 @@ export function RootNavigator(props: RootNavigatorProps): React.ReactElement {
       ? tokens.profit
       : connectionState === "CONNECTING" ||
         connectionState === "RECONNECTING" ||
-        connectionState === "STALE"
+        connectionState === "STALE" ||
+        connectionState === "UPDATE_NEEDED"
       ? tokens.warning
       : connectionState === "NOT_PAIRED"
       ? tokens.textDim
@@ -141,7 +146,9 @@ export function RootNavigator(props: RootNavigatorProps): React.ReactElement {
       : connectionState === "RECONNECTING"
       ? "Reconnecting"
       : connectionState === "STALE"
-      ? "Stale"
+      ? "Data Delayed"
+      : connectionState === "UPDATE_NEEDED"
+      ? "Update Needed"
       : connectionState === "COMPANION_OFFLINE"
       ? "Offline"
       : connectionState === "MT5_DISCONNECTED"
@@ -294,6 +301,7 @@ export function RootNavigator(props: RootNavigatorProps): React.ReactElement {
             credentials={credentials}
             connectionLabel={connShortLabel}
             lastSyncedMs={lastSyncedMs}
+            syncDiagnostics={props.syncDiagnostics}
             biometricEnabled={props.biometricEnabled}
             onToggleBiometric={props.onToggleBiometric}
             onPaired={props.onPaired}

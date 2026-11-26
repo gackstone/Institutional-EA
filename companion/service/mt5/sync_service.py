@@ -495,6 +495,8 @@ class MT5SyncService:
 
             # Reconcile positions and classify ownership
             self._reconcile_positions(raw_positions)
+            if mt5 is not None and self.connection_status == "CONNECTED":
+                self._sync_closed_deals(mt5)
             self.pending_orders = raw_orders
             self.check_zmq_bridge()
             self.last_sync_at = datetime.now(timezone.utc).isoformat()
@@ -763,6 +765,11 @@ class MT5SyncService:
             )
 
         self.positions = reconciled
+        try:
+            if self.connection_status == "CONNECTED" and hasattr(self.repo, "cleanup_stale_open_trade_records"):
+                self.repo.cleanup_stale_open_trade_records([r["ticket"] for r in reconciled])
+        except Exception:
+            pass
         self.reconciliation_report = {
             "status": "RECONCILED",
             "bot_owned_count": bot_owned,
@@ -772,6 +779,94 @@ class MT5SyncService:
             "unprotected_bot_tickets": unprotected_bot,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
+
+    def _sync_closed_deals(self, mt5: Any) -> None:
+        """Synchronizes closed MT5 deals (DEAL_ENTRY_OUT / INOUT) into SQLite trade_records with status='CLOSED'."""
+        history_fn = getattr(mt5, "history_deals_get", None)
+        if not callable(history_fn):
+            return
+        try:
+            now_ts = int(time.time()) + 86400
+            start_ts = max(0, now_ts - 90 * 86400)
+            deals = history_fn(start_ts, now_ts) or []
+            if not deals:
+                return
+
+            in_deals: Dict[int, Any] = {}
+            out_deals: List[Any] = []
+            for d in deals:
+                entry_kind = int(getattr(d, "entry", -1))
+                sym = str(getattr(d, "symbol", "") or "").strip()
+                if not sym:
+                    continue
+                pos_id = int(getattr(d, "position_id", 0) or getattr(d, "order", 0) or getattr(d, "ticket", 0))
+                if entry_kind == 0 and pos_id > 0:
+                    in_deals[pos_id] = d
+                elif entry_kind in (1, 2):
+                    out_deals.append(d)
+
+            # Persist the most recent 250 closed deals
+            for d in out_deals[-250:]:
+                deal_ticket = int(getattr(d, "ticket", 0) or 0)
+                if deal_ticket <= 0:
+                    continue
+                pos_id = int(getattr(d, "position_id", 0) or deal_ticket)
+                in_d = in_deals.get(pos_id)
+                sym = str(getattr(d, "symbol", "") or "")
+                d_type = int(getattr(d, "type", 0) or 0)
+                # Closing deal type is opposite to original position direction unless in_d is present
+                if in_d is not None:
+                    in_type = int(getattr(in_d, "type", 0) or 0)
+                    direction = "BUY" if in_type == 0 else "SELL"
+                    entry_price = float(getattr(in_d, "price", 0.0) or 0.0)
+                    open_ts = int(getattr(in_d, "time", 0) or 0)
+                else:
+                    direction = "SELL" if d_type == 0 else "BUY"
+                    entry_price = float(getattr(d, "price", 0.0) or 0.0)
+                    open_ts = int(getattr(d, "time", 0) or 0)
+
+                close_price = float(getattr(d, "price", 0.0) or 0.0)
+                close_ts = int(getattr(d, "time", 0) or 0)
+                opened_iso = (
+                    datetime.fromtimestamp(open_ts, tz=timezone.utc).isoformat()
+                    if open_ts > 0
+                    else datetime.now(timezone.utc).isoformat()
+                )
+                closed_iso = (
+                    datetime.fromtimestamp(close_ts, tz=timezone.utc).isoformat()
+                    if close_ts > 0
+                    else datetime.now(timezone.utc).isoformat()
+                )
+                magic = int(getattr(d, "magic", 0) or (getattr(in_d, "magic", 0) if in_d else 0) or 0)
+                ownership = "BOT" if magic == self.bot_magic else ("MANUAL" if magic == 0 else "OTHER_EA")
+                raw_profit = float(getattr(d, "profit", 0.0) or 0.0)
+                comm = float(getattr(d, "commission", 0.0) or 0.0)
+                swap = float(getattr(d, "swap", 0.0) or 0.0)
+                net_profit = round(raw_profit + comm + swap, 2)
+
+                self.repo.upsert_trade_record(
+                    {
+                        "ticket": deal_ticket,
+                        "correlation_id": str(pos_id),
+                        "symbol": sym,
+                        "direction": direction,
+                        "volume": float(getattr(d, "volume", 0.0) or 0.0),
+                        "entry_price": entry_price,
+                        "close_price": close_price,
+                        "stop_loss": 0.0,
+                        "take_profit": 0.0,
+                        "profit": net_profit,
+                        "commission": round(comm, 2),
+                        "swap": round(swap, 2),
+                        "magic": magic,
+                        "ownership": ownership,
+                        "status": "CLOSED",
+                        "opened_at": opened_iso,
+                        "closed_at": closed_iso,
+                    }
+                )
+        except Exception:
+            pass
 
     def get_snapshot(self) -> Dict[str, Any]:
         with self._lock:

@@ -174,13 +174,39 @@ Deno.serve(async (req: Request) => {
           deviceId: session.approved_device_id,
           deviceToken: token,
           companionName: session.companion_name,
-          schemaVersion: "1.0.0",
+          schemaVersion: "1.1.0",
           readOnly: true,
           pairedAt: nowIso,
         });
       }
 
       return jsonResponse({ error: "PAIRING_ALREADY_CONSUMED", status: session.status }, 409);
+    }
+
+    if (action === "unpair_self") {
+      const authHeader = req.headers.get("Authorization") || "";
+      const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+      const rawToken = bearer.startsWith("iea_ro_") ? bearer : String(body.deviceToken || "").trim();
+      if (!rawToken || !rawToken.startsWith("iea_ro_")) {
+        return jsonResponse({ error: "UNAUTHORIZED", message: "Valid read-only device token required to unpair." }, 401);
+      }
+      const tokenHash = await sha256Hex(rawToken);
+      const { data: device } = await service
+        .from("mobile_paired_devices")
+        .select("id, status")
+        .eq("token_hash", tokenHash)
+        .maybeSingle();
+
+      if (!device) {
+        return jsonResponse({ ok: true, revoked: true, alreadyRevoked: true });
+      }
+
+      await service
+        .from("mobile_paired_devices")
+        .update({ status: "revoked", revoked_at: nowIso })
+        .eq("id", device.id);
+
+      return jsonResponse({ ok: true, revoked: true, deviceId: device.id });
     }
 
     // ------------------------------------------------------------------

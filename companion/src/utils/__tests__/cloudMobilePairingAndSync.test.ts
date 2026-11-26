@@ -136,3 +136,36 @@ test("Migration 20261126000004 backfills missing profiles with lowest-privilege 
   assert.match(authTs, /ignoreDuplicates:\s*true/);
   assert.match(authTs, /role:\s*"user"/);
 });
+
+
+test("Migration 20261127000005 adds v1.1.0 telemetry columns additively and mobile-pairing supports unpair_self", () => {
+  const sql = fs.readFileSync(
+    path.join(
+      REPO_ROOT,
+      "supabase/migrations/20261127000005_mobile_sync_v1_1_telemetry_columns.sql"
+    ),
+    "utf-8"
+  );
+  assert.match(sql, /ALTER TABLE public\.companion_telemetry_snapshots/);
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS meta_json JSONB/);
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS candles_json JSONB/);
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS drawings_json JSONB/);
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS equity_json JSONB/);
+  assert.doesNotMatch(sql, /DROP\s+|TRUNCATE\s+|DELETE\s+/i);
+
+  const pairSrc = fs.readFileSync(
+    path.join(REPO_ROOT, "supabase/functions/mobile-pairing/index.ts"),
+    "utf-8"
+  );
+  assert.match(pairSrc, /action === "unpair_self"/);
+  assert.match(pairSrc, /status:\s*"revoked"/);
+
+  const syncSrc = fs.readFileSync(
+    path.join(REPO_ROOT, "supabase/functions/mobile-sync/index.ts"),
+    "utf-8"
+  );
+  assert.match(syncSrc, /candlesByKey/);
+  assert.match(syncSrc, /drawingsByKey/);
+  assert.match(syncSrc, /equityPoints/);
+  assert.match(syncSrc, /schemaVersion:\s*"1\.1\.0"/);
+});

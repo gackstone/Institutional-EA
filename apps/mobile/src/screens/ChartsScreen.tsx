@@ -50,11 +50,11 @@ const LAYER_CHIPS: Array<{
   label: string;
   countKeys: string[];
 }> = [
-  { key: "liquidity", label: "Liq", countKeys: ["LIQ"] },
-  { key: "fvgOb", label: "FVG/OB", countKeys: ["FVG", "OB"] },
-  { key: "structure", label: "Struct", countKeys: ["STRUCT"] },
-  { key: "sessions", label: "Sess", countKeys: ["SESS"] },
-  { key: "trades", label: "Trades", countKeys: ["TRADE"] },
+  { key: "liquidity", label: "Liq", countKeys: ["liquidity", "LIQ"] },
+  { key: "fvgOb", label: "FVG/OB", countKeys: ["fvgOb", "FVG_OB", "FVG", "OB"] },
+  { key: "structure", label: "Struct", countKeys: ["structure", "STRUCT"] },
+  { key: "sessions", label: "Sess", countKeys: ["sessions", "SESS"] },
+  { key: "trades", label: "Trades", countKeys: ["trades", "TRADE", "TRADES"] },
 ];
 
 export const ChartsScreen = memo(function ChartsScreen({
@@ -94,10 +94,22 @@ export const ChartsScreen = memo(function ChartsScreen({
   const getLayerCount = useCallback(
     (countKeys: string[]): number => {
       if (!drawings) return 0;
+      const itemsArr = Array.isArray(drawings.items)
+        ? drawings.items
+        : Array.isArray((drawings as any).drawings)
+        ? (drawings as any).drawings
+        : [];
+      if (itemsArr.length > 0) {
+        return itemsArr.filter((i: any) => countKeys.includes(String(i.type || "").toUpperCase())).length;
+      }
       if (drawings.counts) {
+        const primaryKey = countKeys[0];
+        if (typeof drawings.counts[primaryKey] === "number") {
+          return Number(drawings.counts[primaryKey]);
+        }
         return countKeys.reduce((acc, k) => acc + Number(drawings.counts?.[k] ?? 0), 0);
       }
-      return drawings.items.filter((i) => countKeys.includes(i.type)).length;
+      return 0;
     },
     [drawings]
   );
