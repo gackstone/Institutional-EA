@@ -2,6 +2,30 @@
 
 All notable changes to the Institutional Multi-Timeframe Algorithmic Trading Bot (`Institutional EA`) are documented in this file.
 
+## [3.16.0] - 2026-11-27 (Companion & Android Read-Only `v1.3.7`, Sync Schema `v1.1.0`)
+
+### Fixed & Added - Windows Companion → Android Read-Only Cloud Sync Audit & Complete Remediation (E1–E10)
+- **Audit, Root-Cause Proofs & Security Review (`docs/ANDROID_SYNC_AUDIT.md`, `docs/ANDROID_SYNC_ACCEPTANCE.md`)**:
+  - Completed end-to-end data-flow audit across Windows MT5 → Python Producer (`companion/service/`) → SQLite (`companion_control.db`) → Desktop Electron Renderer (`companion/src/App.tsx`) → Supabase `mobile-sync` / `mobile-pairing` Edge Functions → Android Read-Only Consumer (`apps/mobile/`), documenting exact `file:line` root causes and payload proofs for all 10 production symptoms (`E1`–`E10`).
+  - Documented the **Tier-1 Live Safety Finding (`E7`)**: all 6 live open `XAUUSD.m` BUY positions in MT5 (`#2738475820`, `#2738475828`, `#2738475831`, `#2738475834`, `#2738475836`, `#2738476138`, `magic=0`) genuinely had `sl = 0.0` and `tp = 0.0` in MetaTrader 5. Preserved trading isolation (zero order/position modifications) and added prominent `"NO SL"` / `"NO TP"` warning badges on Android and an unprotected-position safety notice on Desktop.
+- **Shared Mobile Sync Contract `v1.1.0` (`packages/data-contract/src/mobileSync.ts`)**:
+  - Bumped `MOBILE_SYNC_SCHEMA_VERSION` to `"1.1.0"` with backward compatibility (`checkSyncSchemaCompatibility` accepts `1.0.x` and `1.1.x` while flagging major/newer-minor mismatches as `UPDATE_NEEDED`).
+  - Added `MobileSyncMetaSchema` (`schemaVersion`, `companionVersion`, `generatedAt`, `seq`, `deviceId`, `accountMasked`, `symbolFormat`, `timezoneRule: "UTC_00_00"`), optional `nextCursor` on `MobileTradesPageSchema`, and `normalizeDrawingsCounts()` supporting both camelCase (`liquidity`, `fvgOb`, `structure`, `sessions`, `trades`) and uppercase (`LIQ`, `FVG`, `OB`, `FVG_OB`, `STRUCT`, `SESS`, `TRADE`, `TRADES`) layer keys.
+- **Windows Producer & Closed-Deal Reconciliation (`companion/service/mt5/sync_service.py`, `companion/database/repository.py`, `companion/service/mobile/sync_server.py`, `companion/service/market/drawings_engine.py`, `companion/src/App.tsx`)**:
+  - Fixed `E5` & `E6`: `MT5SyncService` now imports closed MT5 history deals (`DEAL_ENTRY_OUT` / `DEAL_ENTRY_INOUT`) into `trade_records` with `status='CLOSED'` and cleans up stale `status='OPEN'` rows no longer open in MT5 (`cleanup_stale_open_trade_records`).
+  - Enforced strict closed-deal filtering (`status == 'CLOSED'`) in `build_stats_payload()`, `build_trades_payload()`, and desktop `pushSnapshot()` so active open positions are never miscounted as closed deals (`50 deals, 25W/25L`).
+  - Aligned Today P/L (`todayRealizedPnl + floatingPnl`) and `tradesToday` (`todayClosedCount + openPositionsCount`) under the `UTC_00_00` day boundary on both Desktop and Android.
+  - Added `GET /api/mobile-sync/cloud-bundle`, `GET /api/sync/health`, and `GET /api/mobile/v1/meta`, publishing `meta`, `status`, `account` (including `marginLevel`, `freeMargin`, `margin`, `leverage`), `stats`, `positions`, closed `trades`, `signals`, `symbols`, `candlesByKey` (`M1/M5/M15/H1/H4`), `drawingsByKey`, and `equityPoints`.
+- **Supabase Cloud Relay (`supabase/migrations/20261127000005_mobile_sync_v1_1_telemetry_columns.sql`, `supabase/functions/mobile-sync/index.ts`, `supabase/functions/mobile-pairing/index.ts`)**:
+  - Added additive migration for `meta_json`, `candles_json`, `drawings_json`, and `equity_json` on `public.companion_telemetry_snapshots`, plus dual-write/dual-read fallback inside `status_json` (`_meta`, `_candlesByKey`, `_drawingsByKey`, `_equityPoints`) for zero-downtime compatibility before and after migration execution.
+  - Added server-side `action: "unpair_self"` on `mobile-pairing` so unpairing from Android immediately revokes the `iea_ro_*` token row (`status = 'revoked'`) in Supabase.
+- **Android Read-Only Companion `v1.3.7` (`apps/mobile/`)**:
+  - Fixed `E1`: `MobileSyncClient.getTrades()` in Cloud Mode now constructs and validates a full `{ summary, items, nextCursor }` `MobileTradesPage` object with client-side filtering (`symbol`, `result`, `period`), sorting (`newest`, `oldest`, `pnl_high`, `pnl_low`), search, and cursor pagination over closed deals, plus `formatSyncErrorMessage()` so raw Zod JSON never leaks to the UI.
+  - Fixed `E2`, `E3`, `E4`: Implemented Cloud Mode `getSymbols()`, `getCandles()`, `getDrawings()`, and `getEquity()` backed by the latest cloud snapshot (`candlesByKey`, `drawingsByKey`, `equityPoints`), and updated `ChartsScreen.getLayerCount()` to read both `items`/`drawings` and camelCase/uppercase count keys.
+  - Fixed `E7` & `E8`: Normalized `sl <= 0` / `tp <= 0` to `null` with `"NO SL"` / `"NO TP"` badges in `PositionsList.tsx`; updated `KpiCards.tsx` to render `marginLevel > 0` as `X.XX%` and `0` with 0 open positions as `n/a`.
+  - Fixed `E9`: Split Trades filter controls into distinct single-select rows (`Symbol`, `Result`, `Period`) with an unclipped `Sort:` button and persistent filter preferences via `OfflineCache`.
+  - Fixed `E10`: Derived header banner freshness (`LIVE` vs `Data Delayed` / `STALE` vs `UPDATE_NEEDED`) from the producer snapshot timestamp (`snap.updatedAt` / `status.lastHeartbeat`) rather than mobile fetch time (`Date.now()`), and added a read-only **Sync Diagnostics** card on `SecurityScreen`.
+
 ## [3.15.0] - 2026-11-26
 
 ### Added & Changed - Windows Companion & Android Read-Only Cross-Network Cloud Upgrade
