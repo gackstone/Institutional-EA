@@ -180,7 +180,24 @@ export const SignalsGridScreen: React.FC<{
                         {s.status}
                       </span>
                     </td>
-                    <td className="py-2.5 pr-4 font-sans text-iea-textSecondary">{s.rejection_reason || "—"}</td>
+                    <td className="py-2.5 pr-4 font-sans text-iea-textSecondary">
+                      {(s as any).setup_id ? (
+                        <div className="space-y-0.5">
+                          <div className="font-mono text-[11px] font-semibold text-iea-textPrimary">
+                            {(s as any).setup_id}
+                            {(s as any).three_point_grade ? ` · Grade ${(s as any).three_point_grade}` : ""}
+                          </div>
+                          {Array.isArray((s as any).provenance) && (s as any).provenance.length > 0 && (
+                            <div className="text-[10px] text-iea-textMuted">
+                              {(s as any).provenance.join(", ")}
+                            </div>
+                          )}
+                          {s.rejection_reason ? <div>{s.rejection_reason}</div> : null}
+                        </div>
+                      ) : (
+                        s.rejection_reason || "—"
+                      )}
+                    </td>
                   </tr>
                 );
               })

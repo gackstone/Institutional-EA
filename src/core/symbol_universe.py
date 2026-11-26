@@ -27,6 +27,16 @@ logger = logging.getLogger("SymbolUniverse")
 # Strict, non-negotiable canonical approved trading universe: Gold and Bitcoin ONLY
 APPROVED_CANONICAL_SYMBOLS: Tuple[str, ...] = ("XAUUSD", "BTCUSD")
 
+# Optional data-only reference symbols for SMT correlation (NEVER tradable; orders rejected)
+DATA_ONLY_REFERENCE_SYMBOLS: Tuple[str, ...] = (
+    "USDJPY",
+    "XAGUSD",
+    "DXY",
+    "USDX",
+    "ETHUSD",
+    "EURUSD",
+)
+
 # Common broker aliases for the 2 canonical symbols (including cent .c variants)
 APPROVED_CANONICAL_ALIASES: Dict[str, Set[str]] = {
     "XAUUSD": {
@@ -175,6 +185,16 @@ class SpecializedSymbolUniverse:
             if sym_upper in aliases or root in aliases:
                 return True
         return False
+
+    def is_reference_only(self, symbol: str) -> bool:
+        """
+        Returns True if `symbol` is a data-only reference symbol (e.g. USDJPY, XAGUSD, DXY,
+        ETHUSD, EURUSD) permitted strictly for SMT market-data correlation and NEVER for trading.
+        """
+        if not symbol:
+            return False
+        root = self.normalize_root(symbol.strip().upper())
+        return root in DATA_ONLY_REFERENCE_SYMBOLS and root not in APPROVED_CANONICAL_SYMBOLS
 
     def validate_or_reject(self, symbol: str) -> Tuple[bool, Optional[str]]:
         """

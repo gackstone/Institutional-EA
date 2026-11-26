@@ -1,0 +1,133 @@
+{
+  "schema_version": "1.0.0",
+  "export_id": "video_skills_2026-11",
+  "generated_at": "2026-11-26T00:00:00Z",
+  "disclaimer": "EDUCATIONAL HYPOTHESES ONLY - NOT FINANCIAL ADVICE. Parameters are engineering starting defaults for replay calibration, not validated profitability claims. Trading involves substantial risk of loss.",
+  "source_limitations": {
+    "extraction_method": "Burned-in video captions and chart annotations; spoken explanations unavailable.",
+    "missing_clips": ["keepssy_fx-20261126-0012"],
+    "incomplete_clips": [
+      {
+        "video": "chart__tactix-20261113-0001",
+        "note": "Announces 3 confirmations but ends after the 2nd. The 3rd slot defaults to HTF-bias alignment and is explicitly flagged as not from the video."
+      }
+    ]
+  },
+  "primitives": [
+    {
+      "id": "P1_EQH_EQL_CLUSTERS",
+      "name": "Equal Highs / Equal Lows Stop Clusters",
+      "definition": "Two or more swing highs/lows within tolerance (default 0.10 x ATR(14)) representing resting stop clusters; tracked as untapped or taken.",
+      "parameters": { "atr_tolerance_mult": 0.10, "atr_period": 14 },
+      "provenance": ["[VIDEO: keepssy_fx-20261126-0002]", "[VIDEO: keepssy_fx-20261126-0003]"]
+    },
+    {
+      "id": "P2_SWEEP_VS_BREAKOUT",
+      "name": "Sweep vs Breakout Classifier",
+      "definition": "Classifies trades beyond a prior high/low as SWEEP, BREAKOUT, or UNDECIDED using (1) post-pierce candle formation, (2) ATR-normalised approach overlap/body/slope, and (3) configurable HTF-bias slot (not from video).",
+      "parameters": { "approach_bars": 5, "use_third_confirmation_slot": true },
+      "provenance": ["[VIDEO: chart__tactix-20261113-0001]"]
+    },
+    {
+      "id": "P3_CONFIRMED_SWEEP",
+      "name": "Confirmed Liquidity Sweep",
+      "definition": "Wick pierces pool by >= 0.05 x ATR and a candle closes back beyond the level within max_bars_to_reclaim (default 3); rejected if P2 classifies as BREAKOUT.",
+      "parameters": { "min_pierce_atr": 0.05, "max_bars_to_reclaim": 3 },
+      "provenance": ["[VIDEO: keepssy_fx-20261126-0002]"]
+    },
+    {
+      "id": "P4_MSS_DISPLACEMENT",
+      "name": "MSS / BOS With Displacement",
+      "definition": "Post-sweep candle close beyond the last opposing swing with displacement (body >= 1.0x avg body or >= 0.8x ATR) leaving an FVG.",
+      "parameters": { "min_body_avg_mult": 1.0, "min_body_atr_mult": 0.8 },
+      "provenance": ["[VIDEO: keepssy_fx-20261126-0002]", "[VIDEO: keepssy_fx-20261126-0003]", "[VIDEO: keepssy_fx-20261126-0006]"]
+    },
+    {
+      "id": "P5_FVG_CE",
+      "name": "Fair Value Gap + Consequent Encroachment (CE)",
+      "definition": "Standard 3-candle FVG with minimum size 0.15 x ATR; entry reference at CE = 50% midpoint.",
+      "parameters": { "fvg_min_atr": 0.15, "ce_ratio": 0.50 },
+      "provenance": ["[VIDEO: keepssy_fx-20261126-0001]", "[VIDEO: keepssy_fx-20261126-0007]", "[VIDEO: keepssy_fx-20261126-0008]"]
+    },
+    {
+      "id": "P6_INVERSION_FVG",
+      "name": "Inversion FVG (IFVG)",
+      "definition": "FVG closed through against its original direction flips polarity; retest of inverted gap is entry. First FVG before the stop hunt on 5M is highest priority.",
+      "parameters": { "fvg_min_atr": 0.15 },
+      "provenance": ["[VIDEO: keepssy_fx-20261126-0004]", "[VIDEO: keepssy_fx-20261126-0005]"]
+    },
+    {
+      "id": "P7_BREAKER_BLOCK",
+      "name": "Breaker Block",
+      "definition": "Order block smashed by a candle close through flips polarity into opposite-bias breaker.",
+      "parameters": {},
+      "provenance": ["[VIDEO: keepssy_fx-20261126-0004]"]
+    },
+    {
+      "id": "P8_BOS_ANCHORED_OTE",
+      "name": "BOS-Anchored Fibonacci & OTE",
+      "definition": "Anchor fib strictly to the larger swing leg that broke structure (never minor pullbacks); OTE 0.62-0.79, sweet spot 0.705; highest grade when FVG overlaps OTE with directional close.",
+      "parameters": { "ote_min": 0.62, "ote_sweet_spot": 0.705, "ote_max": 0.79 },
+      "provenance": ["[VIDEO: algovistra-20261125-0001]", "[VIDEO: keepssy_fx-20261126-0003]"]
+    },
+    {
+      "id": "P9_DRAW_ON_LIQUIDITY",
+      "name": "Draw on Liquidity Target Selection",
+      "definition": "Nearest untapped opposing liquidity pool (BSL/SSL, EQH/EQL, session/PD H/L, PD mid).",
+      "parameters": {},
+      "provenance": ["[VIDEO: keepssy_fx-20261126-0009]", "[VIDEO: scriptedge_-20261114-0001]"]
+    },
+    {
+      "id": "P10_NO_DRAW_NO_TRADE",
+      "name": "No Draw, No Trade Gate",
+      "definition": "Invalidates setup if target pool is already taken or R:R fails minimum threshold.",
+      "parameters": { "min_rr_demo": 2.0, "min_rr_prop": 2.5 },
+      "provenance": ["[VIDEO: keepssy_fx-20261126-0009]"]
+    },
+    {
+      "id": "P11_THREE_POINT_TURN",
+      "name": "3-Point Turn Validator (Sweep + SMT + MSS)",
+      "definition": "Requires liquidity sweep + SMT divergence + MSS. Grade A+ = all 3; Grade B = sweep+MSS with SMT unknown; INVALID = fewer or SMT contradicted.",
+      "parameters": { "allow_b_grade_default": false },
+      "provenance": ["[VIDEO: keepssy_fx-20261126-0006]"]
+    }
+  ],
+  "setups": [
+    { "id": "S1_RAID_SHIFT_FVG_CE", "name": "Raid -> Shift -> FVG -> CE (4-Step ICT Model)", "context": "NY_KILLZONE / ANY", "entry": "Limit at FVG CE (50%)", "stop": "Beyond raid extreme + max(2*spread, 0.05*ATR)", "target": "Nearest untapped opposing liquidity (P9)", "invalidation": "Close beyond raid extreme", "mirror": "Symmetric BUY/SELL", "provenance": ["[VIDEO: keepssy_fx-20261126-0007]", "[VIDEO: keepssy_fx-20261126-0008]"] },
+    { "id": "S2_SILVER_BULLET", "name": "ICT Silver Bullet", "context": "NY 03:00-04:00, 10:00-11:00, 14:00-15:00", "entry": "First FVG CE after sweep inside window", "stop": "Beyond sweep extreme + buffer", "target": "Untapped BSL/SSL (P10 mandatory)", "invalidation": "Window close cancels unfilled limits", "mirror": "Symmetric BUY/SELL", "provenance": ["[VIDEO: keepssy_fx-20261126-0001]", "[VIDEO: keepssy_fx-20261126-0009]"] },
+    { "id": "S3_NY_MACRO", "name": "NY Macro Window Setup", "context": "NY 09:50-10:10 & 10:50-11:10", "entry": "FVG CE before macro window closes", "stop": "Beyond sweep extreme + buffer", "target": "Untapped range/BSL/SSL", "invalidation": "Cancel unfilled limit at macro end", "mirror": "Symmetric BUY/SELL", "provenance": ["[VIDEO: keepssy_fx-20261126-0010]"] },
+    { "id": "S4_LONDON_JUDAS_SWING", "name": "London Judas Swing / Asian Fake Breakout", "context": "London open after Asian range", "entry": "FVG CE after sweep of Asian H/L + MSS", "stop": "Beyond Judas extreme + buffer", "target": "Opposite side of Asian range", "invalidation": "Close beyond Judas extreme", "mirror": "Symmetric BUY/SELL", "provenance": ["[VIDEO: keepssy_fx-20261126-0011]"] },
+    { "id": "S5_ASIAN_SD_REVERSAL", "name": "Asian-Range Standard Deviation Projection Reversal", "context": "London drive into +-2.0 to +-2.5 SD zone", "entry": "FVG CE above/below SD projection after reversal MSS", "stop": "Beyond SD sweep extreme + buffer", "target": "TP1 Asian Low/High + 50% runner trail", "invalidation": "Close beyond SD extreme", "mirror": "Symmetric BUY/SELL", "provenance": ["[VIDEO: keepssy_fx-20261126-0013]"] },
+    { "id": "S6_IFVG_STOP_HUNT", "name": "IFVG Reversal After Stop Hunt", "context": "5M first FVG before stop hunt", "entry": "Retest of inverted FVG after close-through", "stop": "Beyond stop-hunt extreme + buffer", "target": "Untapped opposing BSL/SSL", "invalidation": "Close back through inverted FVG", "mirror": "Symmetric BUY/SELL", "provenance": ["[VIDEO: keepssy_fx-20261126-0005]"] },
+    { "id": "S7_STACKED_BREAKER_IFVG", "name": "Stacked Breaker + IFVG Overlap", "context": "Post-raid displacement breaking OB and FVG", "entry": "Retest of Breaker/IFVG overlap midpoint", "stop": "Beyond raid extreme + buffer", "target": "Untapped opposing SSL/BSL", "invalidation": "Close reclaiming breaker", "mirror": "Symmetric BUY/SELL", "provenance": ["[VIDEO: keepssy_fx-20261126-0004]"] },
+    { "id": "S8_OTE_STOP_HUNT_BOS", "name": "OTE Entry After Stop Hunt + BOS", "context": "Post-stop-hunt BOS retracement", "entry": "Limit at 0.705 (or FVG inside 0.62-0.79 OTE)", "stop": "Beyond BOS swing origin (fib 1.0) + buffer", "target": "Untapped BSL/EQH or SSL/EQL", "invalidation": "Close beyond fib 1.0 origin", "mirror": "Symmetric BUY/SELL", "provenance": ["[VIDEO: keepssy_fx-20261126-0002]", "[VIDEO: keepssy_fx-20261126-0003]", "[VIDEO: algovistra-20261125-0001]"] },
+    { "id": "S9_HIDDEN_DEMAND_SUPPLY", "name": "Hidden Demand/Supply (HTF Wick-to-Wick -> LTF OB)", "context": "HTF BOS impulse -> LTF M5 refinement", "entry": "Limit at last opposing LTF candle inside HTF wick-to-wick gap", "stop": "Beyond HTF zone + buffer", "target": "Prior HTF highs/lows (BSL/SSL)", "invalidation": "Close through HTF zone", "mirror": "Symmetric BUY/SELL", "provenance": ["[VIDEO: nexusquant_ai-20261125-0001]"] },
+    { "id": "S10_SESSION_SWEEP_REVERSAL", "name": "Session-Level Sweep Reversals", "context": "Asia->London, London->NY, PDL/PDH->PD Mid", "entry": "S1 mechanics (MSS + FVG + CE) after key-level sweep", "stop": "Beyond swept level extreme + buffer", "target": "Opposite session level or PD Mid (TP1)", "invalidation": "Close beyond swept level extreme", "mirror": "Symmetric BUY/SELL", "provenance": ["[VIDEO: scriptedge_-20261114-0001]"] }
+  ],
+  "documented_failure_modes": [
+    {
+      "id": "FAIL-01_NO_DRAW",
+      "title": "Right time + clean FVG, but no remaining draw on liquidity",
+      "lesson": "A Silver Bullet inside the window with a clean FVG still fails when the opposing liquidity pool was already taken. No draw, no trade.",
+      "provenance": ["[VIDEO: keepssy_fx-20261126-0009]"]
+    },
+    {
+      "id": "FAIL-02_MISSING_SMT",
+      "title": "Sweep + MSS + FVG without SMT divergence (2 of 3 fails)",
+      "lesson": "When the correlated market also makes a mirrored new extreme at the same time (no SMT), a reversal turn lacks institutional confirmation.",
+      "provenance": ["[VIDEO: keepssy_fx-20261126-0006]"]
+    },
+    {
+      "id": "FAIL-03_WRONG_SWING_ANCHOR",
+      "title": "Anchoring Fibonacci to a minor internal pullback instead of the BOS leg",
+      "lesson": "Always zoom out and anchor Fibonacci to the larger leg that actually closed beyond structure.",
+      "provenance": ["[VIDEO: algovistra-20261125-0001]"]
+    },
+    {
+      "id": "FAIL-04_BREAKOUT_AS_SWEEP",
+      "title": "Mistaking an impulsive breakout for a liquidity sweep",
+      "lesson": "Judge by candle reaction after taking liquidity and by approach quality; strong displacement closes beyond the level indicate breakout, not sweep.",
+      "provenance": ["[VIDEO: chart__tactix-20261113-0001]"]
+    }
+  ]
+}

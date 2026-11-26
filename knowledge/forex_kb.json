@@ -616,5 +616,32 @@
     "Do not teach ICT 04, 06, or 08 topics beyond what appears in verified cards; state clearly that they were announced but not uploaded.",
     "Enforce that position size derives strictly from stop distance, never from margin or leverage.",
     "All trading decisions require completed, closed candles. Never judge or enter on a still-forming bar."
-  ]
+  ],
+  "video_skills_2026_11": {
+    "export_file": "knowledge/exports/video_skills_2026-11.json",
+    "primitives_count": 11,
+    "setups_count": 10,
+    "documented_failure_modes": [
+      {
+        "id": "FAIL-01_NO_DRAW",
+        "title": "Right time + clean FVG, but no remaining draw on liquidity",
+        "tag": "[VIDEO: keepssy_fx-20261126-0009]"
+      },
+      {
+        "id": "FAIL-02_MISSING_SMT",
+        "title": "Sweep + MSS + FVG without SMT divergence (2 of 3 fails)",
+        "tag": "[VIDEO: keepssy_fx-20261126-0006]"
+      },
+      {
+        "id": "FAIL-03_WRONG_SWING_ANCHOR",
+        "title": "Anchoring Fibonacci to a minor internal pullback instead of the BOS leg",
+        "tag": "[VIDEO: algovistra-20261125-0001]"
+      },
+      {
+        "id": "FAIL-04_BREAKOUT_AS_SWEEP",
+        "title": "Mistaking an impulsive breakout for a liquidity sweep",
+        "tag": "[VIDEO: chart__tactix-20261113-0001]"
+      }
+    ]
+  }
 }

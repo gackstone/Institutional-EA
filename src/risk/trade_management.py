@@ -1629,3 +1629,138 @@ class TradeManagementEngine:
 
         self._persist_state(position, state)
         return actions
+
+    # ========================================================================
+    # VIDEO-DERIVED TRADE MANAGEMENT HELPERS (STRICTLY TIGHTEN-ONLY R9.3)
+    # ========================================================================
+
+    @staticmethod
+    def is_tighter_stop(direction: OrderType, current_sl: float, candidate_sl: float) -> bool:
+        """Rule R9.3 guard: returns True ONLY if candidate_sl strictly tightens current_sl."""
+        if candidate_sl <= 0.0:
+            return False
+        if current_sl <= 0.0:
+            return True
+        if direction == OrderType.BUY:
+            return candidate_sl > current_sl
+        return candidate_sl < current_sl
+
+    def evaluate_video_runner_management(
+        self,
+        position: Position,
+        current_price: float,
+        first_target_price: float,
+        partial_pct: float = 0.50,
+        cost_buffer: float = 0.0,
+        trailing_stop_candidate: Optional[float] = None,
+        symbol_info: Optional[SymbolInfo] = None,
+    ) -> List[PositionAction]:
+        """
+        Runner / 'let it ride' management [VIDEO: keepssy_fx-20261126-0001, 0013]:
+        1. At first target (e.g. Asian low / PD mid), take partial (default 50%) and move SL to
+           break-even + cost buffer (strictly tighten-only R9.3).
+        2. After partial is taken, trail remainder toward next untapped pool using structural SL
+           (strictly tighten-only R9.3; never widens or removes a stop).
+        """
+        actions: List[PositionAction] = []
+        is_buy = position.order_type == OrderType.BUY
+        hit_tp1 = (current_price >= first_target_price) if is_buy else (current_price <= first_target_price)
+
+        if hit_tp1 and not position.partial_taken:
+            raw_close = position.volume * max(0.0, min(1.0, partial_pct))
+            close_vol = (
+                symbol_info.normalize_volume_down(raw_close)
+                if symbol_info
+                else round(raw_close, 2)
+            )
+            if close_vol > 0 and close_vol < position.volume:
+                actions.append(
+                    PositionAction(
+                        ticket=position.ticket,
+                        symbol=position.symbol,
+                        action_type="PARTIAL_CLOSE",
+                        close_volume=close_vol,
+                        reason=f"Runner TP1 reached ({first_target_price:.5f}); banking {partial_pct*100:.0f}% partial",
+                    )
+                )
+
+            be_sl = (position.open_price + abs(cost_buffer)) if is_buy else (position.open_price - abs(cost_buffer))
+            if symbol_info:
+                be_sl = symbol_info.round_price(be_sl)
+            be_valid_side = (be_sl < current_price) if is_buy else (be_sl > current_price)
+            if be_valid_side and self.is_tighter_stop(position.order_type, position.stop_loss, be_sl):
+                actions.append(
+                    PositionAction(
+                        ticket=position.ticket,
+                        symbol=position.symbol,
+                        action_type="MODIFY_SL",
+                        new_sl=be_sl,
+                        reason=f"Runner TP1 break-even + cost buffer locked at {be_sl:.5f} (R9.3 tighten-only)",
+                    )
+                )
+
+        if position.partial_taken and trailing_stop_candidate is not None:
+            cand = symbol_info.round_price(trailing_stop_candidate) if symbol_info else trailing_stop_candidate
+            side_ok = (cand < current_price) if is_buy else (cand > current_price)
+            if side_ok and self.is_tighter_stop(position.order_type, position.stop_loss, cand):
+                actions.append(
+                    PositionAction(
+                        ticket=position.ticket,
+                        symbol=position.symbol,
+                        action_type="MODIFY_SL",
+                        new_sl=cand,
+                        reason=f"Runner structural trail tightened to {cand:.5f} (R9.3)",
+                    )
+                )
+
+        return actions
+
+    @staticmethod
+    def evaluate_invalidation_exit(
+        position: Position,
+        last_closed_candle: Candle,
+        invalidation_price: Optional[float],
+    ) -> Optional[PositionAction]:
+        """
+        Early invalidation exit: closes position if a closed candle closes back beyond
+        the setup's invalidation price (e.g. IFVG closed through again or breaker reclaimed).
+        """
+        if invalidation_price is None or invalidation_price <= 0:
+            return None
+        is_buy = position.order_type == OrderType.BUY
+        invalidated = (
+            (is_buy and last_closed_candle.close < invalidation_price)
+            or (not is_buy and last_closed_candle.close > invalidation_price)
+        )
+        if not invalidated:
+            return None
+        return PositionAction(
+            ticket=position.ticket,
+            symbol=position.symbol,
+            action_type="FULL_CLOSE",
+            reason=(
+                f"Setup invalidation close: bar closed at {last_closed_candle.close:.5f} "
+                f"beyond invalidation {invalidation_price:.5f}"
+            ),
+        )
+
+    @staticmethod
+    def should_cancel_window_expired_order(
+        window_name: Optional[str],
+        order_placed_dt: datetime,
+        current_dt: datetime,
+        session_engine: Any,
+        cancel_on_window_end: bool = True,
+        broker_utc_offset_sec: int = 0,
+    ) -> bool:
+        """Cancels unfilled S2 Silver Bullet / S3 NY Macro limit orders once their NY window closes."""
+        if not cancel_on_window_end or not window_name:
+            return False
+        return bool(
+            session_engine.is_window_expired(
+                window_name=window_name,
+                order_placed_dt=order_placed_dt,
+                current_dt=current_dt,
+                broker_utc_offset_sec=broker_utc_offset_sec,
+            )
+        )
