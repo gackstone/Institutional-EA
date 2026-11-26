@@ -8,6 +8,7 @@
  */
 
 import {
+  AnyPairingQrPayloadSchema,
   assertMobileHttpReadOnly,
   MobileAccountSchema,
   MobileActivityResponseSchema,
@@ -22,6 +23,7 @@ import {
   MobileStatusSchema,
   MobileSymbolsResponseSchema,
   MobileTradesPageSchema,
+  type AnyPairingQrPayload,
   type MobileAccount,
   type MobileActivityResponse,
   type MobileCandlesResponse,
@@ -71,6 +73,11 @@ export function isSnapshotStale(
   return nowMs - lastUpdatedMs > thresholdMs;
 }
 
+export const DEFAULT_CLOUD_API_URL = (
+  (typeof process !== "undefined" && process.env?.EXPO_PUBLIC_SUPABASE_URL) ||
+  "https://arcadefx.live"
+).replace(/\/+$/, "");
+
 export function parsePairingQrPayload(raw: string): MobilePairingQrPayload {
   const trimmed = (raw || "").trim();
   if (!trimmed) {
@@ -78,6 +85,128 @@ export function parsePairingQrPayload(raw: string): MobilePairingQrPayload {
   }
   const parsed = JSON.parse(trimmed);
   return MobilePairingQrPayloadSchema.parse(parsed);
+}
+
+export function parseAnyPairingQrPayload(raw: string): AnyPairingQrPayload {
+  const trimmed = (raw || "").trim();
+  if (!trimmed) {
+    throw new Error("Empty QR code payload");
+  }
+  const parsed = JSON.parse(trimmed);
+  return AnyPairingQrPayloadSchema.parse(parsed);
+}
+
+export interface CloudClaimResult {
+  sessionId: string;
+  claimNonce: string;
+  companionName: string;
+  expiresAt: number;
+  cloudUrl: string;
+}
+
+/**
+ * Step 1 of Cross-Network Cloud Pairing:
+ * Claims a 6-digit code or v2 Cloud QR session over HTTPS (no LAN IP or port needed).
+ * Moves session to `awaiting_approval` on Windows Companion.
+ */
+export async function claimCloudPairing(params: {
+  cloudUrl?: string;
+  code?: string;
+  sessionId?: string;
+  sessionToken?: string;
+  deviceName: string;
+  signal?: AbortSignal;
+}): Promise<CloudClaimResult> {
+  const path = "/functions/v1/mobile-pairing";
+  assertMobileHttpReadOnly("POST", path);
+
+  const baseUrl = (params.cloudUrl || DEFAULT_CLOUD_API_URL).trim().replace(/\/+$/, "");
+  if (!baseUrl.startsWith("https://") && !baseUrl.startsWith("http://127.0.0.1")) {
+    throw new MobileSyncError("Cloud pairing requires HTTPS.", 0, "INSECURE_URL");
+  }
+
+  const resp = await fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      action: "claim",
+      code: params.code?.trim(),
+      sessionId: params.sessionId?.trim(),
+      sessionToken: params.sessionToken?.trim(),
+      deviceName: params.deviceName.trim() || "Android Device",
+      platform: "android",
+    }),
+    signal: params.signal,
+  });
+
+  const body = (await resp.json().catch(() => ({}))) as Record<string, any>;
+  if (!resp.ok) {
+    throw new MobileSyncError(
+      body.message || body.error || `Cloud pairing failed (${resp.status})`,
+      resp.status,
+      body.error || "CLOUD_PAIR_FAILED"
+    );
+  }
+
+  return {
+    sessionId: String(body.sessionId),
+    claimNonce: String(body.claimNonce),
+    companionName: String(body.companionName || "Windows Companion"),
+    expiresAt: Number(body.expiresAt || Math.floor(Date.now() / 1000) + 300),
+    cloudUrl: baseUrl,
+  };
+}
+
+/**
+ * Step 2 of Cross-Network Cloud Pairing:
+ * Polls until Windows Companion approves (or declines/expires) the device registration.
+ */
+export async function pollCloudPairingApproval(
+  claim: CloudClaimResult,
+  signal?: AbortSignal
+): Promise<{ status: "awaiting_approval" | "approved"; credentials?: PairingCredentials }> {
+  const path = "/functions/v1/mobile-pairing";
+  assertMobileHttpReadOnly("POST", path);
+
+  const resp = await fetch(`${claim.cloudUrl}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      action: "poll",
+      sessionId: claim.sessionId,
+      claimNonce: claim.claimNonce,
+    }),
+    signal,
+  });
+
+  const body = (await resp.json().catch(() => ({}))) as Record<string, any>;
+  if (!resp.ok) {
+    throw new MobileSyncError(
+      body.message || body.error || `Approval check failed (${resp.status})`,
+      resp.status,
+      body.error || "POLL_FAILED"
+    );
+  }
+
+  if (body.status === "approved" && body.deviceToken && body.deviceId) {
+    const validated = MobilePairResponseSchema.parse(body);
+    return {
+      status: "approved",
+      credentials: {
+        mode: "cloud",
+        cloudUrl: claim.cloudUrl,
+        host: new URL(claim.cloudUrl).hostname,
+        hosts: [new URL(claim.cloudUrl).hostname],
+        port: 443,
+        deviceId: validated.deviceId,
+        deviceToken: validated.deviceToken,
+        companionName: validated.companionName,
+        pairedAt: validated.pairedAt,
+      },
+    };
+  }
+
+  return { status: "awaiting_approval" };
 }
 
 export interface TradesQueryParams {
@@ -322,15 +451,71 @@ export class MobileSyncClient {
     }
   }
 
+  private lastCloudSequence = 0;
+
   /**
-   * Opens a live SSE stream (/api/mobile/v1/events) with automatic exponential-backoff
-   * reconnection and zero polling while the stream is healthy.
+   * Opens a live SSE stream (LAN mode) or resilient HTTPS Cloud Sync loop (Cloud mode)
+   * with automatic exponential-backoff reconnection and sequence-number deduplication.
    */
   startStream(handlers: StreamHandlers): void {
     this.stopStream();
     this.streamRunning = true;
     this.reconnectAttempt = 0;
-    this.openSseConnection(handlers);
+    if (this.creds.mode === "cloud" && this.creds.cloudUrl) {
+      this.pollCloudLoop(handlers);
+    } else {
+      this.openSseConnection(handlers);
+    }
+  }
+
+  private async pollCloudLoop(handlers: StreamHandlers): Promise<void> {
+    if (!this.streamRunning || !this.creds.cloudUrl) return;
+    const path = "/functions/v1/mobile-sync";
+    assertMobileHttpReadOnly("GET", path);
+
+    try {
+      const resp = await fetch(`${this.creds.cloudUrl.replace(/\/+$/, "")}${path}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${this.creds.deviceToken}`,
+          Accept: "application/json",
+        },
+      });
+      if (resp.status === 401 || resp.status === 403) {
+        this.stopStream();
+        handlers.onRevoked?.();
+        return;
+      }
+      if (!resp.ok) {
+        throw new Error(`Cloud sync HTTP ${resp.status}`);
+      }
+      const snap = (await resp.json()) as Record<string, any>;
+      this.reconnectAttempt = 0;
+      handlers.onOpen?.();
+
+      const seq = Number(snap.sequenceNo || 0);
+      if (seq === 0 || seq >= this.lastCloudSequence) {
+        this.lastCloudSequence = Math.max(this.lastCloudSequence, seq);
+        handlers.onEvent({
+          type: "snapshot",
+          timestamp: String(snap.updatedAt || new Date().toISOString()),
+          payload: snap,
+        });
+      }
+
+      if (this.streamRunning) {
+        this.reconnectTimer = setTimeout(() => {
+          this.pollCloudLoop(handlers);
+        }, 5000);
+      }
+    } catch (err) {
+      if (!this.streamRunning) return;
+      handlers.onError?.(err instanceof Error ? err : new Error("Cloud sync interrupted"));
+      const delay = computeBackoffMs(this.reconnectAttempt++);
+      this.reconnectTimer = setTimeout(() => {
+        this.pollCloudLoop(handlers);
+      }, delay);
+    }
   }
 
   stopStream(): void {

@@ -13,6 +13,8 @@ export interface ISecureStorage {
 }
 
 export interface PairingCredentials {
+  mode?: "cloud" | "lan";
+  cloudUrl?: string;
   host: string;
   hosts: string[];
   port: number;
@@ -76,6 +78,7 @@ const KEYS = {
   PAIRING_CREDS: "iea_pairing_creds_v1",
   THEME: "iea_theme",
   BIOMETRIC_LOCK: "iea_biometric_lock",
+  LOGGED_OUT: "iea_session_logged_out",
 } as const;
 
 export const SecureStorage = {
@@ -100,7 +103,9 @@ export const SecureStorage = {
     if (!raw) return null;
     try {
       const parsed = JSON.parse(raw) as PairingCredentials;
-      if (!parsed.host || !parsed.port || !parsed.deviceToken || !parsed.deviceId) {
+      const isCloud = parsed.mode === "cloud" && Boolean(parsed.cloudUrl);
+      const isLan = Boolean(parsed.host && parsed.port);
+      if ((!isCloud && !isLan) || !parsed.deviceToken || !parsed.deviceId) {
         return null;
       }
       return parsed;

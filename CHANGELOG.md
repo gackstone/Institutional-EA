@@ -2,6 +2,21 @@
 
 All notable changes to the Institutional Multi-Timeframe Algorithmic Trading Bot (`Institutional EA`) are documented in this file.
 
+## [3.15.0] - 2026-11-26
+
+### Added & Changed - Windows Companion & Android Read-Only Cross-Network Cloud Upgrade
+- **Windows Companion Dashboard (`companion/src/components/screens/CoreTradingScreens.tsx`)**:
+  - Removed the chart-header P&L/Equity toggle, Balance/Sync caption bar, and `1 Day`–`All` time-period filter pills above `LiveTradingChart`, preserving all 4 KPI cards, underlying financial calculations, and chart functionality with zero layout gaps.
+- **Live Signals Lifecycle (`companion/src/components/screens/SignalsAlertsScreens.tsx`, `packages/data-contract/src/mobileSync.ts`)**:
+  - Normalized real bot setups into clear lifecycle statuses (`New`, `Active`, `Triggered`, `Expired`, `Invalidated`) with timeframe, entry/SL/TP, R:R, setup classification, and supporting analysis; added `MobileLiveSignalSchema` for read-only synchronization to Android.
+- **User-Friendly Settings (`companion/src/components/screens/MonitoringSettingsScreens.tsx`, `companion/src/App.tsx`)**:
+  - Organized Companion Settings into plain-English sections: Application Settings (theme, notifications, startup prefs, version, Logout), Trading Bot Status & Monitoring, MT5 Connection & Diagnostics (masked account, zero credentials exposed), and a prominent `PAIR NEW ANDROID DEVICE` button.
+- **Secure Cross-Network Cloud-Mediated Pairing & Sync (`supabase/migrations/20261126000003_mobile_cloud_pairing_sync.sql`, `supabase/functions/mobile-pairing/`, `supabase/functions/mobile-sync/`, `companion/electron/cloudAuthManager.cjs`, `companion/src/components/MobileSyncModal.tsx`, `apps/mobile/src/services/MobileSyncClient.ts`, `apps/mobile/src/screens/SecurityScreen.tsx`)**:
+  - Implemented Windows Companion → Supabase Cloud Relay → Android Read-Only App pairing via QR code (`v: 2`, no permanent secrets) and one-time 6-digit code across any network (Wi-Fi, 4G/5G, Ethernet, dynamic IPs) with 5-minute expiry, rate limiting, explicit Windows user approval, DB-enforced `CHECK (scope = 'read_only')`, server-side HTTP `403 READ_ONLY_VIOLATION` enforcement, monotonic sequence-number telemetry sync, and device revocation.
+  - Removed manual Host IP and Port 8766 from the standard Android pairing flow (retained as a collapsed optional Local Wi-Fi Fallback).
+  - Updated `cloudAuthManager.cjs` production portal default from `http://localhost:5173` to `https://arcadefx.live`.
+  - Verified `46/46` Companion desktop tests, `11/11` Mobile unit tests, `0` hardcoded/mock violations, and `3/3` Python mobile sync server security tests.
+
 ## [3.14.0] - 2026-11-26
 
 ### Added - Advanced ICT/SMC Market Intelligence Upgrade (Videos 0010–0019)

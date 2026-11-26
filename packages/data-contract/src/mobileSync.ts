@@ -6,6 +6,7 @@ export const ALLOWED_MOBILE_HTTP_METHODS = ["GET"] as const;
 export const ALLOWED_MOBILE_AUTH_ENDPOINTS = [
   "/api/mobile/v1/pair",
   "/api/mobile/v1/unpair",
+  "/functions/v1/mobile-pairing",
 ] as const;
 
 export const MobileBotStateSchema = z.enum([
@@ -240,6 +241,39 @@ export const MobileActivityResponseSchema = z.object({
 });
 export type MobileActivityResponse = z.infer<typeof MobileActivityResponseSchema>;
 
+export const MobileLiveSignalStatusSchema = z.enum([
+  "New",
+  "Active",
+  "Triggered",
+  "Expired",
+  "Invalidated",
+]);
+export type MobileLiveSignalStatus = z.infer<typeof MobileLiveSignalStatusSchema>;
+
+export const MobileLiveSignalSchema = z.object({
+  id: z.string().min(1),
+  symbol: z.string().min(1),
+  direction: z.enum(["BUY", "SELL"]),
+  timeframe: z.string().default("M15"),
+  entryPrice: z.number().finite().nullable(),
+  stopLoss: z.number().finite().nullable(),
+  takeProfit: z.number().finite().nullable(),
+  rr: z.number().finite().nullable(),
+  strategy: z.string().default(""),
+  score: z.number().finite().nullable().default(null),
+  status: MobileLiveSignalStatusSchema,
+  analysis: z.string().default(""),
+  createdAt: z.string(),
+  expiresAt: z.string().nullable().default(null),
+});
+export type MobileLiveSignal = z.infer<typeof MobileLiveSignalSchema>;
+
+export const MobileLiveSignalsResponseSchema = z.object({
+  signals: z.array(MobileLiveSignalSchema),
+  updatedAt: z.string().nullable(),
+});
+export type MobileLiveSignalsResponse = z.infer<typeof MobileLiveSignalsResponseSchema>;
+
 export const MobilePairingQrPayloadSchema = z.object({
   v: z.literal(1),
   host: z.string().min(1),
@@ -250,6 +284,24 @@ export const MobilePairingQrPayloadSchema = z.object({
   companionName: z.string().optional(),
 });
 export type MobilePairingQrPayload = z.infer<typeof MobilePairingQrPayloadSchema>;
+
+export const CloudPairingQrPayloadSchema = z.object({
+  v: z.literal(2),
+  mode: z.literal("cloud"),
+  cloudUrl: z.string().url(),
+  sessionId: z.string().min(8),
+  sessionToken: z.string().min(16),
+  code: z.string().regex(/^[0-9]{6}$/, "Pairing code must be 6 digits"),
+  expiresAt: z.number().int().positive(),
+  companionName: z.string().optional(),
+});
+export type CloudPairingQrPayload = z.infer<typeof CloudPairingQrPayloadSchema>;
+
+export const AnyPairingQrPayloadSchema = z.union([
+  CloudPairingQrPayloadSchema,
+  MobilePairingQrPayloadSchema,
+]);
+export type AnyPairingQrPayload = z.infer<typeof AnyPairingQrPayloadSchema>;
 
 export const MobilePairResponseSchema = z.object({
   deviceId: z.string().min(1),

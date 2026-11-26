@@ -532,6 +532,56 @@ export const App: React.FC = () => {
   const openPosCount = effectiveStatus.mt5.positions.length;
   const recentTradeCount = normalized.recentTrades.length;
 
+  // Background Cloud Relay Telemetry & Live Signals Publisher (cross-network Android Read-Only sync)
+  const cloudSyncSeqRef = useRef<number>(0);
+  useEffect(() => {
+    const api = (window as any)?.electronAPI;
+    if (!cloudState?.authenticated || !api?.cloudMobilePushSnapshot) return;
+    let active = true;
+
+    const pushSnapshot = async () => {
+      if (!active) return;
+      try {
+        const sigRes = await controlClient.getSignals().catch(() => ({ signals: [] }));
+        cloudSyncSeqRef.current += 1;
+        await api.cloudMobilePushSnapshot({
+          sequenceNo: cloudSyncSeqRef.current,
+          status: {
+            botState: effectiveStatus.engine.state,
+            mt5Connected: effectiveStatus.mt5.connection_status === "CONNECTED",
+            demoMode: effectiveStatus.mt5.account.demo_verified,
+            broker: effectiveStatus.mt5.account.broker,
+            accountMasked: effectiveStatus.mt5.account.account_number
+              ? `****${String(effectiveStatus.mt5.account.account_number).slice(-4)}`
+              : "DEMO",
+            readOnlyEnforced: true,
+          },
+          account: {
+            balance: effectiveStatus.mt5.account.balance,
+            equity: effectiveStatus.mt5.account.equity,
+            floatingPnl: Number(
+              (effectiveStatus.mt5.account.equity - effectiveStatus.mt5.account.balance).toFixed(2)
+            ),
+            currency: effectiveStatus.mt5.account.currency || "USD",
+            openPositionsCount: effectiveStatus.mt5.positions.length,
+          },
+          positions: effectiveStatus.mt5.positions,
+          trades: normalized.recentTrades.slice(0, 50),
+          signals: (sigRes.signals || []).slice(0, 40),
+        });
+      } catch {
+        // Silent retry on next interval; never disrupts local MT5 execution
+      }
+    };
+
+    pushSnapshot();
+    const timer = setInterval(pushSnapshot, 15000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [cloudState?.authenticated, effectiveStatus, normalized.recentTrades]);
+
   // Existing error/warning count from controlLogs for peach attention badge
   const warningErrorLogCount = useMemo(
     () =>
@@ -1502,10 +1552,15 @@ export const App: React.FC = () => {
 
               {activeScreen === "settings" && (
                 <SettingsScreen
+                  status={effectiveStatus}
+                  cloudEmail={cloudState?.profile?.email || null}
+                  cloudConnected={Boolean(cloudState?.authenticated)}
                   onOpenDiagnostics={() => setIsDiagnosticsOpen(true)}
                   onOpenInstitutionalEa={() => setIsPairingOpen(true)}
                   onOpenTelegram={() => setIsTelegramOpen(true)}
                   onOpenMobileSync={() => setIsMobileSyncOpen(true)}
+                  onReconnectService={handleReconnectService}
+                  onSignOut={handleSignOutClick}
                 />
               )}
             </div>

@@ -80,7 +80,19 @@ test("Regression Guard: Deprecated PNL Trend chart header block must remain remo
     );
   }
 
-  // The remaining intentional controls must exist
-  assert.match(content, /aria-label="Toggle P&L or Equity display"/);
-  assert.match(content, /aria-label="Select trend range"/);
+  // Removed chart header P&L/Equity toggle, Balance/Sync bar, and time-period filters must stay removed
+  const forbiddenChartHeaderControls = [
+    /aria-label="Toggle P&L or Equity display"/,
+    /aria-label="Select trend range"/,
+    /TREND_RANGES/,
+    /handleRangeSelect/,
+  ];
+
+  for (const pattern of forbiddenChartHeaderControls) {
+    assert.equal(
+      pattern.test(content),
+      false,
+      `Regression detected: removed chart header control ${pattern} found in CoreTradingScreens.tsx`
+    );
+  }
 });
