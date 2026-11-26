@@ -24,7 +24,7 @@ import { formatClockTime, formatShortDateTime } from "../utils/formatters.ts";
 import { triggerLightHaptic } from "../services/haptics.ts";
 import type { PairingCredentials } from "../services/SecureStorage.ts";
 
-const APP_VERSION = "1.3.4";
+const APP_VERSION = "1.3.5";
 
 interface SecurityScreenProps {
   theme: ThemeMode;

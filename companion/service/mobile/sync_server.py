@@ -34,7 +34,7 @@ from urllib.parse import parse_qs, urlparse
 from companion.service.market.drawings_engine import canonical_symbol
 
 MOBILE_SYNC_SCHEMA_VERSION = "1.0.0"
-APP_VERSION = "1.3.4"
+APP_VERSION = "1.3.5"
 DEFAULT_MOBILE_PORT = 8766
 PAIRING_CODE_TTL_SEC = 300
 PAIR_RATE_LIMIT_MAX_ATTEMPTS = 5

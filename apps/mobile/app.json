@@ -2,7 +2,7 @@
   "expo": {
     "name": "Institutional EA",
     "slug": "institutional-ea-mobile",
-    "version": "1.3.4",
+    "version": "1.3.5",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.institutionalea.monitor",
-      "buildNumber": "1.3.4",
+      "buildNumber": "1.3.5",
       "infoPlist": {
         "NSFaceIDUsageDescription": "Use FaceID to unlock your read-only monitoring dashboard.",
         "NSCameraUsageDescription": "Use the camera to scan your Windows Companion pairing QR code."
@@ -26,7 +26,7 @@
         "backgroundColor": "#0B0F19"
       },
       "package": "com.institutionalea.monitor",
-      "versionCode": 10304,
+      "versionCode": 10305,
       "permissions": [
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
