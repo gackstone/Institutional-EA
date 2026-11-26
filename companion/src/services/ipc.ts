@@ -732,4 +732,14 @@ export const controlClient = {
   // Telegram Quick Connectivity Test
   testTelegram: (sendMessage = true) =>
     callControl<{ success: boolean; message: string }>("POST", "/api/telegram/test", { send_message: sendMessage }),
+
+  // Opt-In Read-Only Mobile Sync (LAN Pairing & Device Management)
+  getMobileSyncStatus: () => callControl<any>("GET", "/api/mobile-sync/status"),
+  enableMobileSync: (port?: number) =>
+    callControl<any>("POST", "/api/mobile-sync/enable", port ? { port } : {}),
+  disableMobileSync: () => callControl<any>("POST", "/api/mobile-sync/disable", {}),
+  generateMobilePairingCode: () => callControl<any>("POST", "/api/mobile-sync/pairing-code", {}),
+  revokeMobileDevice: (deviceId: string) =>
+    callControl<any>("POST", "/api/mobile-sync/devices/revoke", { deviceId }),
+  revokeAllMobileDevices: () => callControl<any>("POST", "/api/mobile-sync/devices/revoke-all", {}),
 };
