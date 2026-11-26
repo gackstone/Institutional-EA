@@ -2,7 +2,7 @@
   "expo": {
     "name": "Institutional EA",
     "slug": "institutional-ea-mobile",
-    "version": "1.3.6",
+    "version": "1.3.7",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -26,7 +26,7 @@
         "backgroundColor": "#0B0F19"
       },
       "package": "com.institutionalea.monitor",
-      "versionCode": 10306,
+      "versionCode": 10307,
       "permissions": [
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",

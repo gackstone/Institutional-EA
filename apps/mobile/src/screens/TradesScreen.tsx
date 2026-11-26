@@ -20,7 +20,14 @@ import {
   formatSignedPnl,
 } from "../utils/formatters.ts";
 import { triggerSelectionHaptic } from "../services/haptics.ts";
-import type { MobileSyncClient } from "../services/MobileSyncClient.ts";
+import {
+  formatSyncErrorMessage,
+  type MobileSyncClient,
+} from "../services/MobileSyncClient.ts";
+import {
+  DEFAULT_TRADE_FILTER_PREFS,
+  OfflineCache,
+} from "../services/OfflineCache.ts";
 import type {
   MobileSymbolSpec,
   MobileTradeRecord,
@@ -45,11 +52,13 @@ export const TradesScreen = memo(function TradesScreen({
   onShowTradeOnChart,
 }: TradesScreenProps): React.ReactElement {
   const tokens = getThemeTokens(theme);
-  const [symbolFilter, setSymbolFilter] = useState<string>("ALL");
-  const [outcome, setOutcome] = useState<OutcomeFilter>("ALL");
-  const [dateRange, setDateRange] = useState<DateRangeOption>("ALL");
-  const [sort, setSort] = useState<SortOption>("time_desc");
-  const [search, setSearch] = useState("");
+  const [symbolFilter, setSymbolFilter] = useState<string>(DEFAULT_TRADE_FILTER_PREFS.symbolFilter);
+  const [outcome, setOutcome] = useState<OutcomeFilter>(DEFAULT_TRADE_FILTER_PREFS.outcome);
+  const [dateRange, setDateRange] = useState<DateRangeOption>(DEFAULT_TRADE_FILTER_PREFS.dateRange);
+  const [sort, setSort] = useState<SortOption>(DEFAULT_TRADE_FILTER_PREFS.sort);
+  const [search, setSearch] = useState(DEFAULT_TRADE_FILTER_PREFS.search);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+
   const [pageData, setPageData] = useState<MobileTradesPage | null>(null);
   const [items, setItems] = useState<MobileTradeRecord[]>([]);
   const [page, setPage] = useState(1);
@@ -58,6 +67,38 @@ export const TradesScreen = memo(function TradesScreen({
   const [error, setError] = useState<string | null>(null);
   const [selectedTrade, setSelectedTrade] = useState<MobileTradeRecord | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Restore saved trade filter state so filters survive rotation & tab changes
+  useEffect(() => {
+    let active = true;
+    OfflineCache.loadTradeFilterPreferences()
+      .then((prefs) => {
+        if (!active) return;
+        setSymbolFilter(prefs.symbolFilter);
+        setOutcome(prefs.outcome);
+        setDateRange(prefs.dateRange);
+        setSort(prefs.sort);
+        setSearch(prefs.search);
+        setPrefsLoaded(true);
+      })
+      .catch(() => {
+        if (active) setPrefsLoaded(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!prefsLoaded) return;
+    OfflineCache.saveTradeFilterPreferences({
+      symbolFilter,
+      outcome,
+      dateRange,
+      sort,
+      search,
+    }).catch(() => {});
+  }, [prefsLoaded, symbolFilter, outcome, dateRange, sort, search]);
 
   const computeFromIso = useCallback((rng: DateRangeOption): string | undefined => {
     if (rng === "ALL") return undefined;
@@ -95,7 +136,7 @@ export const TradesScreen = memo(function TradesScreen({
         setItems((prev) => (append ? [...prev, ...res.items] : res.items));
       } catch (err: any) {
         if (err?.name === "AbortError") return;
-        setError(err instanceof Error ? err.message : "Failed to load trade history");
+        setError(formatSyncErrorMessage(err, "Unable to load trade history. Tap Retry."));
       } finally {
         setLoading(false);
         setLoadingMore(false);
@@ -120,6 +161,26 @@ export const TradesScreen = memo(function TradesScreen({
   };
 
   const currency = pageData?.currency ?? "USD";
+
+  const symbolChoices = [
+    "ALL",
+    ...Array.from(
+      new Set(
+        (symbols.length > 0 ? symbols.map((s) => s.symbol) : ["XAUUSD", "USDJPY", "BTCUSD"]).filter(
+          Boolean
+        )
+      )
+    ),
+  ];
+
+  const sortLabel =
+    sort === "time_desc"
+      ? "Sort: Newest"
+      : sort === "time_asc"
+      ? "Sort: Oldest"
+      : sort === "pnl_desc"
+      ? "Sort: Best P/L"
+      : "Sort: Worst P/L";
 
   const renderTrade = useCallback(
     ({ item }: { item: MobileTradeRecord }) => {
@@ -189,39 +250,61 @@ export const TradesScreen = memo(function TradesScreen({
 
   return (
     <View style={[styles.container, { backgroundColor: tokens.background }]}>
-      {/* Search + Filters */}
+      {/* Search + Separated Mutually-Exclusive Filter Groups (E9 Fix) */}
       <View
         style={[
           styles.filterBox,
           { backgroundColor: tokens.surface, borderBottomColor: tokens.borderSubtle },
         ]}
       >
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search ticket, symbol, or strategy tag…"
-          placeholderTextColor={tokens.textDim}
-          style={[
-            styles.searchInput,
-            {
-              backgroundColor: tokens.cardSecondary,
-              color: tokens.text,
-              borderColor: tokens.borderSubtle,
-            },
-          ]}
-          accessibilityLabel="Search trades"
-        />
+        {/* Row 1: Search Input + Dedicated Unclipped Sort Button */}
+        <View style={styles.searchSortRow}>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search ticket, symbol, or strategy tag…"
+            placeholderTextColor={tokens.textDim}
+            style={[
+              styles.searchInput,
+              {
+                backgroundColor: tokens.cardSecondary,
+                color: tokens.text,
+                borderColor: tokens.borderSubtle,
+              },
+            ]}
+            accessibilityLabel="Search trades"
+          />
+          <TouchableOpacity
+            onPress={() => {
+              triggerSelectionHaptic();
+              const order: SortOption[] = ["time_desc", "time_asc", "pnl_desc", "pnl_asc"];
+              setSort(order[(order.indexOf(sort) + 1) % order.length]);
+            }}
+            style={[
+              styles.sortBtn,
+              { backgroundColor: tokens.cardSecondary, borderColor: tokens.borderSubtle },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={sortLabel}
+          >
+            <Text style={[styles.sortBtnText, { color: tokens.text }]} numberOfLines={1}>
+              {sortLabel}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
+        {/* Row 2: Symbol Group (Single-Select) */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipRow}
         >
-          {["ALL", ...symbols.map((s) => s.symbol)].map((sym) => {
+          <Text style={[styles.groupLabel, { color: tokens.textDim }]}>Symbol</Text>
+          {symbolChoices.map((sym) => {
             const active = symbolFilter === sym;
             return (
               <TouchableOpacity
-                key={sym}
+                key={`sym-${sym}`}
                 onPress={() => {
                   triggerSelectionHaptic();
                   setSymbolFilter(sym);
@@ -230,8 +313,12 @@ export const TradesScreen = memo(function TradesScreen({
                   styles.chip,
                   {
                     backgroundColor: active ? tokens.accent : tokens.cardSecondary,
+                    borderColor: active ? tokens.accent : tokens.borderSubtle,
+                    borderWidth: 1,
                   },
                 ]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
               >
                 <Text
                   style={[
@@ -239,12 +326,20 @@ export const TradesScreen = memo(function TradesScreen({
                     { color: active ? tokens.accentText : tokens.textMuted },
                   ]}
                 >
-                  {sym}
+                  {sym === "ALL" ? "All Symbols" : sym}
                 </Text>
               </TouchableOpacity>
             );
           })}
+        </ScrollView>
 
+        {/* Row 3: Result Group (Single-Select) + Period Group (Single-Select) with divider */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
+          <Text style={[styles.groupLabel, { color: tokens.textDim }]}>Result</Text>
           {(["ALL", "WIN", "LOSS"] as OutcomeFilter[]).map((o) => {
             const active = outcome === o;
             return (
@@ -262,6 +357,8 @@ export const TradesScreen = memo(function TradesScreen({
                     borderWidth: 1,
                   },
                 ]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
               >
                 <Text
                   style={[
@@ -275,6 +372,9 @@ export const TradesScreen = memo(function TradesScreen({
             );
           })}
 
+          <View style={[styles.groupDivider, { backgroundColor: tokens.borderSubtle }]} />
+
+          <Text style={[styles.groupLabel, { color: tokens.textDim }]}>Period</Text>
           {(["ALL", "1D", "1W", "1M"] as DateRangeOption[]).map((r) => {
             const active = dateRange === r;
             return (
@@ -287,43 +387,25 @@ export const TradesScreen = memo(function TradesScreen({
                 style={[
                   styles.chip,
                   {
-                    backgroundColor: active ? tokens.accentLight : tokens.card,
+                    backgroundColor: active ? tokens.accent : tokens.card,
                     borderColor: active ? tokens.accent : tokens.borderSubtle,
                     borderWidth: 1,
                   },
                 ]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    { color: active ? tokens.accent : tokens.textMuted },
+                    { color: active ? tokens.accentText : tokens.textMuted },
                   ]}
                 >
-                  {r}
+                  {r === "ALL" ? "All Time" : r}
                 </Text>
               </TouchableOpacity>
             );
           })}
-
-          <TouchableOpacity
-            onPress={() => {
-              triggerSelectionHaptic();
-              const order: SortOption[] = ["time_desc", "time_asc", "pnl_desc", "pnl_asc"];
-              setSort(order[(order.indexOf(sort) + 1) % order.length]);
-            }}
-            style={[styles.chip, { backgroundColor: tokens.cardSecondary }]}
-          >
-            <Text style={[styles.chipText, { color: tokens.text }]}>
-              Sort:{" "}
-              {sort === "time_desc"
-                ? "Newest"
-                : sort === "time_asc"
-                ? "Oldest"
-                : sort === "pnl_desc"
-                ? "Best P/L"
-                : "Worst P/L"}
-            </Text>
-          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -393,7 +475,9 @@ export const TradesScreen = memo(function TradesScreen({
             !loading ? (
               <View style={styles.centerBox}>
                 <Text style={[styles.emptyText, { color: tokens.textDim }]}>
-                  No trades match your filters
+                  {symbolFilter !== "ALL" || outcome !== "ALL" || dateRange !== "ALL" || search.trim()
+                    ? "No closed deals match your active filters"
+                    : "No closed deals recorded on this account yet"}
                 </Text>
               </View>
             ) : null
@@ -509,23 +593,54 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 8,
     borderBottomWidth: 1,
+    gap: 7,
+  },
+  searchSortRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   searchInput: {
-    height: 40,
+    flex: 1,
+    height: 38,
     borderRadius: 10,
     borderWidth: 1,
     paddingHorizontal: 12,
-    fontSize: 13,
+    fontSize: 12,
+  },
+  sortBtn: {
+    height: 38,
+    paddingHorizontal: 11,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  sortBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
   },
   chipRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
+  groupLabel: {
+    fontSize: 9,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginRight: 2,
+  },
+  groupDivider: {
+    width: 1,
+    height: 16,
+    marginHorizontal: 4,
+  },
   chip: {
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: 8,
   },
   chipText: {
@@ -611,6 +726,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 13,
+    textAlign: "center",
   },
   errorText: {
     fontSize: 13,

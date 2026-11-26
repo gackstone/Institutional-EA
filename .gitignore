@@ -97,7 +97,11 @@ ios/build/
 *.apk
 *.aab
 *.ipa
+*.idsig
 credentials.json
+supabase/.temp/
+apps/mobile/android/
+backups/release-archive-*/
 *service-account*.json
 google-services.json
 GoogleService-Info.plist

@@ -19,10 +19,13 @@ import {
   MobileSyncClient,
   MobileSyncError,
   isSnapshotStale,
+  parseIsoToMs,
+  type SyncDiagnosticsState,
 } from "./services/MobileSyncClient.ts";
 import type { ConnectionState } from "./components/ConnectionBanner.tsx";
 import type { EquityRange } from "./components/EquityCurveCard.tsx";
 import {
+  MOBILE_SYNC_SCHEMA_VERSION,
   MobileAccountSchema,
   MobilePositionSchema,
   MobileStatsSchema,
@@ -69,10 +72,12 @@ export default function App(): React.ReactElement {
   const [drawings, setDrawings] = useState<MobileDrawingsResponse | null>(null);
   const [focusChartTime, setFocusChartTime] = useState<number | null>(null);
 
-  // Connectivity state
+  // Connectivity & Honest Freshness state (E10)
   const [streamConnected, setStreamConnected] = useState(false);
   const [streamError, setStreamError] = useState(false);
   const [lastSyncedMs, setLastSyncedMs] = useState<number | null>(null);
+  const [producerUpdatedMs, setProducerUpdatedMs] = useState<number | null>(null);
+  const [syncDiagnostics, setSyncDiagnostics] = useState<SyncDiagnosticsState | null>(null);
   const [isShowingCache, setIsShowingCache] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -87,13 +92,18 @@ export default function App(): React.ReactElement {
   useEffect(() => {
     let active = true;
     (async () => {
-      const [storedTheme, bioEnabled, storedCreds, prefs, cached] = await Promise.all([
+      const [storedTheme, bioEnabled, storedCreds, prefs] = await Promise.all([
         SecureStorage.getStoredTheme(),
         SecureStorage.getBiometricLockEnabled(),
         SecureStorage.getPairingCredentials(),
         OfflineCache.loadChartPreferences(),
-        OfflineCache.loadSnapshot(),
       ]);
+      if (!active) return;
+
+      const cached = await OfflineCache.loadSnapshot({
+        deviceId: storedCreds?.deviceId ?? null,
+        schemaVersion: MOBILE_SYNC_SCHEMA_VERSION,
+      });
       if (!active) return;
 
       if (storedTheme === "light" || storedTheme === "dark") {
@@ -128,6 +138,10 @@ export default function App(): React.ReactElement {
         candlesCacheRef.current = cached.candlesByKey || {};
         drawingsCacheRef.current = cached.drawingsByKey || {};
         setLastSyncedMs(cached.cachedAt);
+        setProducerUpdatedMs(
+          parseIsoToMs(cached.status?.lastHeartbeat || cached.account?.updatedAt) ??
+            cached.cachedAt
+        );
         setIsShowingCache(true);
 
         const sym =
@@ -143,6 +157,7 @@ export default function App(): React.ReactElement {
       if (storedCreds) {
         clientRef.current = new MobileSyncClient(storedCreds);
         setCredentials(storedCreds);
+        setSyncDiagnostics(clientRef.current.getDiagnostics());
       }
     })();
     return () => {
@@ -160,13 +175,23 @@ export default function App(): React.ReactElement {
       equity: MobileEquityResponse | null;
       activity: MobileActivityEvent[];
     }>) => {
-      const now = Date.now();
-      setLastSyncedMs(now);
+      const nextStatus = overrides?.status !== undefined ? overrides.status : status;
+      const nextAccount = overrides?.account !== undefined ? overrides.account : account;
+      const prodMs =
+        parseIsoToMs(nextStatus?.lastHeartbeat || nextAccount?.updatedAt) ?? Date.now();
+      setLastSyncedMs(prodMs);
+      setProducerUpdatedMs(prodMs);
       setIsShowingCache(false);
+      if (clientRef.current) {
+        setSyncDiagnostics(clientRef.current.getDiagnostics());
+      }
       OfflineCache.saveSnapshot({
-        cachedAt: now,
-        status: overrides?.status !== undefined ? overrides.status : status,
-        account: overrides?.account !== undefined ? overrides.account : account,
+        cachedAt: prodMs,
+        deviceId: credentials?.deviceId,
+        accountMasked: nextAccount?.accountMasked || nextStatus?.accountMasked,
+        schemaVersion: MOBILE_SYNC_SCHEMA_VERSION,
+        status: nextStatus,
+        account: nextAccount,
         stats: overrides?.stats !== undefined ? overrides.stats : stats,
         positions: overrides?.positions !== undefined ? overrides.positions : positions,
         symbols: overrides?.symbols !== undefined ? overrides.symbols : symbolsData,
@@ -176,7 +201,7 @@ export default function App(): React.ReactElement {
         activity: overrides?.activity !== undefined ? overrides.activity : activity,
       }).catch(() => {});
     },
-    [status, account, stats, positions, symbolsData, equity, activity]
+    [credentials?.deviceId, status, account, stats, positions, symbolsData, equity, activity]
   );
 
   const handleRevoked = useCallback(async () => {
@@ -208,14 +233,14 @@ export default function App(): React.ReactElement {
         drawingsCacheRef.current[key] = dRes;
         setCandlesData(cRes);
         setDrawings(dRes);
-        setLastSyncedMs(Date.now());
-        setIsShowingCache(false);
+        setSyncDiagnostics(client.getDiagnostics());
       } catch (err: any) {
         if (err?.name === "AbortError") return;
         if (err instanceof MobileSyncError && err.status === 401) {
           handleRevoked();
           return;
         }
+        setSyncDiagnostics(client.getDiagnostics());
         if (!preserveOld) {
           const key = `${sym}:${tf}`;
           setCandlesData(candlesCacheRef.current[key] ?? null);
@@ -244,6 +269,20 @@ export default function App(): React.ReactElement {
           client.getEquity(equityRange),
           client.getActivity(40),
         ]);
+
+        // If account changed, invalidate old cached charts
+        if (
+          account?.accountMasked &&
+          acc.accountMasked &&
+          account.accountMasked !== "DEMO" &&
+          acc.accountMasked !== "DEMO" &&
+          account.accountMasked !== acc.accountMasked
+        ) {
+          candlesCacheRef.current = {};
+          drawingsCacheRef.current = {};
+          await OfflineCache.clearSnapshot();
+        }
+
         setStatus(st);
         setAccount(acc);
         setStats(stStats);
@@ -256,7 +295,7 @@ export default function App(): React.ReactElement {
         const nextSym =
           selectedSymbol && symRes.symbols.some((s) => s.symbol === selectedSymbol)
             ? selectedSymbol
-            : symRes.symbols[0]?.symbol ?? null;
+            : symRes.symbols[0]?.symbol ?? "XAUUSD";
         if (nextSym && nextSym !== selectedSymbol) {
           setSelectedSymbol(nextSym);
         }
@@ -279,15 +318,24 @@ export default function App(): React.ReactElement {
           return;
         }
         setStreamError(true);
+        setSyncDiagnostics(client.getDiagnostics());
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
       }
     },
-    [equityRange, selectedSymbol, selectedTimeframe, fetchChartData, handleRevoked, persistSnapshot]
+    [
+      account?.accountMasked,
+      equityRange,
+      selectedSymbol,
+      selectedTimeframe,
+      fetchChartData,
+      handleRevoked,
+      persistSnapshot,
+    ]
   );
 
-  // Start / stop live SSE stream when credentials change or AppState transitions
+  // Start / stop live SSE / Cloud Sync stream when credentials change or AppState transitions
   const startLiveSync = useCallback(() => {
     const client = clientRef.current;
     if (!client) return;
@@ -297,15 +345,27 @@ export default function App(): React.ReactElement {
       onOpen: () => {
         setStreamConnected(true);
         setStreamError(false);
+        setSyncDiagnostics(client.getDiagnostics());
       },
       onEvent: (ev) => {
-        setLastSyncedMs(Date.now());
         setIsShowingCache(false);
         setStreamConnected(true);
         setStreamError(false);
+        setSyncDiagnostics(client.getDiagnostics());
 
         if (ev.type === "snapshot" && ev.payload && typeof ev.payload === "object") {
           const p = ev.payload as any;
+          const prodTs = parseIsoToMs(p.updatedAt || p.status?.lastHeartbeat || ev.timestamp);
+          if (prodTs) {
+            setProducerUpdatedMs(prodTs);
+            setLastSyncedMs(prodTs);
+          }
+
+          if (client.getCredentials().mode === "cloud") {
+            fetchFullSnapshot(false);
+            return;
+          }
+
           try {
             if (p.status) setStatus(MobileStatusSchema.parse(p.status));
             if (p.account) setAccount(MobileAccountSchema.parse(p.account));
@@ -325,13 +385,20 @@ export default function App(): React.ReactElement {
           }
         } else if (ev.type === "status" && ev.payload) {
           try {
-            setStatus(MobileStatusSchema.parse(ev.payload));
+            const st = MobileStatusSchema.parse(ev.payload);
+            setStatus(st);
+            const hbMs = parseIsoToMs(st.lastHeartbeat);
+            if (hbMs) {
+              setProducerUpdatedMs(hbMs);
+              setLastSyncedMs(hbMs);
+            }
           } catch {}
         }
       },
       onError: () => {
         setStreamConnected(false);
         setStreamError(true);
+        setSyncDiagnostics(client.getDiagnostics());
       },
       onRevoked: () => {
         handleRevoked();
@@ -386,16 +453,18 @@ export default function App(): React.ReactElement {
     return () => clearInterval(iv);
   }, []);
 
-  // Derive honest connection banner state
+  // Derive honest connection banner state tied strictly to producer data freshness (E10 Fix)
   const deriveConnectionState = (): ConnectionState => {
     void staleTick;
     if (!credentials) return "NOT_PAIRED";
+    if (syncDiagnostics?.updateNeeded) return "UPDATE_NEEDED";
     if (streamError && !streamConnected) {
       return lastSyncedMs ? "RECONNECTING" : "COMPANION_OFFLINE";
     }
     if (!streamConnected && isLoading) return "CONNECTING";
-    if (lastSyncedMs && isSnapshotStale(lastSyncedMs, Date.now(), 35_000)) {
-      return "STALE";
+    const freshnessMs = producerUpdatedMs ?? lastSyncedMs;
+    if (!freshnessMs || isSnapshotStale(freshnessMs, Date.now(), 45_000)) {
+      return streamConnected ? "STALE" : "CONNECTING";
     }
     if (status && !status.mt5Connected) return "MT5_DISCONNECTED";
     if (status?.botState === "PAUSED") return "BOT_PAUSED";
@@ -462,9 +531,13 @@ export default function App(): React.ReactElement {
   }, []);
 
   const handlePaired = useCallback(async (creds: PairingCredentials) => {
+    await OfflineCache.clearSnapshot();
+    candlesCacheRef.current = {};
+    drawingsCacheRef.current = {};
     await SecureStorage.setPairingCredentials(creds);
     clientRef.current = new MobileSyncClient(creds);
     setCredentials(creds);
+    setSyncDiagnostics(clientRef.current.getDiagnostics());
     setCurrentTab("OVERVIEW");
   }, []);
 
@@ -487,6 +560,8 @@ export default function App(): React.ReactElement {
     setEquity(null);
     setActivity([]);
     setLastSyncedMs(null);
+    setProducerUpdatedMs(null);
+    setSyncDiagnostics(null);
     setStreamConnected(false);
     setStreamError(false);
   }, []);
@@ -497,6 +572,7 @@ export default function App(): React.ReactElement {
     drawingsCacheRef.current = {};
     if (!streamConnected) {
       setLastSyncedMs(null);
+      setProducerUpdatedMs(null);
       setIsShowingCache(false);
     }
   }, [streamConnected]);
@@ -543,7 +619,8 @@ export default function App(): React.ReactElement {
             }}
             connectionState={deriveConnectionState()}
             botState={status?.botState ?? null}
-            lastSyncedMs={lastSyncedMs}
+            lastSyncedMs={producerUpdatedMs ?? lastSyncedMs}
+            syncDiagnostics={syncDiagnostics}
             isShowingCache={isShowingCache}
             onRetryConnection={startLiveSync}
             credentials={credentials}

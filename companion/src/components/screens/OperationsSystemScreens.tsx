@@ -23,6 +23,16 @@ export const MT5ConnectionScreen: React.FC<{
   const [busy, setBusy] = useState(false);
   const [deployingId, setDeployingId] = useState<string | null>(null);
   const [deployReport, setDeployReport] = useState<DeployEAResult | null>(null);
+  const [syncHealth, setSyncHealth] = useState<any | null>(null);
+
+  const loadSyncHealth = async () => {
+    try {
+      const h = await controlClient.getSyncHealth();
+      setSyncHealth(h);
+    } catch {
+      // ignore if service starting
+    }
+  };
 
   const scan = async () => {
     try {
@@ -35,6 +45,9 @@ export const MT5ConnectionScreen: React.FC<{
 
   useEffect(() => {
     scan();
+    loadSyncHealth();
+    const iv = setInterval(loadSyncHealth, 10000);
+    return () => clearInterval(iv);
   }, []);
 
   const handleConnect = async (terminalPath?: string) => {
@@ -112,6 +125,48 @@ export const MT5ConnectionScreen: React.FC<{
           </button>
         </div>
       </div>
+
+      {/* Android & Cloud Sync Telemetry Health Indicator (Read-Only) */}
+      {syncHealth && (
+        <div className="iea-card p-5 space-y-3 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-iea-textPrimary">
+                Companion → Android Telemetry Sync Health (v{syncHealth.schemaVersion || "1.1.0"})
+              </h3>
+              <p className="text-[11px] text-iea-textSecondary mt-0.5">
+                Last sync:{" "}
+                <span className="font-mono text-iea-textPrimary">
+                  {syncHealth.lastSyncAt ? new Date(syncHealth.lastSyncAt).toLocaleTimeString() : "Waiting"}
+                </span>
+                {typeof syncHealth.lagSeconds === "number" && (
+                  <>
+                    {" "}· Lag: <span className="font-mono text-iea-accent">{syncHealth.lagSeconds}s</span>
+                  </>
+                )}
+              </p>
+            </div>
+            {syncHealth.safetyFindings?.unprotectedOpenPositionsCount > 0 && (
+              <span className="px-2.5 py-1 rounded-full bg-iea-dangerSoft border border-iea-dangerBorder text-iea-danger font-bold text-[11px]">
+                Safety Notice: {syncHealth.safetyFindings.unprotectedOpenPositionsCount} open position(s) have NO SL
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {Object.entries(syncHealth.streams || {}).map(([key, st]: [string, any]) => (
+              <div key={key} className="iea-inset p-2.5 rounded-xl">
+                <div className="text-[10px] uppercase font-bold text-iea-textMuted">{key.replace("_", " ")}</div>
+                <div className="font-mono font-bold text-iea-textPrimary mt-0.5">
+                  {st?.rowsPublished ?? 0} rows
+                </div>
+                <div className="text-[10px] font-mono text-iea-textSecondary">
+                  {st?.lastError ? "Error" : st?.lastPublishTime ? "Synced" : "Idle"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="iea-card p-5 space-y-3">
         <h3 className="text-sm font-bold text-iea-textPrimary">Terminals ({terminals.length})</h3>

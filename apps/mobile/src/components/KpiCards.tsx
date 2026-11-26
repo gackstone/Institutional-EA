@@ -221,7 +221,13 @@ export const KpiCards = memo(function KpiCards({
         <View style={styles.stripItem}>
           <Text style={[styles.stripLabel, { color: tokens.textDim }]}>Margin Level</Text>
           <Text style={[styles.stripValue, { color: tokens.text }]}>
-            {account && account.marginLevel > 0 ? formatPercent(account.marginLevel, 0) : "—"}
+            {account
+              ? account.marginLevel > 0
+                ? formatPercent(account.marginLevel, 0)
+                : account.margin === 0 && account.openPositionsCount === 0
+                ? "n/a"
+                : "—"
+              : "—"}
           </Text>
         </View>
         <View style={[styles.stripDivider, { backgroundColor: tokens.borderSubtle }]} />

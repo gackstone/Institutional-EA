@@ -33,8 +33,8 @@ from urllib.parse import parse_qs, urlparse
 
 from companion.service.market.drawings_engine import canonical_symbol
 
-MOBILE_SYNC_SCHEMA_VERSION = "1.0.0"
-APP_VERSION = "1.3.5"
+MOBILE_SYNC_SCHEMA_VERSION = "1.1.0"
+APP_VERSION = "1.3.7"
 DEFAULT_MOBILE_PORT = 8766
 PAIRING_CODE_TTL_SEC = 300
 PAIR_RATE_LIMIT_MAX_ATTEMPTS = 5
@@ -499,35 +499,52 @@ class MobileSyncManager:
     def build_stats_payload(self) -> Dict[str, Any]:
         snap = self.ctx.mt5_sync.get_snapshot()
         acc = snap.get("account") or {}
+        positions = snap.get("positions") or []
         currency = str(acc.get("currency") or "USD")
+        balance = float(acc.get("balance", 0.0) or 0.0)
+        equity = float(acc.get("equity", 0.0) or 0.0)
+        floating_pnl = round(equity - balance, 2) if (balance or equity) else round(
+            sum(float(p.get("profit", 0.0) or 0.0) for p in positions), 2
+        )
+
         trades = self.ctx.repo.get_trade_records(limit=2000) or []
-        closed = [t for t in trades if str(t.get("status", "")).upper() != "OPEN"]
+        closed = [
+            t for t in trades
+            if str(t.get("status", "")).upper() == "CLOSED" or bool(t.get("closed_at"))
+        ]
         today_prefix = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-        total_profit = 0.0
-        today_pnl = 0.0
+        realized_total_profit = 0.0
+        today_realized_pnl = 0.0
         wins = 0
         losses = 0
-        trades_today = 0
+        today_closed_count = 0
 
         for t in closed:
             pnl = float(t.get("pnl", t.get("profit", 0.0)) or 0.0)
-            total_profit += pnl
+            realized_total_profit += pnl
             if pnl > 0:
                 wins += 1
             elif pnl < 0:
                 losses += 1
-            ts_str = str(t.get("closed_at") or t.get("opened_at") or "")
+            ts_str = str(t.get("closed_at") or "")
             if ts_str.startswith(today_prefix):
-                today_pnl += pnl
-                trades_today += 1
+                today_realized_pnl += pnl
+                today_closed_count += 1
 
         deals_count = len(closed)
+        open_positions_count = len(positions)
+        trades_today = today_closed_count + open_positions_count
+        today_pnl = round(today_realized_pnl + floating_pnl, 2)
+        total_profit = round(realized_total_profit, 2) if deals_count > 0 else today_pnl
         decided = wins + losses
         win_rate = round((wins / decided) * 100.0, 2) if decided > 0 else 0.0
         return {
-            "todayPnl": round(today_pnl, 2),
-            "totalProfit": round(total_profit, 2),
+            "todayPnl": today_pnl,
+            "todayRealizedPnl": round(today_realized_pnl, 2),
+            "todayClosedCount": today_closed_count,
+            "openPositionsCount": open_positions_count,
+            "totalProfit": total_profit,
             "winRate": win_rate,
             "dealsCount": deals_count,
             "tradesToday": trades_today,
@@ -594,7 +611,10 @@ class MobileSyncManager:
         from_ts = _parse_iso_ts(from_iso)
         to_ts = _parse_iso_ts(to_iso)
 
-        raw_trades = self.ctx.repo.get_trade_records(limit=2000) or []
+        raw_trades = [
+            t for t in (self.ctx.repo.get_trade_records(limit=2000) or [])
+            if str(t.get("status", "")).upper() == "CLOSED" or bool(t.get("closed_at"))
+        ]
         normalized: List[Dict[str, Any]] = []
         for t in raw_trades:
             sym = str(t.get("symbol") or "")
@@ -876,6 +896,164 @@ class MobileSyncManager:
             },
         }
 
+    def build_cloud_bundle(
+        self,
+        include_candles: bool = True,
+        include_drawings: bool = True,
+        candles_limit: int = 80,
+    ) -> Dict[str, Any]:
+        """
+        Builds the complete v1.1.0 cloud telemetry bundle from authoritative local sources:
+        status, account, stats, positions, closed trades, signals, symbols, candlesByKey,
+        drawingsByKey, equityPoints, and meta.
+        """
+        now_iso = _utc_now_iso()
+        status_payload = self.build_status_payload()
+        account_payload = self.build_account_payload()
+        stats_payload = self.build_stats_payload()
+        positions_payload = self.build_positions_payload()["positions"]
+        symbols_payload = self.build_symbols_payload()["symbols"]
+
+        # Closed trades only (up to 150 most recent)
+        trades_page = self.build_trades_payload({"page": ["1"], "limit": ["150"]})
+        closed_trades = trades_page.get("items") or []
+
+        # Signals (up to 40)
+        try:
+            signals = (self.ctx.repo.get_signals(limit=40) or [])[:40]
+        except Exception:
+            signals = []
+
+        # Equity snapshots (up to 200 points across ALL history so 1D/1W/1M/ALL work on client)
+        equity_res = self.build_equity_payload({"range": ["ALL"]})
+        all_eq_points = equity_res.get("points") or []
+        if len(all_eq_points) > 200:
+            step = max(1, len(all_eq_points) // 200)
+            sampled_eq = all_eq_points[::step]
+            if sampled_eq[-1]["time"] != all_eq_points[-1]["time"]:
+                sampled_eq.append(all_eq_points[-1])
+            equity_points = sampled_eq[-200:]
+        else:
+            equity_points = all_eq_points
+
+        candles_by_key: Dict[str, Any] = {}
+        drawings_by_key: Dict[str, Any] = {}
+
+        if include_candles or include_drawings:
+            target_symbols = [s["symbol"] for s in symbols_payload] or ["XAUUSD", "USDJPY", "BTCUSD"]
+            for sym in target_symbols:
+                for tf in SUPPORTED_TIMEFRAMES:
+                    key = f"{sym}:{tf}"
+                    tf_limit = candles_limit if tf in ("M5", "M15") else min(60, candles_limit)
+                    if include_candles:
+                        try:
+                            c_payload = self.build_candles_payload(
+                                {"symbol": [sym], "tf": [tf], "limit": [str(tf_limit)]}
+                            )
+                            if c_payload.get("candles"):
+                                candles_by_key[key] = c_payload
+                        except Exception:
+                            pass
+                    if include_drawings:
+                        try:
+                            d_payload = self.build_drawings_payload(
+                                {"symbol": [sym], "tf": [tf], "count": [str(tf_limit)]}
+                            )
+                            if d_payload.get("items") or d_payload.get("drawings"):
+                                drawings_by_key[key] = d_payload
+                        except Exception:
+                            pass
+
+        return {
+            "meta": {
+                "schemaVersion": MOBILE_SYNC_SCHEMA_VERSION,
+                "minClientSchemaVersion": "1.0.0",
+                "supportedVersions": ["1.0.0", "1.1.0"],
+                "producerVersion": APP_VERSION,
+                "generatedAt": now_iso,
+                "timezoneRule": "UTC_00_00",
+                "brokerUtcOffsetHours": int(getattr(self.ctx.mt5_sync, "broker_utc_offset_seconds", 0) // 3600),
+            },
+            "status": status_payload,
+            "account": account_payload,
+            "stats": stats_payload,
+            "positions": positions_payload,
+            "trades": closed_trades,
+            "signals": signals,
+            "symbols": symbols_payload,
+            "candlesByKey": candles_by_key,
+            "drawingsByKey": drawings_by_key,
+            "equityPoints": equity_points,
+        }
+
+    def get_sync_health(self) -> Dict[str, Any]:
+        """Returns read-only sync diagnostics per stream for /api/sync/health."""
+        snap = self.ctx.mt5_sync.get_snapshot()
+        mt5_connected = snap.get("connection_status") == "CONNECTED"
+        last_sync_at = snap.get("last_sync_at")
+        now_ts = time.time()
+        sync_ts = _parse_iso_ts(last_sync_at)
+        lag_sec = round(max(0.0, now_ts - sync_ts), 2) if sync_ts else None
+
+        trades = self.ctx.repo.get_trade_records(limit=2000) or []
+        closed_count = len([t for t in trades if str(t.get("status", "")).upper() == "CLOSED" or bool(t.get("closed_at"))])
+        eq_snaps = self.ctx.repo.get_balance_snapshots(limit=500) or []
+        positions = snap.get("positions") or []
+        symbols = snap.get("symbols") or {}
+        unprotected_tickets = [
+            int(p.get("ticket", 0))
+            for p in positions
+            if float(p.get("sl") or p.get("stop_loss") or 0.0) <= 0.0
+        ]
+
+        return {
+            "ok": True,
+            "schemaVersion": MOBILE_SYNC_SCHEMA_VERSION,
+            "producerVersion": APP_VERSION,
+            "checkedAt": _utc_now_iso(),
+            "mt5Connected": mt5_connected,
+            "lastSyncAt": last_sync_at,
+            "lagSeconds": lag_sec,
+            "lanServerEnabled": self.enabled,
+            "pairedLanDevicesCount": len(self.store.list_devices()),
+            "safetyFindings": {
+                "unprotectedOpenPositionsCount": len(unprotected_tickets),
+                "unprotectedTickets": unprotected_tickets,
+            },
+            "streams": {
+                "account": {
+                    "lastPublishTime": last_sync_at,
+                    "rowsPublished": 1 if mt5_connected else 0,
+                    "lastError": snap.get("last_error"),
+                    "lagSeconds": lag_sec,
+                },
+                "positions": {
+                    "lastPublishTime": last_sync_at,
+                    "rowsPublished": len(positions),
+                    "lastError": None,
+                    "lagSeconds": lag_sec,
+                },
+                "trades": {
+                    "lastPublishTime": last_sync_at,
+                    "rowsPublished": closed_count,
+                    "lastError": None,
+                    "lagSeconds": lag_sec,
+                },
+                "symbols_candles": {
+                    "lastPublishTime": last_sync_at,
+                    "rowsPublished": len(symbols),
+                    "lastError": None,
+                    "lagSeconds": lag_sec,
+                },
+                "equity_snapshots": {
+                    "lastPublishTime": eq_snaps[-1].get("created_at") if eq_snaps else last_sync_at,
+                    "rowsPublished": len(eq_snaps),
+                    "lastError": None,
+                    "lagSeconds": lag_sec,
+                },
+            },
+        }
+
     # --- HTTP Request Handler (Strictly Read-Only) ---
 
     def _build_handler(self):
@@ -1020,6 +1198,19 @@ class MobileSyncManager:
                     self._send_json(200, manager.build_equity_payload(query))
                 elif path == "/api/mobile/v1/activity":
                     self._send_json(200, manager.build_activity_payload(query))
+                elif path in ("/api/mobile/v1/meta", "/meta"):
+                    self._send_json(
+                        200,
+                        {
+                            "schemaVersion": MOBILE_SYNC_SCHEMA_VERSION,
+                            "minClientSchemaVersion": "1.0.0",
+                            "supportedVersions": ["1.0.0", "1.1.0"],
+                            "producerVersion": APP_VERSION,
+                            "generatedAt": _utc_now_iso(),
+                            "timezoneRule": "UTC_00_00",
+                            "readOnlyEnforced": True,
+                        },
+                    )
                 elif path == "/api/mobile/v1/events":
                     self._stream_sse(device["deviceId"])
                 else:

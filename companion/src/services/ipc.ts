@@ -733,8 +733,17 @@ export const controlClient = {
   testTelegram: (sendMessage = true) =>
     callControl<{ success: boolean; message: string }>("POST", "/api/telegram/test", { send_message: sendMessage }),
 
-  // Opt-In Read-Only Mobile Sync (LAN Pairing & Device Management)
+  // Opt-In Read-Only Mobile Sync (LAN Pairing & Device Management + Cloud Bundle & Sync Health)
   getMobileSyncStatus: () => callControl<any>("GET", "/api/mobile-sync/status"),
+  getMobileCloudBundle: (opts?: { candles?: boolean; drawings?: boolean; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (opts?.candles === false) qs.set("candles", "0");
+    if (opts?.drawings === false) qs.set("drawings", "0");
+    if (opts?.limit) qs.set("limit", String(opts.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return callControl<any>("GET", `/api/mobile-sync/cloud-bundle${suffix}`);
+  },
+  getSyncHealth: () => callControl<any>("GET", "/api/sync/health"),
   enableMobileSync: (port?: number) =>
     callControl<any>("POST", "/api/mobile-sync/enable", port ? { port } : {}),
   disableMobileSync: () => callControl<any>("POST", "/api/mobile-sync/disable", {}),

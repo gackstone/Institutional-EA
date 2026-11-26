@@ -9,6 +9,7 @@ export type ConnectionState =
   | "LIVE"
   | "RECONNECTING"
   | "STALE"
+  | "UPDATE_NEEDED"
   | "COMPANION_OFFLINE"
   | "MT5_DISCONNECTED"
   | "BOT_PAUSED"
@@ -63,11 +64,17 @@ export function ConnectionBanner({
     },
     STALE: {
       label: timeLabel
-        ? `Data stale · Last updated ${timeLabel}`
-        : "Data stale · Waiting for heartbeat",
+        ? `Data delayed · Companion last updated ${timeLabel}`
+        : "Data delayed · Waiting for companion snapshot",
       bg: tokens.warningBg,
       color: tokens.warning,
       showRetry: true,
+    },
+    UPDATE_NEEDED: {
+      label: "Sync schema update required — update Companion or Android app",
+      bg: tokens.warningBg,
+      color: tokens.warning,
+      showRetry: false,
     },
     COMPANION_OFFLINE: {
       label: timeLabel
