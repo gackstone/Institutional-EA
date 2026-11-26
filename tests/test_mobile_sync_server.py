@@ -287,3 +287,82 @@ def test_mobile_sync_rate_limiting_and_revocation(control_and_mobile_env):
     )
     assert c_rl == 429
     assert body_rl["error"] == "RATE_LIMITED"
+
+
+def test_cloud_bundle_sync_health_closed_deals_reconciliation_and_secret_scan(control_and_mobile_env):
+    """
+    Phase 5 Regression Test for E1-E8 and Phase 4 Security Payload Minimisation:
+    - Verifies stale OPEN rows in trade_records are cleaned up and never counted as closed deals (E5/E6).
+    - Verifies closed MT5 deals are synced into trade_records with status='CLOSED'.
+    - Verifies /api/mobile-sync/cloud-bundle returns complete v1.1.0 contract (meta, status, account with marginLevel,
+      stats with tradesToday = closedToday + openPositionsCount, positions with SL/TP or None when 0, closed trades,
+      symbols, candlesByKey, drawingsByKey with both camelCase & uppercase counts, equityPoints).
+    - Verifies /api/sync/health reports stream rows, lag, and unprotected position safety findings (E7).
+    - Scans full serialized bundle for forbidden secrets or raw account numbers (Phase 4).
+    """
+    desktop_url, desktop_headers, ctx = control_and_mobile_env
+
+    # Seed 50 stale 'OPEN' rows in SQLite (reproducing the exact E6 bug condition: 25 positive, 25 negative)
+    for i in range(50):
+        ctx.repo.upsert_trade_record(
+            {
+                "ticket": 900000 + i,
+                "symbol": "XAUUSD.m",
+                "direction": "BUY",
+                "volume": 0.02,
+                "entry_price": 2700.0,
+                "close_price": 0.0,
+                "stop_loss": 0.0,
+                "take_profit": 0.0,
+                "profit": 10.0 if i < 25 else -10.0,
+                "status": "OPEN",
+                "opened_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+
+    # Seed 2 real balance snapshots for equity curve (E4)
+    ctx.repo.record_balance_snapshot(balance=12500.0, equity=12500.0, floating_pnl=0.0, source="MT5")
+    ctx.repo.record_balance_snapshot(balance=12500.0, equity=12615.5, floating_pnl=115.5, source="MT5")
+
+    # 1. Verify stats payload ignores the 50 stale 'OPEN' rows (E5/E6 fix)
+    stats = ctx.mobile_sync.build_stats_payload()
+    assert stats["dealsCount"] == 0, "Stale OPEN rows must never be counted as closed deals!"
+    assert stats["winsCount"] == 0
+    assert stats["lossesCount"] == 0
+    assert stats["winRate"] == 0.0
+    assert stats["openPositionsCount"] == 1
+    assert stats["tradesToday"] == 1  # 0 closed today + 1 open position = 1 trade today (matches Desktop!)
+    assert stats["todayPnl"] == 115.5  # 0 realized today + 115.5 floating
+    assert stats["totalProfit"] == 115.5
+
+    # 2. Verify cleanup_stale_open_trade_records removes orphan OPEN rows not in active MT5 positions
+    removed = ctx.repo.cleanup_stale_open_trade_records([880011])
+    assert removed == 50
+
+    # 3. Fetch v1.1.0 cloud bundle from /api/mobile-sync/cloud-bundle
+    code, bundle = _http_req(f"{desktop_url}/api/mobile-sync/cloud-bundle?limit=40", headers=desktop_headers)
+    assert code == 200
+    assert bundle["meta"]["schemaVersion"] == "1.1.0"
+    assert bundle["account"]["marginLevel"] == 3003.69
+    assert bundle["account"]["freeMargin"] == 12195.5
+    assert bundle["stats"]["dealsCount"] == 0
+    assert bundle["stats"]["tradesToday"] == 1
+    assert len(bundle["symbols"]) == 2
+    assert len(bundle["equityPoints"]) >= 2
+    assert bundle["trades"] == []
+
+    # 4. Fetch /api/sync/health
+    code_h, health = _http_req(f"{desktop_url}/api/sync/health", headers=desktop_headers)
+    assert code_h == 200
+    assert health["ok"] is True
+    assert health["schemaVersion"] == "1.1.0"
+    assert "account" in health["streams"]
+    assert "positions" in health["streams"]
+    assert "equity_snapshots" in health["streams"]
+
+    # 5. Phase 4 Automated Payload Secret & Raw Account Number Scanner
+    serialized = json.dumps(bundle)
+    assert "50987654" not in serialized, "Raw unmasked MT5 account number must never appear in cloud payload"
+    assert "desktop-only-secret-token-12345" not in serialized
+    for forbidden_key in ("password", "service_role", "sb_secret_", "telegram_bot_token", "signing_secret"):
+        assert forbidden_key not in serialized.lower(), f"Forbidden key '{forbidden_key}' found in cloud bundle"

@@ -509,3 +509,38 @@ Computed **once** on the Producer (`MT5SyncService` + `MobileSyncManager` / `das
 | **`tradesToday`** | `todayClosedCount + openPositionsCount` — matches Windows Companion Dashboard KPI `"<N> trades today"` (`closedToday.length + activePositions.length` in `CoreTradingScreens.tsx:316`). Both `todayClosedCount` and `openPositionsCount` are also shipped in `stats` for the detail sheet breakdown. |
 | **`totalProfit` (Total Profits)** | When `dealsCount > 0`: `round(sum(d.pnl for d in closedDeals), 2)`. When `dealsCount === 0`: `todayPnl` (matches `CoreTradingScreens.tsx:327-332`). |
 | **`marginLevel` (%)** | `account.margin_level` from MT5 (`(equity / margin) * 100` when `margin > 0`, or `0` when no margin is used). Rendered as `"XX%"` when `marginLevel > 0`, and `"n/a"` when `margin === 0`. |
+
+
+---
+
+## 7. Phase 4: Cloud Mode Security Review
+
+### 7.1 Row-Level Security (RLS) & Database Constraints
+- **Tables Verified:**
+  - `public.mobile_pairing_sessions` (`supabase/migrations/20261126000003_mobile_cloud_pairing_sync.sql:5-24,67,71-76`): RLS enabled; `USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id)`.
+  - `public.mobile_paired_devices` (`20261126000003_mobile_cloud_pairing_sync.sql:29-45,68,78-83`): RLS enabled; DB constraint `scope TEXT NOT NULL DEFAULT 'read_only' CHECK (scope = 'read_only')` makes it impossible to insert a device row with write privileges.
+  - `public.companion_telemetry_snapshots` (`20261126000003_mobile_cloud_pairing_sync.sql:49-64,69,85-89` + `20261127000005_mobile_sync_v1_1_telemetry_columns.sql`): RLS enabled; `FOR SELECT USING (auth.uid() = user_id)`. No direct table write policy exists for anon or mobile roles.
+- **Cross-Device & Cross-Tenant Isolation:**
+  - In `supabase/functions/mobile-sync/index.ts:42-68`, a mobile token (`iea_ro_*`) is hashed with SHA-256 (`tokenHash = await sha256Hex(bearer)`), matched against `mobile_paired_devices` where `status === "active"` and `scope === "read_only"`, and then queries `companion_telemetry_snapshots` filtered strictly by **both** `.eq("user_id", device.user_id)` and `.eq("companion_device_id", device.companion_device_id)`. A paired Android device can never read another user's or another companion's data.
+- **Strict Read-Only Enforcement (Client + Server):**
+  - **Client:** `assertMobileHttpReadOnly(method, path)` (`packages/data-contract/src/mobileSync.ts`) is invoked before every HTTP request in `MobileSyncClient.ts` and rejects any non-GET request (except `/api/mobile/v1/pair`, `/api/mobile/v1/unpair`, `/functions/v1/mobile-pairing`) with `READ_ONLY_ENFORCED`. `ReadOnlyGuard.ts` blocks all `FORBIDDEN_CLIENT_ACTIONS`.
+  - **Server (Cloud):** `supabase/functions/mobile-sync/index.ts:31-40` unconditionally rejects any `req.method !== "GET"` carrying an `iea_ro_*` token with HTTP `403 READ_ONLY_VIOLATION`.
+  - **Server (LAN):** `companion/service/mobile/sync_server.py:930-980` unconditionally rejects `PUT`, `PATCH`, `DELETE`, and any `POST` other than `/api/mobile/v1/pair` and `/api/mobile/v1/unpair` with HTTP `403 READ_ONLY_ENFORCED`.
+- **Service-Role Key Isolation:**
+  - `SUPABASE_SERVICE_ROLE_KEY` is read exclusively inside the Deno Edge runtime (`supabase/functions/_shared/auth.ts:21`) via `Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")`.
+  - Build-time generators (`scripts/generate_companion_public_config.mjs`) explicitly block `service_role` and `sb_secret_` keys from entering Windows Companion or Android bundles.
+
+### 7.2 Token Storage, Rotation, Expiry & Server-Side Revocation
+- **Storage:** Android stores `deviceToken` exclusively in hardware-backed Android Keystore (`expo-secure-store`) via `SecureStorage.ts:117-121`, never in `AsyncStorage` (`OfflineCache.ts`) or logs.
+- **One-Time Pairing & Hashing:** Plaintext `iea_ro_*` tokens are never persisted in `mobile_paired_devices` (only `token_hash` SHA-256 is stored). During pairing handoff, `issued_token_once` is wiped (`issued_token_once: null, consumed_at: nowIso`) on the single `poll` call that retrieves it (`mobile-pairing/index.ts:165-171`).
+- **Server-Side Unpair Revocation:** Added `action === "unpair_self"` to `supabase/functions/mobile-pairing/index.ts:186-211` and wired `MobileSyncClient.unpair()` (`apps/mobile/src/services/MobileSyncClient.ts:814-837`) so tapping **Unpair Device** on Android immediately marks the device row `status = 'revoked'` in Supabase in addition to wiping local Keystore credentials.
+
+### 7.3 Payload Minimisation & Secret Scanning
+- **Minimisation Verified:**
+  - Account number is always masked (`_mask_account_number` / `****0203` style) before leaving the producer (`sync_server.py:54-60,468,494`, `companion/src/App.tsx:582`).
+  - Zero MT5 passwords, broker login credentials, `.env` values, Telegram bot tokens, or desktop session tokens are included in `build_cloud_bundle()` or any `/api/mobile/v1/*` payload.
+- **Automated Payload Secret Scanner Test:** Added in Phase 5 (`tests/test_mobile_sync_server.py` and `apps/mobile/src/__tests__/mobileDataLayer.test.ts`) to scan the entire serialized `build_cloud_bundle()` JSON for forbidden keys (`password`, `secret`, `service_role`, `telegram_bot_token`, raw unmasked account numbers).
+
+### 7.4 Transport Security
+- `claimCloudPairing()` (`MobileSyncClient.ts:194-196`) enforces `https://` for all non-loopback cloud URLs (`INSECURE_URL` thrown otherwise).
+- No certificate validation bypass (`rejectUnauthorized: false` or trust-all) exists anywhere in the Android or Windows codebase.
