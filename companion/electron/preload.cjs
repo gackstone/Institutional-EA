@@ -102,6 +102,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   cloudSignInPassword: (email, password) => ipcRenderer.invoke("cloud-sign-in-password", email, password),
   cloudSignUp: (fullName, email, password) => ipcRenderer.invoke("cloud-sign-up", fullName, email, password),
   cloudSignOut: () => ipcRenderer.invoke("cloud-sign-out"),
+  cloudRecoverPassword: (email) => ipcRenderer.invoke("cloud-recover-password", email),
+  cloudResendVerification: (email) => ipcRenderer.invoke("cloud-resend-verification", email),
   cloudRefresh: () => ipcRenderer.invoke("cloud-refresh"),
   cloudGetPayments: () => ipcRenderer.invoke("cloud-get-payments"),
   cloudSubmitPayment: (payload) => ipcRenderer.invoke("cloud-submit-payment", payload),

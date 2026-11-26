@@ -4,9 +4,22 @@ import { Link, useRouter } from "../lib/router";
 import { useAuth } from "../context/AuthContext";
 
 export const SiteHeader: React.FC = () => {
-  const { pathname } = useRouter();
+  const { pathname, navigate } = useRouter();
   const { session, profile, isAdmin, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+      setMobileOpen(false);
+      navigate("/");
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
   const navItems = [
     { label: "Home", to: "/" },
@@ -79,10 +92,11 @@ export const SiteHeader: React.FC = () => {
               </Link>
               <button
                 type="button"
-                onClick={() => signOut()}
-                className="rounded-lg px-3 py-2 text-xs font-medium text-[#9CA3AF] transition hover:text-white"
+                disabled={signingOut}
+                onClick={handleSignOut}
+                className="rounded-lg px-3 py-2 text-xs font-medium text-[#9CA3AF] transition hover:text-white disabled:opacity-50"
               >
-                Sign Out
+                {signingOut ? "Signing Out..." : "Sign Out"}
               </button>
             </>
           ) : (
@@ -149,13 +163,11 @@ export const SiteHeader: React.FC = () => {
                 )}
                 <button
                   type="button"
-                  onClick={() => {
-                    setMobileOpen(false);
-                    signOut();
-                  }}
-                  className="rounded-lg px-3 py-2 text-left text-sm font-medium text-red-400 hover:bg-red-500/10"
+                  disabled={signingOut}
+                  onClick={handleSignOut}
+                  className="rounded-lg px-3 py-2 text-left text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
                 >
-                  Sign Out
+                  {signingOut ? "Signing Out..." : "Sign Out"}
                 </button>
               </>
             ) : (

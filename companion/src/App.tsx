@@ -26,7 +26,11 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { AccountSubscriptionScreen } from "./components/screens/AccountSubscriptionScreen";
+import {
+  AccountSubscriptionScreen,
+  type CompanionCloudState,
+} from "./components/screens/AccountSubscriptionScreen";
+import { DesktopPublicEntry } from "./components/DesktopPublicEntry";
 import { DashboardScreen } from "./components/screens/CoreTradingScreens";
 import {
   PositionsScreen,
@@ -280,6 +284,15 @@ export const App: React.FC = () => {
   const [isPairingOpen, setIsPairingOpen] = useState<boolean>(false);
   const [isTelegramOpen, setIsTelegramOpen] = useState<boolean>(false);
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState<boolean>(false);
+
+  // Authoritative Cloud Authentication & Subscription State (Electron Main Process + Windows DPAPI)
+  const [cloudState, setCloudState] = useState<CompanionCloudState | null>(null);
+  const [cloudAuthReady, setCloudAuthReady] = useState<boolean>(false);
+  const [signingOut, setSigningOut] = useState<boolean>(false);
+  const [publicNotice, setPublicNotice] = useState<{ message: string; isError?: boolean } | null>(
+    null
+  );
+  const wasAuthenticatedRef = useRef<boolean>(false);
 
   const handleActionMessage = useCallback((message: string, isError = false) => {
     setActionToast((prev) => {
@@ -651,22 +664,126 @@ export const App: React.FC = () => {
     [setActiveScreen, isSidebarTouchPinned]
   );
 
-  const handleSignOutClick = useCallback(async () => {
-    if (pairing.isPaired) {
-      const res = await IPC.disconnectPairing().catch(() => ({
-        success: false,
-        message: "Unable to disconnect cloud pairing",
-      }));
-      if (res.success) {
-        setPairing((p) => ({ ...p, isPaired: false, instanceId: null, deviceTokenMasked: null }));
-        handleActionMessage("Signed out of Institutional EA Cloud pairing.", false);
-      } else {
-        handleActionMessage(res.message || "Sign out failed", true);
-      }
-    } else {
-      setIsPairingOpen(true);
+  // Hydrate encrypted cloud session on startup & listen for main-process auth transitions
+  useEffect(() => {
+    let cancelled = false;
+    const eApi = (window as any).electronAPI;
+
+    if (!isElectron || !eApi?.cloudGetState) {
+      setCloudAuthReady(true);
+      return;
     }
-  }, [pairing.isPaired, handleActionMessage]);
+
+    const applyCloudState = (next: CompanionCloudState | null) => {
+      if (cancelled) return;
+      const nowAuth = Boolean(next?.authenticated);
+      const prevAuth = wasAuthenticatedRef.current;
+      wasAuthenticatedRef.current = nowAuth;
+      setCloudState(next);
+
+      // Route based on subscription status when transitioning unauthenticated -> authenticated
+      if (!prevAuth && nowAuth && next) {
+        setPublicNotice(null);
+        if (next.entitlement?.isActive) {
+          setActiveScreenState("dashboard");
+        } else {
+          setActiveScreenState("account");
+          handleActionMessage(
+            next.entitlement?.reason ||
+              "Activate or renew Institutional EA Pro ($50/mo) to unlock full access.",
+            false
+          );
+        }
+      }
+    };
+
+    (async () => {
+      try {
+        const initial: CompanionCloudState = await eApi.cloudGetState();
+        applyCloudState(initial);
+        if (!cancelled) setCloudAuthReady(true);
+
+        if (initial?.authenticated && eApi.cloudRefresh) {
+          const refreshed = await eApi.cloudRefresh().catch(() => null);
+          if (refreshed?.state) {
+            applyCloudState(refreshed.state);
+          }
+        }
+      } catch {
+        if (!cancelled) setCloudAuthReady(true);
+      }
+    })();
+
+    const unsub = eApi.onCloudStateChanged?.((next: CompanionCloudState) => {
+      applyCloudState(next);
+    });
+
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
+  }, [isElectron, handleActionMessage]);
+
+  const handleSignOutClick = useCallback(async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const eApi = (window as any).electronAPI;
+
+      // Best-effort disconnect legacy pairing if paired (never blocks cloud sign-out)
+      if (pairing.isPaired) {
+        await IPC.disconnectPairing().catch(() => {});
+        setPairing((p) => ({ ...p, isPaired: false, instanceId: null, deviceTokenMasked: null }));
+      }
+
+      if (eApi?.cloudSignOut) {
+        const res = await eApi.cloudSignOut().catch((err: unknown) => ({
+          ok: false,
+          remoteRevoked: false,
+          warning: err instanceof Error ? err.message : "Remote session revocation could not be confirmed.",
+          state: null,
+        }));
+
+        wasAuthenticatedRef.current = false;
+        setCloudState(
+          res?.state || {
+            configured: cloudState?.configured ?? true,
+            webPortalUrl: cloudState?.webPortalUrl ?? "http://localhost:5173",
+            authenticated: false,
+            user: null,
+            profile: null,
+            subscription: null,
+            entitlement: {
+              status: "no_subscription",
+              isActive: false,
+              isGraceActive: false,
+              requiresSubscriptionAction: true,
+              expiresAtUtc: null,
+              daysRemaining: null,
+              connectivity: "offline",
+              reason: "Signed out.",
+            },
+            connectivity: "online",
+            lastVerifiedAtUtc: null,
+            deviceName: cloudState?.deviceName ?? "Windows PC",
+            deviceFingerprintShort: cloudState?.deviceFingerprintShort ?? "",
+          }
+        );
+        setActiveScreenState("dashboard");
+        setActionToast(null);
+        setPublicNotice({
+          message:
+            res?.warning ||
+            "You have been signed out securely. Encrypted credentials have been cleared.",
+          isError: Boolean(res?.warning),
+        });
+      } else {
+        setIsPairingOpen(true);
+      }
+    } finally {
+      setSigningOut(false);
+    }
+  }, [signingOut, pairing.isPaired, cloudState]);
 
   const renderBadgePill = (badge?: number, tone: "mint" | "peach" = "mint") => {
     if (badge === undefined) return null;
@@ -730,6 +847,57 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {/* Unauthenticated Desktop Entry Gate: Public Landing, Pricing, Sign In & Sign Up */}
+      {isElectron && !cloudAuthReady && (
+        <div
+          style={{ paddingTop: `${titlebarHeightPx}px` }}
+          className="flex-1 flex items-center justify-center bg-[#0A0A0C] text-xs font-mono text-iea-textSecondary"
+        >
+          Verifying Institutional EA secure session...
+        </div>
+      )}
+
+      {isElectron && cloudAuthReady && !cloudState?.authenticated && (
+        <div
+          style={{ paddingTop: `${titlebarHeightPx}px` }}
+          className="iea-no-drag flex-1 min-h-0 flex flex-col w-full h-screen overflow-hidden"
+        >
+          <DesktopPublicEntry
+            cloudState={cloudState}
+            initialView="landing"
+            notice={publicNotice}
+            onDismissNotice={() => setPublicNotice(null)}
+            onAuthenticated={(nextState) => {
+              wasAuthenticatedRef.current = Boolean(nextState?.authenticated);
+              setCloudState(nextState);
+              setPublicNotice(null);
+              if (nextState.entitlement?.isActive) {
+                setActiveScreenState("dashboard");
+              } else {
+                setActiveScreenState("account");
+              }
+            }}
+            openPositionsCount={openPosCount}
+            engineRunning={effectiveStatus.engine.state === "RUNNING"}
+            onEmergencyPause={async () => {
+              await controlClient.pauseEntries().catch(() => {});
+              await refreshStatus();
+            }}
+            onEmergencyStop={async () => {
+              await controlClient.stopEngine().catch(() => {});
+              await refreshStatus();
+            }}
+            onEmergencyCloseAll={async () => {
+              await controlClient.closeAllBotPositions(true).catch(() => {});
+              await refreshStatus();
+            }}
+          />
+        </div>
+      )}
+
+      {/* Authenticated Companion Shell */}
+      {(!isElectron || (cloudAuthReady && Boolean(cloudState?.authenticated))) && (
+      <>
       {/* =====================================================================
           BM FOREX HUB DOCKED FULL-HEIGHT OVERLAY SIDEBAR
           Collapsed: ~72px icon rail | Expanded: ~256px overlay with labels
@@ -1085,17 +1253,15 @@ export const App: React.FC = () => {
             );
           })()}
 
-          {/* Sign Out / Cloud Pairing Action */}
+          {/* Sign Out Action */}
           <button
             type="button"
+            disabled={signingOut}
             onClick={handleSignOutClick}
-            aria-label="Sign out or manage cloud pairing"
-            title={
-              pairing.isPaired
-                ? `Sign out from Institutional EA Cloud (${pairing.instanceId || "Paired"})`
-                : "Sign Out / Cloud Pairing"
-            }
-            className={`group relative w-full flex items-center rounded-[11px] transition-all duration-200 text-iea-textSecondary hover:text-iea-danger hover:bg-iea-dangerSoft/60 border border-transparent ${
+            data-testid="sidebar-sign-out-button"
+            aria-label="Sign out of Institutional EA"
+            title="Sign Out — clears encrypted credentials and returns to landing page"
+            className={`group relative w-full flex items-center rounded-[11px] transition-all duration-200 text-iea-textSecondary hover:text-iea-danger hover:bg-iea-dangerSoft/60 border border-transparent disabled:opacity-50 ${
               isSidebarExpanded ? "h-10 px-3 justify-between" : "h-10 justify-center"
             }`}
           >
@@ -1103,7 +1269,7 @@ export const App: React.FC = () => {
               <div className="flex items-center space-x-3 min-w-0">
                 <LogOut className="w-[18px] h-[18px] shrink-0 text-iea-textSecondary group-hover:text-iea-danger" />
                 <span className="iea-sidebar-label text-[13px] whitespace-nowrap truncate">
-                  Sign Out
+                  {signingOut ? "Signing Out..." : "Sign Out"}
                 </span>
               </div>
             ) : (
@@ -1321,7 +1487,15 @@ export const App: React.FC = () => {
               )}
 
               {activeScreen === "account" && (
-                <AccountSubscriptionScreen onActionMessage={handleActionMessage} />
+                <AccountSubscriptionScreen
+                  onActionMessage={handleActionMessage}
+                  externalCloudState={cloudState}
+                  onCloudStateChange={(next) => {
+                    wasAuthenticatedRef.current = Boolean(next?.authenticated);
+                    setCloudState(next);
+                  }}
+                  onSignOut={handleSignOutClick}
+                />
               )}
 
               {activeScreen === "settings" && (
@@ -1390,6 +1564,8 @@ export const App: React.FC = () => {
         isOpen={isDiagnosticsOpen}
         onClose={() => setIsDiagnosticsOpen(false)}
       />
+      </>
+      )}
     </div>
   );
 };

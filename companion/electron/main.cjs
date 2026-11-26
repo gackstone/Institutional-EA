@@ -3249,10 +3249,24 @@ ipcMain.handle("cloud-sign-up", async (_e, fullName, email, password) => {
 });
 ipcMain.handle("cloud-sign-out", async () => {
   try {
-    const state = await cloudAuthManager.signOut();
-    return { ok: true, state };
+    return await cloudAuthManager.signOut();
   } catch (err) {
-    return { ok: false, error: err?.message || "Sign out failed." };
+    const state = cloudAuthManager.getSanitizedState();
+    return { ok: false, state, remoteRevoked: false, error: err?.message || "Sign out failed." };
+  }
+});
+ipcMain.handle("cloud-recover-password", async (_e, email) => {
+  try {
+    return await cloudAuthManager.recoverPassword(email);
+  } catch (err) {
+    return { ok: false, error: err?.message || "Failed to send password reset email." };
+  }
+});
+ipcMain.handle("cloud-resend-verification", async (_e, email) => {
+  try {
+    return await cloudAuthManager.resendVerification(email);
+  } catch (err) {
+    return { ok: false, error: err?.message || "Failed to resend verification email." };
   }
 });
 ipcMain.handle("cloud-refresh", async () => {

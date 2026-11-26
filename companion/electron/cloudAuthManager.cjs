@@ -62,6 +62,18 @@ function createCloudAuthManager(options) {
 
   let activeLoopbackServer = null;
   let memoryStore = null; // { session, profile, subscription, lastVerifiedAtUtc, connectivity }
+  let signOutInFlight = null;
+
+  function emitStateChanged(sanitized) {
+    try {
+      const win = getMainWindow();
+      if (win && !win.isDestroyed() && win.webContents) {
+        win.webContents.send("cloud-state-changed", sanitized);
+      }
+    } catch {
+      // Ignore if window not ready
+    }
+  }
 
   function getEnvConfig() {
     const fileEnv = loadDotEnvMap([
@@ -456,7 +468,9 @@ function createCloudAuthManager(options) {
       connectivity: "online",
     };
     persistEncrypted(store);
-    return syncEntitlementAndDevice(store);
+    const state = await syncEntitlementAndDevice(store);
+    emitStateChanged(state);
+    return state;
   }
 
   async function signUp(fullName, email, password) {
@@ -489,10 +503,36 @@ function createCloudAuthManager(options) {
       };
       persistEncrypted(store);
       const state = await syncEntitlementAndDevice(store);
+      emitStateChanged(state);
       return { ok: true, needsEmailVerification: !data.user.email_confirmed_at, state };
     }
 
     return { ok: true, needsEmailVerification: true, state: getSanitizedState() };
+  }
+
+  async function recoverPassword(email) {
+    const env = getEnvConfig();
+    await supabaseFetch("/auth/v1/recover", {
+      method: "POST",
+      body: JSON.stringify({
+        email: String(email || "").trim().toLowerCase(),
+        redirect_to: `${env.webPortalUrl}/auth/callback?type=recovery`,
+      }),
+    });
+    return { ok: true };
+  }
+
+  async function resendVerification(email) {
+    const env = getEnvConfig();
+    await supabaseFetch("/auth/v1/resend", {
+      method: "POST",
+      body: JSON.stringify({
+        type: "signup",
+        email: String(email || "").trim().toLowerCase(),
+        options: { emailRedirectTo: `${env.webPortalUrl}/auth/callback` },
+      }),
+    });
+    return { ok: true };
   }
 
   async function signInViaSystemBrowser() {
@@ -597,23 +637,45 @@ function createCloudAuthManager(options) {
   }
 
   async function signOut() {
-    const store = loadEncrypted();
-    const token = store?.session?.access_token;
-    persistEncrypted(null);
-    if (token) {
-      try {
-        await supabaseFetch("/auth/v1/logout", { method: "POST" }, token);
-      } catch {
-        // Best-effort server logout
+    if (signOutInFlight) return signOutInFlight;
+    signOutInFlight = (async () => {
+      const store = loadEncrypted();
+      const token = store?.session?.access_token;
+
+      // Always clear local encrypted credentials & memory cache first so logout never leaves stale auth
+      persistEncrypted(null);
+
+      let remoteRevoked = true;
+      let warning = null;
+      if (token) {
+        try {
+          await supabaseFetch("/auth/v1/logout", { method: "POST" }, token);
+        } catch (err) {
+          remoteRevoked = false;
+          warning =
+            "Signed out locally and cleared encrypted credentials, but remote session revocation could not be confirmed.";
+          logEvent("cloud-signout-remote-warning", { message: err?.message });
+        }
       }
+
+      const state = getSanitizedState();
+      emitStateChanged(state);
+      return { ok: true, state, remoteRevoked, warning };
+    })();
+
+    try {
+      return await signOutInFlight;
+    } finally {
+      signOutInFlight = null;
     }
-    return getSanitizedState();
   }
 
   async function refresh() {
     const store = loadEncrypted();
     if (!store?.session?.access_token) return getSanitizedState();
-    return syncEntitlementAndDevice(store);
+    const state = await syncEntitlementAndDevice(store);
+    emitStateChanged(state);
+    return state;
   }
 
   async function getPayments() {
@@ -695,8 +757,11 @@ function createCloudAuthManager(options) {
     getDeviceFingerprintHash,
     signInWithPassword,
     signUp,
+    recoverPassword,
+    resendVerification,
     signInViaSystemBrowser,
     signOut,
+    persistEncrypted,
     refresh,
     getPayments,
     submitPayment,

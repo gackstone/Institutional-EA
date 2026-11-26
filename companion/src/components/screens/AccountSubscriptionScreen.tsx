@@ -52,6 +52,9 @@ export interface CompanionCloudState {
 
 interface AccountSubscriptionScreenProps {
   onActionMessage: (msg: string, isError?: boolean) => void;
+  externalCloudState?: CompanionCloudState | null;
+  onCloudStateChange?: (next: CompanionCloudState) => void;
+  onSignOut?: () => Promise<void>;
 }
 
 function formatUtc(iso: string | null | undefined): string {
@@ -80,10 +83,15 @@ function connectivityBadge(state: CloudConnectivityState): { label: string; cls:
 
 export const AccountSubscriptionScreen: React.FC<AccountSubscriptionScreenProps> = ({
   onActionMessage,
+  externalCloudState,
+  onCloudStateChange,
+  onSignOut,
 }) => {
   const api = (window as any).electronAPI;
 
-  const [cloudState, setCloudState] = useState<CompanionCloudState | null>(null);
+  const [cloudState, setCloudState] = useState<CompanionCloudState | null>(
+    externalCloudState ?? null
+  );
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [devices, setDevices] = useState<DeviceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -207,15 +215,35 @@ export const AccountSubscriptionScreen: React.FC<AccountSubscriptionScreenProps>
     }
   };
 
+  useEffect(() => {
+    if (externalCloudState !== undefined) {
+      setCloudState(externalCloudState);
+    }
+  }, [externalCloudState]);
+
   const handleSignOut = async () => {
+    if (onSignOut) {
+      setBusy(true);
+      try {
+        await onSignOut();
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     if (!api?.cloudSignOut) return;
     setBusy(true);
     try {
       const res = await api.cloudSignOut();
-      setCloudState(res?.state || null);
+      const next = res?.state || null;
+      setCloudState(next);
+      if (next && onCloudStateChange) onCloudStateChange(next);
       setPayments([]);
       setDevices([]);
-      onActionMessage("Signed out of Institutional EA cloud account.", false);
+      onActionMessage(
+        res?.warning || "Signed out of Institutional EA cloud account.",
+        Boolean(res?.warning)
+      );
     } finally {
       setBusy(false);
     }
