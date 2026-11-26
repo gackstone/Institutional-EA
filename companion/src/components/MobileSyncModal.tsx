@@ -63,6 +63,39 @@ interface MobileSyncModalProps {
 
 const electronCloud = () => (window as any)?.electronAPI;
 
+function formatFriendlyCloudPairingError(raw: unknown): { message: string; showLanHint: boolean } {
+  const text = raw instanceof Error ? raw.message : String(raw || "");
+  if (/requested function was not found|not_found|404/i.test(text)) {
+    return {
+      message:
+        "Cloud Pairing service is not deployed on your Supabase project yet. Deploy the mobile-pairing and mobile-sync Edge Functions, or switch to Local Wi-Fi Fallback.",
+      showLanHint: true,
+    };
+  }
+  if (/401|unauthorized|not signed in|sign in/i.test(text)) {
+    return {
+      message: "Your cloud session expired. Sign out and sign back in, or use Local Wi-Fi Fallback.",
+      showLanHint: true,
+    };
+  }
+  if (/429|rate_limited|too many/i.test(text)) {
+    return {
+      message: "Too many pairing attempts. Wait a minute and click Regenerate.",
+      showLanHint: false,
+    };
+  }
+  if (/failed to fetch|network|enotfound|etimedout|offline/i.test(text)) {
+    return {
+      message: "Cannot reach Cloud Pairing right now. Check your internet connection or use Local Wi-Fi Fallback.",
+      showLanHint: true,
+    };
+  }
+  return {
+    message: text || "Cloud pairing request failed. Try again or use Local Wi-Fi Fallback.",
+    showLanHint: true,
+  };
+}
+
 export const MobileSyncModal: React.FC<MobileSyncModalProps> = ({ isOpen, onClose }) => {
   const [tab, setTab] = useState<"cloud" | "lan">("cloud");
 
@@ -196,7 +229,7 @@ export const MobileSyncModal: React.FC<MobileSyncModalProps> = ({ isOpen, onClos
     try {
       const res = await api.cloudMobilePairing("create");
       if (!res?.ok) {
-        setCloudError(res?.error || "Unable to create cloud pairing session. Verify you are signed in.");
+        setCloudError(formatFriendlyCloudPairingError(res?.error).message);
         return;
       }
       setCloudSession({
@@ -207,7 +240,7 @@ export const MobileSyncModal: React.FC<MobileSyncModalProps> = ({ isOpen, onClos
         qrPayload: res.qrPayload,
       });
     } catch (e: unknown) {
-      setCloudError(e instanceof Error ? e.message : "Failed to start cloud pairing");
+      setCloudError(formatFriendlyCloudPairingError(e).message);
     } finally {
       setCloudBusy(false);
     }
@@ -366,9 +399,18 @@ export const MobileSyncModal: React.FC<MobileSyncModalProps> = ({ isOpen, onClos
           {tab === "cloud" ? (
             <>
               {cloudError && (
-                <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-400 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{cloudError}</span>
+                <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-400 flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{cloudError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTab("lan")}
+                    className="shrink-0 underline font-semibold text-amber-300 hover:text-amber-200"
+                  >
+                    Use Local Wi-Fi Fallback
+                  </button>
                 </div>
               )}
 

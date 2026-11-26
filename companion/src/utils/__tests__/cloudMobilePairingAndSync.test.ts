@@ -102,3 +102,16 @@ test("Build-time public Supabase config generator blocks service_role keys and D
   assert.match(authSrc, /publicConfig\.generated\.cjs/);
   assert.match(authSrc, /loadUserConfigJson/);
 });
+
+test("supabase/config.toml configures mobile-pairing and mobile-sync and MobileSyncModal maps 404/401/429 cleanly", () => {
+  const toml = fs.readFileSync(path.join(REPO_ROOT, "supabase/config.toml"), "utf-8");
+  assert.match(toml, /\[functions\.mobile-pairing\]\s+verify_jwt\s*=\s*false/);
+  assert.match(toml, /\[functions\.mobile-sync\]\s+verify_jwt\s*=\s*false/);
+
+  const modal = fs.readFileSync(
+    path.join(REPO_ROOT, "companion/src/components/MobileSyncModal.tsx"),
+    "utf-8"
+  );
+  assert.match(modal, /formatFriendlyCloudPairingError/);
+  assert.match(modal, /Use Local Wi-Fi Fallback/);
+});

@@ -42,3 +42,12 @@ verify_jwt = true
 
 [functions.device-heartbeat]
 verify_jwt = true
+
+# Android claim/poll (pairing code) and mobile-sync GET (iea_ro_* device token)
+# do not carry a Supabase user JWT; Windows Companion JWTs are verified explicitly
+# inside each Edge Function via requireAuthenticatedUser(req).
+[functions.mobile-pairing]
+verify_jwt = false
+
+[functions.mobile-sync]
+verify_jwt = false

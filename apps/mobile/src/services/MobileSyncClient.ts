@@ -141,11 +141,17 @@ export async function claimCloudPairing(params: {
 
   const body = (await resp.json().catch(() => ({}))) as Record<string, any>;
   if (!resp.ok) {
-    throw new MobileSyncError(
-      body.message || body.error || `Cloud pairing failed (${resp.status})`,
-      resp.status,
-      body.error || "CLOUD_PAIR_FAILED"
-    );
+    const rawMsg = String(body.message || body.error || "");
+    let friendly = rawMsg || `Cloud pairing failed (${resp.status})`;
+    if (resp.status === 404 || /requested function was not found/i.test(rawMsg)) {
+      friendly =
+        "Cloud Pairing is not deployed on the server yet. Deploy mobile-pairing or use Local Wi-Fi Fallback below.";
+    } else if (resp.status === 401) {
+      friendly = "Cloud pairing authentication failed. Regenerate the code on Windows or use Local Wi-Fi Fallback.";
+    } else if (resp.status === 429) {
+      friendly = "Too many pairing attempts. Wait a minute and generate a new code on Windows.";
+    }
+    throw new MobileSyncError(friendly, resp.status, body.error || "CLOUD_PAIR_FAILED");
   }
 
   return {
