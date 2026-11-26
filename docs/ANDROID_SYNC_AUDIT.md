@@ -453,3 +453,59 @@ There are **two distinct telemetry production paths** on Windows:
 | **E8** | Overview > Margin Level | `NOT_PUBLISHED` | `companion/src/App.tsx:559-567`, `KpiCards.tsx:224` | Windows `App.tsx` omits `margin`, `freeMargin`, `marginLevel`, and `leverage` when pushing `account` to cloud, so `marginLevel` is `0` on Android and renders `"—"`. |
 | **E9** | Trades > Filter Chips & Sort | `UI_STATE_BUG` | `apps/mobile/src/screens/TradesScreen.tsx:215-327` | Symbol (`ALL`), Outcome (`Losses`), Date Range (`ALL`), and Sort (`Sort: Oldest`) are all in a single unseparated horizontal row with identical active styling, making `"Losses"` and `"ALL"` (date range) look dual-selected and clipping `"Sort: Old..."`. |
 | **E10** | Header > Live / RUNNING Banner | `CLIENT_BUG` + `UI_STATE_BUG` | `apps/mobile/src/App.tsx:302,390-404`, `ConnectionBanner.tsx:34-36` | Android sets `lastSyncedMs = Date.now()` on every HTTP 200 poll instead of checking `snap.updatedAt`, so stale/empty cloud snapshots always appear `"LIVE"`. |
+
+
+---
+
+## 6. Phase 2: Sync Contract v1.1.0 Specification (Contract-First Design)
+
+### 6.1 Version Negotiation & Compatibility (`v1.0.0` ↔ `v1.1.0`)
+
+- **Current Schema Version:** `1.1.0` (`MOBILE_SYNC_SCHEMA_VERSION = "1.1.0"`).
+- **Supported Versions:** `["1.0.0", "1.1.0"]`.
+- **Handshake / `/meta` Envelope:**
+  Every Cloud and LAN sync response includes `meta`:
+  ```json
+  {
+    "schemaVersion": "1.1.0",
+    "minClientSchemaVersion": "1.0.0",
+    "supportedVersions": ["1.0.0", "1.1.0"],
+    "producerVersion": "1.3.7",
+    "generatedAt": "2026-11-27T00:00:00.000Z",
+    "sequenceNo": 42,
+    "timezoneRule": "UTC_00_00",
+    "brokerUtcOffsetHours": 0
+  }
+  ```
+- **Backward Compatibility Rules:**
+  - `v1.0.0` Android clients ignore unknown top-level keys (`meta`, `candlesByKey`, `drawingsByKey`, `equityPoints`) and continue reading `status`, `account`, `stats`, `positions`, `trades`, `signals`, `symbols`.
+  - `v1.1.0` Android clients degrade gracefully when connected to a `v1.0.0` producer (defaulting missing `meta.schemaVersion` to `"1.0.0"` and showing honest empty states instead of raw validation errors).
+  - If `checkSyncSchemaCompatibility()` detects a major version mismatch (e.g., `2.x` vs `1.x`), the UI displays a clear `"Update Needed"` banner instead of throwing raw Zod errors.
+
+### 6.2 Units & Conventions
+
+1. **Timestamps:**
+   - Envelope / metadata / trade lifecycle timestamps (`updatedAt`, `generatedAt`, `openedAt`, `closedAt`, `lastHeartbeat`, `serverTime`): **UTC ISO-8601** (`YYYY-MM-DDTHH:mm:ss.sssZ`).
+   - Chart candle bars (`Candle.time`), drawing coordinates (`start_time`, `end_time`), position `openTime`, and equity curve points (`EquityPoint.time`): **UTC Unix epoch seconds** (integer).
+2. **Symbol Naming & Precision:**
+   - Every symbol record carries **both** canonical symbol (`XAUUSD`, `USDJPY`, `BTCUSD`) and broker symbol (`XAUUSD.m`, `USDJPY.m`, `BTCUSD.m`), plus `digits` (`XAUUSD`: 2, `USDJPY`: 3, `BTCUSD`: 2) and `point` (`0.01`, `0.001`, `0.01`).
+3. **"Today" Definition (Explicit Timezone Rule):**
+   - `"Today"` is defined strictly as the current **UTC calendar day** (`00:00:00.000Z` through `23:59:59.999Z`, `timezoneRule: "UTC_00_00"`).
+   - Both Windows Companion (`dashboardDataAdapter.ts` / `CoreTradingScreens.tsx` / `sync_server.py`) and Android (`MobileSyncClient.ts`) use this single UTC-day boundary.
+
+### 6.3 Single Definitions for Financial & Trade Aggregates
+
+Computed **once** on the Producer (`MT5SyncService` + `MobileSyncManager` / `dashboardDataAdapter.ts`) and shipped in `stats` and `trades.summary`:
+
+| Metric | Single Authoritative Definition |
+|---|---|
+| **Deal (`CLOSED` Trade Record)** | A completed MT5 closing execution (`DEAL_ENTRY_OUT` or `DEAL_ENTRY_INOUT`, or a reconciled `trade_records` row with `status === "CLOSED"` and non-null `closed_at`), with net realized P/L = `profit + commission + swap`. Open positions (`status === "OPEN"`) are **never** counted as closed deals. |
+| **Position (`OPEN` Position)** | A currently open MT5 position from `mt5.positions_get()`, carrying `ticket`, `symbol`, `canonicalSymbol`, `type` (`BUY`/`SELL`), `volume`, `openPrice`, `currentPrice`, `sl` (`null` when unset/`<= 0`), `tp` (`null` when unset/`<= 0`), `protected` (`sl !== null && sl > 0`), `profit` (floating P/L), `swap`, `openTime`, `ownership` (`BOT_OWN` / `MANUAL` / `OTHER_EA`). |
+| **`dealsCount` (Total Closed Deals)** | `closedDeals.length` (count of closed deals only). |
+| **`winsCount` / `lossesCount`** | `winsCount = closedDeals.filter(d => d.pnl > 0).length`; `lossesCount = closedDeals.filter(d => d.pnl < 0).length`. |
+| **`winRate` (%)** | `winsCount + lossesCount > 0 ? round((winsCount / (winsCount + lossesCount)) * 100, 1) : 0.0`. |
+| **`todayRealizedPnl`** | Sum of `pnl` for all closed deals where `closedAt` falls within today's UTC date (`YYYY-MM-DD`). |
+| **`todayPnl` (Today P/L)** | `round(todayRealizedPnl + floatingPnl, 2)` — matches Windows Companion Dashboard KPI `"Today P/L"` (`closedPnlToday + floatingPnl` in `dashboardDataAdapter.ts:424-425`). |
+| **`tradesToday`** | `todayClosedCount + openPositionsCount` — matches Windows Companion Dashboard KPI `"<N> trades today"` (`closedToday.length + activePositions.length` in `CoreTradingScreens.tsx:316`). Both `todayClosedCount` and `openPositionsCount` are also shipped in `stats` for the detail sheet breakdown. |
+| **`totalProfit` (Total Profits)** | When `dealsCount > 0`: `round(sum(d.pnl for d in closedDeals), 2)`. When `dealsCount === 0`: `todayPnl` (matches `CoreTradingScreens.tsx:327-332`). |
+| **`marginLevel` (%)** | `account.margin_level` from MT5 (`(equity / margin) * 100` when `margin > 0`, or `0` when no margin is used). Rendered as `"XX%"` when `marginLevel > 0`, and `"n/a"` when `margin === 0`. |

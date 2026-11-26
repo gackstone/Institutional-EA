@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export const MOBILE_SYNC_SCHEMA_VERSION = "1.0.0" as const;
+export const MOBILE_SYNC_SCHEMA_VERSION = "1.1.0" as const;
+export const SUPPORTED_MOBILE_SYNC_SCHEMA_VERSIONS = ["1.0.0", "1.1.0"] as const;
 
 export const ALLOWED_MOBILE_HTTP_METHODS = ["GET"] as const;
 export const ALLOWED_MOBILE_AUTH_ENDPOINTS = [
@@ -27,6 +28,18 @@ export const MobileMt5StatusSchema = z.enum([
   "ERROR",
 ]);
 export type MobileMt5Status = z.infer<typeof MobileMt5StatusSchema>;
+
+export const MobileSyncMetaSchema = z.object({
+  schemaVersion: z.string().min(1).default(MOBILE_SYNC_SCHEMA_VERSION),
+  minClientSchemaVersion: z.string().default("1.0.0"),
+  supportedVersions: z.array(z.string()).default(["1.0.0", "1.1.0"]),
+  producerVersion: z.string().min(1).default("1.3.7"),
+  generatedAt: z.string(),
+  sequenceNo: z.number().int().nonnegative().default(0),
+  timezoneRule: z.string().default("UTC_00_00"),
+  brokerUtcOffsetHours: z.number().int().default(0),
+});
+export type MobileSyncMeta = z.infer<typeof MobileSyncMetaSchema>;
 
 export const MobileStatusSchema = z.object({
   schemaVersion: z.string().min(1),
@@ -62,6 +75,9 @@ export type MobileAccount = z.infer<typeof MobileAccountSchema>;
 
 export const MobileStatsSchema = z.object({
   todayPnl: z.number().finite(),
+  todayRealizedPnl: z.number().finite().optional(),
+  todayClosedCount: z.number().int().nonnegative().optional(),
+  openPositionsCount: z.number().int().nonnegative().optional(),
   totalProfit: z.number().finite(),
   winRate: z.number().min(0).max(100),
   dealsCount: z.number().int().nonnegative(),
@@ -88,6 +104,7 @@ export const MobilePositionSchema = z.object({
   openTime: z.number().int().nonnegative(),
   digits: z.number().int().min(0).max(8).default(2),
   ownership: z.enum(["BOT_OWN", "MANUAL", "OTHER_EA"]).default("BOT_OWN"),
+  protected: z.boolean().optional(),
   comment: z.string().default(""),
 });
 export type MobilePosition = z.infer<typeof MobilePositionSchema>;
@@ -119,19 +136,23 @@ export const MobileTradeRecordSchema = z.object({
 });
 export type MobileTradeRecord = z.infer<typeof MobileTradeRecordSchema>;
 
+export const MobileTradesSummarySchema = z.object({
+  count: z.number().int().nonnegative(),
+  netPnl: z.number().finite(),
+  winRate: z.number().min(0).max(100),
+  wins: z.number().int().nonnegative(),
+  losses: z.number().int().nonnegative(),
+});
+export type MobileTradesSummary = z.infer<typeof MobileTradesSummarySchema>;
+
 export const MobileTradesPageSchema = z.object({
   page: z.number().int().positive(),
   limit: z.number().int().positive(),
   total: z.number().int().nonnegative(),
   hasMore: z.boolean(),
+  nextCursor: z.string().nullable().optional().default(null),
   currency: z.string().min(1).max(12),
-  summary: z.object({
-    count: z.number().int().nonnegative(),
-    netPnl: z.number().finite(),
-    winRate: z.number().min(0).max(100),
-    wins: z.number().int().nonnegative(),
-    losses: z.number().int().nonnegative(),
-  }),
+  summary: MobileTradesSummarySchema,
   items: z.array(MobileTradeRecordSchema),
 });
 export type MobileTradesPage = z.infer<typeof MobileTradesPageSchema>;
@@ -170,6 +191,7 @@ export const MobileDrawingItemSchema = z.object({
   direction: z.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
   timeframe: z.string(),
   symbol: z.string(),
+  broker_symbol: z.string().optional(),
   start_time: z.number().int(),
   end_time: z.number().int().nullable(),
   price_levels: z.record(z.string(), z.any()),
@@ -180,15 +202,17 @@ export const MobileDrawingItemSchema = z.object({
 export type MobileDrawingItem = z.infer<typeof MobileDrawingItemSchema>;
 
 export const MobileDrawingsResponseSchema = z.object({
-  schema_version: z.string().default("1.0"),
+  schema_version: z.string().default("1.1.0"),
   symbol: z.string(),
   broker_symbol: z.string().optional(),
   timeframe: z.string(),
   generated_at: z.string().optional(),
   source: z.string().default("BOT"),
   items: z.array(MobileDrawingItemSchema),
+  drawings: z.array(MobileDrawingItemSchema).optional(),
   counts: z.record(z.string(), z.number()).optional(),
   mtf_levels: z.array(z.any()).optional(),
+  smc: z.record(z.string(), z.any()).optional(),
 });
 export type MobileDrawingsResponse = z.infer<typeof MobileDrawingsResponseSchema>;
 
@@ -331,9 +355,83 @@ export const MobileSseEventSchema = z.object({
 export type MobileSseEvent = z.infer<typeof MobileSseEventSchema>;
 
 /**
+ * Negotiates schema version compatibility between Producer and Consumer.
+ * - Both 1.0.0 and 1.1.0 are supported (v1.1.0 is additive and backward-compatible with v1.0.0).
+ * - If major version differs (e.g. "2.0.0"), returns `compatible: false` with `updateNeeded: true`.
+ */
+export function checkSyncSchemaCompatibility(
+  producerSchemaVersion: string | null | undefined,
+  clientSchemaVersion: string = MOBILE_SYNC_SCHEMA_VERSION
+): {
+  compatible: boolean;
+  updateNeeded: boolean;
+  producerVersion: string;
+  clientVersion: string;
+  reason: string;
+} {
+  const prod = String(producerSchemaVersion || "1.0.0").trim();
+  const cli = String(clientSchemaVersion || MOBILE_SYNC_SCHEMA_VERSION).trim();
+  const prodMajor = Number(prod.split(".")[0] || 1);
+  const cliMajor = Number(cli.split(".")[0] || 1);
+  if (prodMajor !== cliMajor) {
+    return {
+      compatible: false,
+      updateNeeded: true,
+      producerVersion: prod,
+      clientVersion: cli,
+      reason:
+        prodMajor > cliMajor
+          ? `Android app update required (Companion is on Sync Schema v${prod}, app supports v${cli}).`
+          : `Windows Companion update required (App is on Sync Schema v${cli}, Companion is on v${prod}).`,
+    };
+  }
+  return {
+    compatible: true,
+    updateNeeded: false,
+    producerVersion: prod,
+    clientVersion: cli,
+    reason: "Compatible",
+  };
+}
+
+/**
+ * Normalizes drawings counts so both camelCase (`liquidity`, `fvgOb`, `structure`, `sessions`, `trades`)
+ * and uppercase layer keys (`LIQ`, `FVG`, `OB`, `FVG_OB`, `STRUCT`, `SESS`, `TRADE`, `TRADES`) are present.
+ */
+export function normalizeDrawingsCounts(
+  items: Array<{ type?: string }>,
+  rawCounts?: Record<string, number> | null
+): Record<string, number> {
+  const liq = items.filter((d) => d.type === "LIQ").length;
+  const fvg = items.filter((d) => d.type === "FVG").length;
+  const ob = items.filter((d) => d.type === "OB").length;
+  const fvgOb = fvg + ob;
+  const struct = items.filter((d) => d.type === "STRUCT").length;
+  const sess = items.filter((d) => d.type === "SESS").length;
+  const trade = items.filter((d) => d.type === "TRADE").length;
+
+  const hasItems = items.length > 0;
+  return {
+    liquidity: hasItems ? liq : Number(rawCounts?.liquidity ?? rawCounts?.LIQ ?? 0),
+    fvgOb: hasItems ? fvgOb : Number(rawCounts?.fvgOb ?? rawCounts?.FVG_OB ?? ((rawCounts?.FVG ?? 0) + (rawCounts?.OB ?? 0))),
+    structure: hasItems ? struct : Number(rawCounts?.structure ?? rawCounts?.STRUCT ?? 0),
+    sessions: hasItems ? sess : Number(rawCounts?.sessions ?? rawCounts?.SESS ?? 0),
+    trades: hasItems ? trade : Number(rawCounts?.trades ?? rawCounts?.TRADE ?? rawCounts?.TRADES ?? 0),
+    LIQ: hasItems ? liq : Number(rawCounts?.LIQ ?? rawCounts?.liquidity ?? 0),
+    FVG: hasItems ? fvg : Number(rawCounts?.FVG ?? 0),
+    OB: hasItems ? ob : Number(rawCounts?.OB ?? 0),
+    FVG_OB: hasItems ? fvgOb : Number(rawCounts?.FVG_OB ?? rawCounts?.fvgOb ?? 0),
+    STRUCT: hasItems ? struct : Number(rawCounts?.STRUCT ?? rawCounts?.structure ?? 0),
+    SESS: hasItems ? sess : Number(rawCounts?.SESS ?? rawCounts?.sessions ?? 0),
+    TRADE: hasItems ? trade : Number(rawCounts?.TRADE ?? rawCounts?.trades ?? 0),
+    TRADES: hasItems ? trade : Number(rawCounts?.TRADES ?? rawCounts?.trades ?? 0),
+  };
+}
+
+/**
  * Validates that a mobile HTTP request is strictly read-only.
  * Only GET is permitted for data endpoints; POST is permitted exclusively
- * for /api/mobile/v1/pair and /api/mobile/v1/unpair.
+ * for /api/mobile/v1/pair, /api/mobile/v1/unpair, and /functions/v1/mobile-pairing.
  */
 export function assertMobileHttpReadOnly(method: string, path: string): void {
   const normalizedMethod = method.trim().toUpperCase();
