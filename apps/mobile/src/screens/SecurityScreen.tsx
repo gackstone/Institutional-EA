@@ -17,8 +17,12 @@ import { MOBILE_SYNC_SCHEMA_VERSION } from "@institutional-ea/data-contract";
 import { type ThemeMode, getThemeTokens } from "../theme/themeTokens.ts";
 import { QrIcon } from "../components/Icons.tsx";
 import {
+  claimCloudPairing,
+  DEFAULT_CLOUD_API_URL,
   pairWithCompanion,
-  parsePairingQrPayload,
+  parseAnyPairingQrPayload,
+  pollCloudPairingApproval,
+  type CloudClaimResult,
 } from "../services/MobileSyncClient.ts";
 import { formatClockTime, formatShortDateTime } from "../utils/formatters.ts";
 import { triggerLightHaptic } from "../services/haptics.ts";
@@ -54,11 +58,62 @@ export function SecurityScreen({
   const [port, setPort] = useState("8766");
   const [code, setCode] = useState("");
   const [deviceName, setDeviceName] = useState("Android Phone");
+  const [showAdvancedLan, setShowAdvancedLan] = useState(false);
+  const [pendingCloudClaim, setPendingCloudClaim] = useState<CloudClaimResult | null>(null);
   const [pairingBusy, setPairingBusy] = useState(false);
   const [pairError, setPairError] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scanHandled, setScanHandled] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+
+  const waitForCloudApproval = async (claim: CloudClaimResult) => {
+    setPendingCloudClaim(claim);
+    setPairingBusy(true);
+    setPairError(null);
+    const deadline = Math.min(claim.expiresAt * 1000, Date.now() + 120_000);
+    try {
+      while (Date.now() < deadline) {
+        const res = await pollCloudPairingApproval(claim);
+        if (res.status === "approved" && res.credentials) {
+          triggerLightHaptic();
+          setPendingCloudClaim(null);
+          setCode("");
+          onPaired(res.credentials);
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 2500));
+      }
+      setPairError("Timed out waiting for approval on Windows Companion. Try again.");
+    } catch (err: unknown) {
+      setPairError(err instanceof Error ? err.message : "Cloud pairing approval failed");
+    } finally {
+      setPendingCloudClaim(null);
+      setPairingBusy(false);
+    }
+  };
+
+  const executeCloudPairing = async (params: {
+    cloudUrl?: string;
+    code?: string;
+    sessionId?: string;
+    sessionToken?: string;
+  }) => {
+    setPairingBusy(true);
+    setPairError(null);
+    try {
+      const claim = await claimCloudPairing({
+        cloudUrl: params.cloudUrl || DEFAULT_CLOUD_API_URL,
+        code: params.code,
+        sessionId: params.sessionId,
+        sessionToken: params.sessionToken,
+        deviceName,
+      });
+      await waitForCloudApproval(claim);
+    } catch (err: unknown) {
+      setPairError(err instanceof Error ? err.message : "Cloud pairing failed");
+      setPairingBusy(false);
+    }
+  };
 
   const handleOpenScanner = async () => {
     setPairError(null);
@@ -104,9 +159,19 @@ export function SecurityScreen({
     setScanHandled(true);
     setScannerOpen(false);
     try {
-      const qr = parsePairingQrPayload(data);
+      const qr = parseAnyPairingQrPayload(data);
       if (qr.expiresAt < Math.floor(Date.now() / 1000)) {
-        setPairError("QR code expired. Click 'New Code' on your PC and scan again.");
+        setPairError("QR code expired. Click 'Regenerate' on your PC and scan again.");
+        return;
+      }
+      if (qr.v === 2) {
+        setCode(qr.code);
+        executeCloudPairing({
+          cloudUrl: qr.cloudUrl,
+          sessionId: qr.sessionId,
+          sessionToken: qr.sessionToken,
+          code: qr.code,
+        });
         return;
       }
       setHost(qr.host);
@@ -119,11 +184,20 @@ export function SecurityScreen({
         code: qr.code,
       });
     } catch {
-      setPairError("Invalid QR code. Scan the QR displayed in Windows Companion → Mobile Sync.");
+      setPairError("Invalid QR code. Scan the QR displayed in Windows Companion → Android Pairing.");
     }
   };
 
-  const handleManualPair = () => {
+  const handleSixDigitCloudPair = () => {
+    const cleanCode = code.trim();
+    if (!/^[0-9]{6}$/.test(cleanCode)) {
+      setPairError("Enter the 6-digit pairing code shown on your Windows Companion.");
+      return;
+    }
+    executeCloudPairing({ code: cleanCode });
+  };
+
+  const handleManualLanPair = () => {
     const cleanHost = host.trim();
     const parsedPort = Number(port.trim() || "8766");
     const cleanCode = code.trim();
@@ -218,6 +292,7 @@ export function SecurityScreen({
           </View>
         ) : (
           <View style={styles.pairForm}>
+            {/* Method 1: Scan QR Code (Works across ANY network) */}
             <TouchableOpacity
               onPress={handleOpenScanner}
               disabled={pairingBusy}
@@ -231,34 +306,11 @@ export function SecurityScreen({
               </Text>
             </TouchableOpacity>
 
-            <Text style={[styles.orText, { color: tokens.textDim }]}>— or enter manually —</Text>
+            <Text style={[styles.orText, { color: tokens.textDim }]}>
+              — or enter 6-digit code (works on mobile data &amp; any Wi-Fi) —
+            </Text>
 
-            <View style={styles.inputRow}>
-              <TextInput
-                value={host}
-                onChangeText={setHost}
-                placeholder="Host IP (e.g. 192.168.1.42)"
-                placeholderTextColor={tokens.textDim}
-                autoCapitalize="none"
-                keyboardType="numbers-and-punctuation"
-                style={[
-                  styles.input,
-                  { flex: 2, backgroundColor: tokens.cardSecondary, color: tokens.text, borderColor: tokens.borderSubtle },
-                ]}
-              />
-              <TextInput
-                value={port}
-                onChangeText={setPort}
-                placeholder="8766"
-                placeholderTextColor={tokens.textDim}
-                keyboardType="number-pad"
-                style={[
-                  styles.input,
-                  { flex: 1, backgroundColor: tokens.cardSecondary, color: tokens.text, borderColor: tokens.borderSubtle },
-                ]}
-              />
-            </View>
-
+            {/* Method 2: 6-Digit Cloud Code (NO Host IP or Port required) */}
             <View style={styles.inputRow}>
               <TextInput
                 value={code}
@@ -284,16 +336,22 @@ export function SecurityScreen({
               />
             </View>
 
+            {pendingCloudClaim && (
+              <Text style={[styles.rowSub, { color: tokens.accent }]}>
+                Waiting for approval on "{pendingCloudClaim.companionName}"… Confirm on your Windows PC.
+              </Text>
+            )}
+
             {pairError && (
               <Text style={[styles.errorText, { color: tokens.loss }]}>{pairError}</Text>
             )}
 
             <TouchableOpacity
-              onPress={handleManualPair}
+              onPress={handleSixDigitCloudPair}
               disabled={pairingBusy}
               style={[styles.secondaryBtn, { backgroundColor: tokens.cardSecondary, borderColor: tokens.border }]}
               accessibilityRole="button"
-              accessibilityLabel="Pair with code"
+              accessibilityLabel="Pair with 6-digit code"
             >
               {pairingBusy ? (
                 <ActivityIndicator size="small" color={tokens.accent} />
@@ -303,6 +361,55 @@ export function SecurityScreen({
                 </Text>
               )}
             </TouchableOpacity>
+
+            {/* Optional Advanced Local Wi-Fi Fallback */}
+            <TouchableOpacity
+              onPress={() => setShowAdvancedLan((prev) => !prev)}
+              style={{ paddingTop: 6, alignItems: "center" }}
+            >
+              <Text style={[styles.rowSub, { color: tokens.textDim }]}>
+                {showAdvancedLan ? "Hide Local Wi-Fi Fallback ▲" : "Advanced: Local Wi-Fi Fallback ▼"}
+              </Text>
+            </TouchableOpacity>
+
+            {showAdvancedLan && (
+              <View style={{ gap: 8, marginTop: 4 }}>
+                <View style={styles.inputRow}>
+                  <TextInput
+                    value={host}
+                    onChangeText={setHost}
+                    placeholder="LAN Host IP (optional)"
+                    placeholderTextColor={tokens.textDim}
+                    autoCapitalize="none"
+                    keyboardType="numbers-and-punctuation"
+                    style={[
+                      styles.input,
+                      { flex: 2, backgroundColor: tokens.cardSecondary, color: tokens.text, borderColor: tokens.borderSubtle },
+                    ]}
+                  />
+                  <TextInput
+                    value={port}
+                    onChangeText={setPort}
+                    placeholder="8766"
+                    placeholderTextColor={tokens.textDim}
+                    keyboardType="number-pad"
+                    style={[
+                      styles.input,
+                      { flex: 1, backgroundColor: tokens.cardSecondary, color: tokens.text, borderColor: tokens.borderSubtle },
+                    ]}
+                  />
+                </View>
+                <TouchableOpacity
+                  onPress={handleManualLanPair}
+                  disabled={pairingBusy}
+                  style={[styles.secondaryBtn, { backgroundColor: tokens.cardSecondary, borderColor: tokens.borderSubtle }]}
+                >
+                  <Text style={[styles.secondaryBtnText, { color: tokens.textDim }]}>
+                    Pair via Local Wi-Fi
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
       </View>

@@ -110,6 +110,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   cloudGetDevices: () => ipcRenderer.invoke("cloud-get-devices"),
   cloudRevokeDevice: (deviceId) => ipcRenderer.invoke("cloud-revoke-device", deviceId),
   cloudOpenExternalPortal: (routePath) => ipcRenderer.invoke("cloud-open-external-portal", routePath),
+  cloudMobilePairing: (action, payload) => ipcRenderer.invoke("cloud-mobile-pairing", action, payload),
+  cloudMobilePushSnapshot: (snapshot) => ipcRenderer.invoke("cloud-mobile-push-snapshot", snapshot),
   onCloudStateChanged: (callback) => {
     const handler = (_event, state) => callback(state);
     ipcRenderer.on("cloud-state-changed", handler);

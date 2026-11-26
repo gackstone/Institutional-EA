@@ -5,6 +5,24 @@ import { AlertEventRecord, AlertSettings, SignalRecord } from "../../types";
 import { ChartSymbol } from "../../services/dashboardDataAdapter";
 import { getNeutralSymbolChipSpec } from "../../styles/designTokens";
 
+type NormalizedSignalLifecycle = "New" | "Active" | "Triggered" | "Expired" | "Invalidated";
+
+function normalizeSignalLifecycle(rawStatus: string, createdAt?: string): NormalizedSignalLifecycle {
+  const s = (rawStatus || "").toUpperCase();
+  if (s === "TAKEN" || s === "TRIGGERED" || s === "EXECUTED" || s === "FILLED") return "Triggered";
+  if (s === "REJECTED" || s === "INVALIDATED" || s === "BLOCKED") return "Invalidated";
+  if (s === "EXPIRED" || s === "CANCELLED" || s === "TIMEOUT") return "Expired";
+  if (s === "WATCHING" || s === "ACTIVE" || s === "DETECTED" || s === "CONFIRMED" || s === "SHADOW_APPROVED") {
+    if (createdAt) {
+      const ageMs = Date.now() - new Date(createdAt).getTime();
+      if (Number.isFinite(ageMs) && ageMs <= 5 * 60 * 1000) return "New";
+      if (Number.isFinite(ageMs) && ageMs > 4 * 60 * 60 * 1000) return "Expired";
+    }
+    return "Active";
+  }
+  return "New";
+}
+
 export const SignalsGridScreen: React.FC<{
   onJumpToChart: (symbol: ChartSymbol) => void;
 }> = ({ onJumpToChart }) => {
@@ -32,14 +50,23 @@ export const SignalsGridScreen: React.FC<{
 
   useEffect(() => {
     reload();
+    const timer = setInterval(reload, 10000);
+    return () => clearInterval(timer);
   }, []);
 
   // Merge real bot signals + real risk gate decisions (zero mock rows)
   const combinedRows = useMemo(() => {
-    const rows: SignalRecord[] = [...signals];
+    const rows: Array<SignalRecord & { lifecycle: NormalizedSignalLifecycle; timeframe?: string; setup_label?: string }> = signals.map((s) => ({
+      ...s,
+      lifecycle: normalizeSignalLifecycle(s.status, s.created_at),
+      timeframe: (s as any).timeframe || undefined,
+      setup_label: (s as any).setup_id || (s as any).setup_type || undefined,
+    }));
     for (const d of decisions) {
       const sigId = String(d.signal_id || `dec-${d.id}`);
       if (rows.some((r) => r.signal_id === sigId)) continue;
+      const rawSt = d.approved ? "TRIGGERED" : "INVALIDATED";
+      const createdAt = String(d.created_at || "");
       rows.push({
         id: Number(d.id) + 100000,
         signal_id: sigId,
@@ -50,14 +77,17 @@ export const SignalsGridScreen: React.FC<{
         stop_loss: Number(d.stop_loss || 0),
         take_profit: Number(d.take_profit || 0),
         rr: Number(d.rr || 0),
-        status: d.approved ? "TAKEN" : "REJECTED",
+        status: rawSt,
         rejection_reason: String(d.reason || ""),
-        created_at: String(d.created_at || ""),
+        created_at: createdAt,
+        lifecycle: normalizeSignalLifecycle(rawSt, createdAt),
+        timeframe: d.timeframe ? String(d.timeframe) : undefined,
+        setup_label: d.setup_id || d.setup_type ? String(d.setup_id || d.setup_type) : undefined,
       });
     }
     return rows.filter((r) => {
       const symOk = symbolFilter === "ALL" || r.symbol.toUpperCase().includes(symbolFilter);
-      const stOk = statusFilter === "ALL" || r.status.toUpperCase() === statusFilter;
+      const stOk = statusFilter === "ALL" || r.lifecycle.toUpperCase() === statusFilter;
       return symOk && stOk;
     });
   }, [signals, decisions, symbolFilter, statusFilter]);
@@ -75,10 +105,13 @@ export const SignalsGridScreen: React.FC<{
         <div>
           <h2 className="text-lg font-bold text-iea-textPrimary flex items-center space-x-2">
             <Zap className="w-5 h-5 text-iea-accent" />
-            <span>Live Signal Grid ({combinedRows.length})</span>
+            <span>Live Signals ({combinedRows.length})</span>
           </h2>
-          <p className="text-[11px] font-mono text-iea-textMuted mt-0.5">
-            Source: BOT · {fetchedAt ? `Updated ${new Date(fetchedAt).toLocaleTimeString()}` : "Waiting for bot"}
+          <p className="text-[11px] text-iea-textSecondary mt-0.5">
+            Real setups from the Institutional EA engine for observation &amp; manual execution · Synced to paired Android devices (read-only) ·{" "}
+            <span className="font-mono text-iea-textMuted">
+              {fetchedAt ? `Updated ${new Date(fetchedAt).toLocaleTimeString()}` : "Waiting for bot"}
+            </span>
           </p>
         </div>
 
@@ -101,10 +134,12 @@ export const SignalsGridScreen: React.FC<{
             aria-label="Filter signals by status"
             className="iea-pill-control px-3 py-1.5 text-iea-textPrimary focus:outline-none"
           >
-            <option value="ALL" className="bg-iea-card">All Status</option>
-            <option value="WATCHING" className="bg-iea-card">Watching</option>
-            <option value="TAKEN" className="bg-iea-card">Taken</option>
-            <option value="REJECTED" className="bg-iea-card">Rejected</option>
+            <option value="ALL" className="bg-iea-card">All Statuses</option>
+            <option value="NEW" className="bg-iea-card">New</option>
+            <option value="ACTIVE" className="bg-iea-card">Active</option>
+            <option value="TRIGGERED" className="bg-iea-card">Triggered</option>
+            <option value="EXPIRED" className="bg-iea-card">Expired</option>
+            <option value="INVALIDATED" className="bg-iea-card">Invalidated</option>
           </select>
 
           <button
@@ -124,37 +159,38 @@ export const SignalsGridScreen: React.FC<{
           <thead>
             <tr>
               <th className="py-3 pl-4 pr-3">Time (UTC)</th>
-              <th className="py-3 pr-3">Symbol</th>
-              <th className="py-3 pr-3">Side</th>
-              <th className="py-3 pr-3">Score</th>
+              <th className="py-3 pr-3">Symbol / TF</th>
+              <th className="py-3 pr-3">Direction</th>
               <th className="py-3 pr-3">Entry / SL / TP</th>
               <th className="py-3 pr-3">R:R</th>
               <th className="py-3 pr-3">Status</th>
-              <th className="py-3 pr-4">Reason</th>
+              <th className="py-3 pr-4">Setup &amp; Analysis</th>
             </tr>
           </thead>
           <tbody className="font-mono tabular-nums">
             {combinedRows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-10 text-center text-iea-textMuted font-sans">
-                  No signals yet. Real bot setups will appear here as MT5 candles close.
+                <td colSpan={7} className="py-10 text-center text-iea-textMuted font-sans">
+                  No live signals yet. Real trading setups from the Institutional EA engine will appear here automatically as market conditions qualify.
                 </td>
               </tr>
             ) : (
               combinedRows.map((s) => {
                 const chip = getNeutralSymbolChipSpec(s.symbol);
                 const statusClass =
-                  s.status === "TAKEN"
+                  s.lifecycle === "Triggered"
                     ? "bg-iea-profitSoft text-iea-profit border border-iea-profitBorder"
-                    : s.status === "WATCHING"
+                    : s.lifecycle === "New" || s.lifecycle === "Active"
                     ? "bg-iea-accentSoft text-iea-accent border border-iea-accentBorder"
+                    : s.lifecycle === "Expired"
+                    ? "bg-iea-warningSoft text-iea-warning border border-iea-warningBorder"
                     : "bg-iea-dangerSoft text-iea-danger border border-iea-dangerBorder";
                 return (
                   <tr
                     key={`${s.id}-${s.signal_id}`}
                     onClick={() => onJumpToChart(toChartSymbol(s.symbol))}
                     className="cursor-pointer"
-                    title="Click to jump to this symbol on the Dashboard chart"
+                    title="Click to inspect this symbol on the Dashboard chart"
                   >
                     <td className="py-2.5 pl-4 pr-3 text-iea-textMuted">
                       {s.created_at ? new Date(s.created_at).toISOString().slice(11, 19) : "—"}
@@ -164,34 +200,36 @@ export const SignalsGridScreen: React.FC<{
                         <span className={`w-6 h-6 rounded-full text-[10px] font-extrabold inline-flex items-center justify-center ${chip.chipBg}`}>
                           {chip.shortCode}
                         </span>
-                        <span className="font-bold text-iea-textPrimary">{s.symbol}</span>
+                        <div>
+                          <span className="font-bold text-iea-textPrimary">{s.symbol}</span>
+                          {s.timeframe && (
+                            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-iea-inset text-iea-textMuted">
+                              {s.timeframe}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className={`py-2.5 pr-3 font-bold ${s.direction === "BUY" ? "text-iea-profit" : "text-iea-danger"}`}>
                       {s.direction || "—"}
                     </td>
-                    <td className="py-2.5 pr-3 text-iea-textPrimary">{s.score > 0 ? s.score.toFixed(0) : "—"}</td>
                     <td className="py-2.5 pr-3 text-iea-textSecondary">
                       {s.entry_price > 0 ? `${s.entry_price} / ${s.stop_loss || "—"} / ${s.take_profit || "—"}` : "—"}
                     </td>
                     <td className="py-2.5 pr-3 text-iea-accent">{s.rr > 0 ? `${s.rr.toFixed(2)}R` : "—"}</td>
                     <td className="py-2.5 pr-3 font-sans">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusClass}`}>
-                        {s.status}
+                        {s.lifecycle}
                       </span>
                     </td>
                     <td className="py-2.5 pr-4 font-sans text-iea-textSecondary">
-                      {(s as any).setup_id ? (
+                      {s.setup_label || (s as any).setup_id ? (
                         <div className="space-y-0.5">
                           <div className="font-mono text-[11px] font-semibold text-iea-textPrimary">
-                            {(s as any).setup_id}
+                            {s.setup_label || (s as any).setup_id}
                             {(s as any).three_point_grade ? ` · Grade ${(s as any).three_point_grade}` : ""}
+                            {s.score > 0 ? ` · Score ${s.score.toFixed(0)}` : ""}
                           </div>
-                          {Array.isArray((s as any).provenance) && (s as any).provenance.length > 0 && (
-                            <div className="text-[10px] text-iea-textMuted">
-                              {(s as any).provenance.join(", ")}
-                            </div>
-                          )}
                           {s.rejection_reason ? <div>{s.rejection_reason}</div> : null}
                         </div>
                       ) : (

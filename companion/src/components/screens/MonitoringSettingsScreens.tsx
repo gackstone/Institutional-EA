@@ -2,13 +2,21 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   BookOpen,
+  Bot,
   CheckCircle2,
   Database,
   FileText,
   Lock,
+  LogOut,
+  Moon,
+  RefreshCw,
   Settings as SettingsIcon,
+  Smartphone,
+  Sun,
   Trash2,
+  Wifi,
 } from "lucide-react";
+import { useTheme } from "../../context/ThemeContext";
 import { controlClient } from "../../services/ipc";
 import {
   AuditLogRecord,
@@ -493,56 +501,292 @@ export const SystemHealthScreen: React.FC<{
   );
 };
 
+const SETTINGS_PREFS_KEY = "iea_companion_user_prefs_v1";
+
+interface CompanionUserPrefs {
+  desktopNotifications: boolean;
+  signalSoundAlerts: boolean;
+  autoConnectMt5: boolean;
+  startMinimized: boolean;
+}
+
+const DEFAULT_USER_PREFS: CompanionUserPrefs = {
+  desktopNotifications: true,
+  signalSoundAlerts: false,
+  autoConnectMt5: true,
+  startMinimized: false,
+};
+
+function loadUserPrefs(): CompanionUserPrefs {
+  try {
+    const raw = localStorage.getItem(SETTINGS_PREFS_KEY);
+    if (!raw) return DEFAULT_USER_PREFS;
+    return { ...DEFAULT_USER_PREFS, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_USER_PREFS;
+  }
+}
+
 export const SettingsScreen: React.FC<{
+  status?: ControlStatusPayload | null;
+  cloudEmail?: string | null;
+  cloudConnected?: boolean;
   onOpenDiagnostics: () => void;
   onOpenInstitutionalEa: () => void;
   onOpenTelegram: () => void;
   onOpenMobileSync?: () => void;
-}> = ({ onOpenDiagnostics, onOpenInstitutionalEa, onOpenTelegram, onOpenMobileSync }) => {
+  onReconnectService?: () => Promise<void>;
+  onSignOut?: () => Promise<void>;
+}> = ({
+  status = null,
+  cloudEmail = null,
+  cloudConnected = false,
+  onOpenDiagnostics,
+  onOpenInstitutionalEa,
+  onOpenTelegram,
+  onOpenMobileSync,
+  onReconnectService,
+  onSignOut,
+}) => {
+  const { theme, toggleTheme } = useTheme();
+  const [prefs, setPrefs] = useState<CompanionUserPrefs>(() => loadUserPrefs());
+  const [reconnecting, setReconnecting] = useState(false);
+
+  const updatePref = <K extends keyof CompanionUserPrefs>(key: K, val: CompanionUserPrefs[K]) => {
+    setPrefs((prev) => {
+      const next = { ...prev, [key]: val };
+      try {
+        localStorage.setItem(SETTINGS_PREFS_KEY, JSON.stringify(next));
+      } catch {
+        // ignore storage quota errors
+      }
+      return next;
+    });
+  };
+
+  const mt5Connected = status?.mt5?.connection_status === "CONNECTED";
+  const maskedAcct = status?.mt5?.account?.account_number
+    ? `****${String(status.mt5.account.account_number).slice(-4)}`
+    : "Not connected";
+  const engineState = status?.engine?.state || "STOPPED";
+  const engineMode = status?.engine?.operating_mode || "DEMO";
+
   return (
     <div className="space-y-4">
+      {/* Header & Android Pairing CTA */}
       <div className="iea-card p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-bold text-iea-textPrimary flex items-center space-x-2">
-            <SettingsIcon className="w-5 h-5 text-iea-accent" />
-            <span>Connections &amp; Diagnostics</span>
-          </h2>
-          <span
-            title={UI_COPY.brand.demoLockTooltip}
-            className="px-3 py-1 bg-iea-accentSoft border border-iea-accentBorder text-iea-accent text-[11px] font-bold rounded-full inline-flex items-center space-x-1.5"
-          >
-            <Lock className="w-3.5 h-3.5 text-iea-accent" />
-            <span>{UI_COPY.brand.demoLockChip}</span>
-          </span>
+          <div>
+            <h2 className="text-lg font-bold text-iea-textPrimary flex items-center space-x-2">
+              <SettingsIcon className="w-5 h-5 text-iea-accent" />
+              <span>Settings</span>
+            </h2>
+            <p className="text-xs text-iea-textSecondary mt-0.5">
+              Manage appearance, notifications, MT5 connection, and Android companion pairing.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {onOpenMobileSync && (
+              <button
+                type="button"
+                onClick={onOpenMobileSync}
+                data-testid="btn-pair-new-android"
+                className="px-4 py-2 rounded-xl bg-iea-accent hover:bg-iea-accentHover text-white text-xs font-bold inline-flex items-center gap-1.5 transition"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>PAIR NEW ANDROID DEVICE</span>
+              </button>
+            )}
+            <span
+              title={UI_COPY.brand.demoLockTooltip}
+              className="px-3 py-1 bg-iea-accentSoft border border-iea-accentBorder text-iea-accent text-[11px] font-bold rounded-full inline-flex items-center space-x-1.5"
+            >
+              <Lock className="w-3.5 h-3.5 text-iea-accent" />
+              <span>{UI_COPY.brand.demoLockChip}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Section A: Application Settings */}
+      <div className="iea-card p-5 space-y-3" data-testid="settings-section-application">
+        <h3 className="text-sm font-bold text-iea-textPrimary">Application Settings</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div className="iea-inset p-3.5 rounded-xl flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-iea-textPrimary">Appearance Theme</div>
+              <div className="text-[11px] text-iea-textSecondary">Switch between Dark and Light mode</div>
+            </div>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="iea-pill-control px-3 py-1.5 font-semibold inline-flex items-center gap-1.5 text-iea-textPrimary"
+            >
+              {theme === "dark" ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
+              <span>{theme === "dark" ? "Dark" : "Light"}</span>
+            </button>
+          </div>
+
+          <div className="iea-inset p-3.5 rounded-xl flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-iea-textPrimary">Desktop Notifications</div>
+              <div className="text-[11px] text-iea-textSecondary">Alert when new bot signals or trades occur</div>
+            </div>
+            <input
+              type="checkbox"
+              checked={prefs.desktopNotifications}
+              onChange={(e) => updatePref("desktopNotifications", e.target.checked)}
+              aria-label="Desktop Notifications"
+              className="w-4 h-4 accent-emerald-500 cursor-pointer"
+            />
+          </div>
+
+          <div className="iea-inset p-3.5 rounded-xl flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-iea-textPrimary">Auto-Connect MT5 on Startup</div>
+              <div className="text-[11px] text-iea-textSecondary">Reconnect to your MetaTrader 5 terminal automatically</div>
+            </div>
+            <input
+              type="checkbox"
+              checked={prefs.autoConnectMt5}
+              onChange={(e) => updatePref("autoConnectMt5", e.target.checked)}
+              aria-label="Auto-Connect MT5 on Startup"
+              className="w-4 h-4 accent-emerald-500 cursor-pointer"
+            />
+          </div>
+
+          <div className="iea-inset p-3.5 rounded-xl flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-iea-textPrimary">Application Version &amp; Cloud Session</div>
+              <div className="text-[11px] text-iea-textSecondary">
+                v1.3.5 · {cloudConnected ? `Signed in (${cloudEmail || "Cloud Active"})` : "Cloud session offline"}
+              </div>
+            </div>
+            {onSignOut && (
+              <button
+                type="button"
+                onClick={() => onSignOut()}
+                data-testid="settings-logout-btn"
+                className="px-3 py-1.5 rounded-lg bg-iea-dangerSoft border border-iea-dangerBorder text-iea-danger font-semibold inline-flex items-center gap-1.5 hover:opacity-90 transition"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Log Out</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Section B: Trading Bot Settings */}
+      <div className="iea-card p-5 space-y-3" data-testid="settings-section-bot">
+        <h3 className="text-sm font-bold text-iea-textPrimary flex items-center gap-2">
+          <Bot className="w-4 h-4 text-iea-accent" />
+          <span>Trading Bot Status &amp; Monitoring</span>
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div className="iea-inset p-3.5 rounded-xl space-y-1">
+            <div className="iea-label-caps">Trading Engine</div>
+            <div className="font-mono font-bold text-iea-textPrimary">{engineState}</div>
+            <div className="text-[11px] text-iea-textSecondary">Mode: {engineMode}</div>
+          </div>
+          <div className="iea-inset p-3.5 rounded-xl space-y-1">
+            <div className="iea-label-caps">Account Sync</div>
+            <div className={`font-semibold ${mt5Connected ? "text-iea-profit" : "text-iea-textMuted"}`}>
+              {mt5Connected ? "Synchronized" : "Waiting for MT5"}
+            </div>
+            <div className="text-[11px] text-iea-textSecondary">Safety: DEMO &amp; R9.3 Locked</div>
+          </div>
+          <div className="iea-inset p-3.5 rounded-xl flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-iea-textPrimary">Signal Sound Alerts</div>
+              <div className="text-[11px] text-iea-textSecondary">Play chime on new Live Signals</div>
+            </div>
+            <input
+              type="checkbox"
+              checked={prefs.signalSoundAlerts}
+              onChange={(e) => updatePref("signalSoundAlerts", e.target.checked)}
+              aria-label="Signal Sound Alerts"
+              className="w-4 h-4 accent-emerald-500 cursor-pointer"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Section C: MT5 Connection Settings (Zero Credentials Exposed) */}
+      <div className="iea-card p-5 space-y-3" data-testid="settings-section-mt5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-iea-textPrimary flex items-center gap-2">
+            <Wifi className="w-4 h-4 text-iea-accent" />
+            <span>MT5 Connection &amp; Diagnostics</span>
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {onReconnectService && (
+              <button
+                type="button"
+                disabled={reconnecting}
+                onClick={async () => {
+                  setReconnecting(true);
+                  try {
+                    await onReconnectService();
+                  } finally {
+                    setReconnecting(false);
+                  }
+                }}
+                className="iea-pill-control px-3.5 py-1.5 text-xs text-iea-textPrimary font-semibold inline-flex items-center gap-1.5"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${reconnecting ? "animate-spin" : ""}`} />
+                <span>{reconnecting ? "Reconnecting..." : "Reconnect"}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onOpenDiagnostics}
+              className="iea-pill-control px-3.5 py-1.5 text-xs text-iea-textPrimary font-semibold"
+            >
+              Diagnostics
+            </button>
+            <button
+              type="button"
+              onClick={onOpenTelegram}
+              className="iea-pill-control px-3.5 py-1.5 text-xs text-iea-textPrimary font-semibold"
+            >
+              Telegram Setup
+            </button>
+            <button
+              type="button"
+              onClick={onOpenInstitutionalEa}
+              className="iea-pill-control px-3.5 py-1.5 text-xs text-iea-textPrimary font-semibold"
+            >
+              Agent Cloud Pairing
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-2.5">
-          <button
-            onClick={onOpenDiagnostics}
-            className="iea-pill-control px-4 py-2 text-xs text-iea-textPrimary font-semibold"
-          >
-            Diagnostics
-          </button>
-          <button
-            onClick={onOpenInstitutionalEa}
-            className="iea-pill-control px-4 py-2 text-xs text-iea-textPrimary font-semibold"
-          >
-            Cloud Pairing
-          </button>
-          <button
-            onClick={onOpenTelegram}
-            className="iea-pill-control px-4 py-2 text-xs text-iea-textPrimary font-semibold"
-          >
-            Telegram Setup
-          </button>
-          {onOpenMobileSync && (
-            <button
-              onClick={onOpenMobileSync}
-              className="iea-pill-control px-4 py-2 text-xs text-iea-accent font-semibold border border-iea-accentBorder"
-            >
-              Mobile Sync
-            </button>
-          )}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+          <div className="iea-inset p-3.5 rounded-xl space-y-1">
+            <div className="iea-label-caps">MT5 Terminal</div>
+            <div className={`font-bold ${mt5Connected ? "text-iea-profit" : "text-iea-danger"}`}>
+              {mt5Connected ? "Connected" : "Disconnected"}
+            </div>
+          </div>
+          <div className="iea-inset p-3.5 rounded-xl space-y-1">
+            <div className="iea-label-caps">Connected Account</div>
+            <div className="font-mono font-bold text-iea-textPrimary">{maskedAcct}</div>
+            <div className="text-[11px] text-iea-textSecondary truncate">
+              {status?.mt5?.account?.broker || "No broker"}
+            </div>
+          </div>
+          <div className="iea-inset p-3.5 rounded-xl space-y-1">
+            <div className="iea-label-caps">Local Bridge</div>
+            <div className="font-mono text-iea-textPrimary">127.0.0.1:8765</div>
+            <div className="text-[11px] text-iea-textSecondary">Credentials never exposed</div>
+          </div>
+          <div className="iea-inset p-3.5 rounded-xl space-y-1">
+            <div className="iea-label-caps">Last Sync</div>
+            <div className="font-mono text-iea-textPrimary">
+              {status?.mt5?.last_sync_at ? new Date(status.mt5.last_sync_at).toLocaleTimeString() : "—"}
+            </div>
+          </div>
         </div>
       </div>
 

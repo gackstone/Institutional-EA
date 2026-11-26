@@ -66,7 +66,6 @@ import type { EngineDrawingsFeed } from "../../utils/chartDrawingsSchema";
 // One-time confirmation flag per app session for demo order-placing Start
 let sessionStartDemoConfirmed = false;
 
-type TrendMetricMode = "PNL" | "EQUITY";
 type AccountKpiMode = "BALANCE" | "EQUITY";
 const ACCOUNT_KPI_MODE_STORAGE_KEY = "iea_account_kpi_mode_v1";
 
@@ -87,24 +86,6 @@ function formatCurrencyValue(value: number | null | undefined, signed = false): 
   }
   return `${value >= 0 ? "+" : "-"}$${absFormatted}`;
 }
-type TrendRangeOption =
-  | "1 Day"
-  | "1 Week"
-  | "1 Month"
-  | "3 Months"
-  | "6 Months"
-  | "1 Year"
-  | "All";
-
-const TREND_RANGES: TrendRangeOption[] = [
-  "1 Day",
-  "1 Week",
-  "1 Month",
-  "3 Months",
-  "6 Months",
-  "1 Year",
-  "All",
-];
 
 function formatHeaderClock(now: Date): string {
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -157,8 +138,7 @@ export const DashboardScreen: React.FC<
   const [connectingMt5, setConnectingMt5] = useState<boolean>(false);
   const [mt5PickerTerminals, setMt5PickerTerminals] = useState<MT5TerminalInfo[] | null>(null);
 
-  // Main Card Header states (PNL Trend segmented toggle, range selector, quick search)
-  const [trendMode, setTrendMode] = useState<TrendMetricMode>("EQUITY");
+  // Account KPI mode & quick search
   const [accountKpiMode, setAccountKpiMode] = useState<AccountKpiMode>(
     () =>
       readVersionedState<AccountKpiMode>({
@@ -168,7 +148,6 @@ export const DashboardScreen: React.FC<
         migrate: (legacy) => (isValidAccountKpiMode(legacy) ? legacy : null),
       }).value
   );
-  const [selectedRange, setSelectedRange] = useState<TrendRangeOption>("1 Month");
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -377,16 +356,6 @@ export const DashboardScreen: React.FC<
       winRatePct,
     };
   }, [dash.recentTrades, dash.connected, activePositions.length, kpis.todayPnlUsd, kpis.floatingPnl]);
-
-  const handleRangeSelect = (range: TrendRangeOption) => {
-    setSelectedRange(range);
-    // Map range pills to chart timeframes while keeping direct timeframe selection intact
-    if (range === "1 Day") setSelectedTimeframe("M1");
-    else if (range === "1 Week") setSelectedTimeframe("M5");
-    else if (range === "1 Month" || range === "3 Months") setSelectedTimeframe("M15");
-    else if (range === "6 Months" || range === "1 Year") setSelectedTimeframe("H1");
-    else setSelectedTimeframe("H4");
-  };
 
   const handleSaveScreenshot = async (
     ticket: number,
@@ -1455,93 +1424,7 @@ export const DashboardScreen: React.FC<
           ROW 3: FULL-WIDTH MAIN CHART CARD
       ====================================================================== */}
       <section aria-label="Main Trading Chart Card" className="w-full">
-        <div className="w-full iea-card p-5 flex flex-col gap-4">
-          {/* Chart Card Header: P&L / Equity Toggle + Range Pills (Left) | Balance Figure + Synced Caption (Right) */}
-          <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-iea-borderSubtle">
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* P&L / Equity Segmented Toggle */}
-              <div
-                role="tablist"
-                aria-label="Toggle P&L or Equity display"
-                className="inline-flex items-center p-1 rounded-[10px] bg-iea-inset border border-iea-borderSubtle text-xs"
-              >
-                {(["PNL", "EQUITY"] as const).map((m) => {
-                  const active = trendMode === m;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      role="tab"
-                      aria-selected={active}
-                      onClick={() => setTrendMode(m)}
-                      className={`px-3 py-1 rounded-[8px] font-semibold transition ${
-                        active
-                          ? "bg-iea-accent text-white"
-                          : "text-iea-textSecondary hover:text-iea-textPrimary"
-                      }`}
-                    >
-                      {m === "PNL" ? "P&L" : "Equity"}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Range Pill Selector (1 Day, 1 Week, 1 Month, 3 Months, 6 Months, 1 Year, All) */}
-              <div
-                role="group"
-                aria-label="Select trend range"
-                className="flex flex-wrap items-center gap-1"
-              >
-                {TREND_RANGES.map((range) => {
-                  const active = selectedRange === range;
-                  return (
-                    <button
-                      key={range}
-                      type="button"
-                      onClick={() => handleRangeSelect(range)}
-                      className={`px-2.5 py-1 rounded-[8px] text-[11px] font-medium transition ${
-                        active
-                          ? "bg-iea-accent text-white font-semibold"
-                          : "bg-iea-inset hover:bg-iea-elevated text-iea-textSecondary hover:text-iea-textPrimary border border-iea-borderSubtle"
-                      }`}
-                    >
-                      {range}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Big Balance / P&L Figure + "Bal ... · Synced hh:mm" Caption on the Right */}
-            <div className="text-left sm:text-right sm:ml-auto">
-              <div
-                className={`text-2xl md:text-[28px] font-bold font-mono tabular-nums tracking-tight leading-none ${
-                  trendMode === "PNL"
-                    ? (kpiSummary.netPnlValue ?? 0) >= 0
-                      ? "text-iea-profit"
-                      : "text-iea-danger"
-                    : "text-iea-textPrimary"
-                }`}
-              >
-                {trendMode === "PNL"
-                  ? formatCurrencyValue(kpiSummary.netPnlValue, true)
-                  : kpis.equity !== null
-                  ? formatCurrencyValue(kpis.equity, false)
-                  : kpis.balance !== null
-                  ? formatCurrencyValue(kpis.balance, false)
-                  : "-"}
-              </div>
-              <div className="text-[11px] font-mono text-iea-textMuted mt-1.5 flex items-center sm:justify-end space-x-2">
-                {kpis.balance !== null && (
-                  <span>
-                    Bal {formatCurrencyValue(kpis.balance, false)} ·
-                  </span>
-                )}
-                <span>{syncedTimeLabel}</span>
-              </div>
-            </div>
-          </div>
-
+        <div className="w-full iea-card p-5 flex flex-col">
           {/* LiveTradingChart Container */}
           <PanelErrorBoundary panelName="Live Chart">
             <div

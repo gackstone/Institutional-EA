@@ -3314,6 +3314,22 @@ ipcMain.handle("cloud-revoke-device", async (_e, deviceId) => {
 ipcMain.handle("cloud-open-external-portal", (_e, routePath) =>
   cloudAuthManager.openExternalPortal(routePath)
 );
+ipcMain.handle("cloud-mobile-pairing", async (_e, action, payload) => {
+  try {
+    const data = await cloudAuthManager.mobilePairingAction(action, payload);
+    return { ok: true, ...data };
+  } catch (err) {
+    return { ok: false, error: err?.message || "Cloud pairing request failed." };
+  }
+});
+ipcMain.handle("cloud-mobile-push-snapshot", async (_e, snapshot) => {
+  try {
+    const data = await cloudAuthManager.pushMobileSnapshot(snapshot);
+    return { ok: true, ...data };
+  } catch (err) {
+    return { ok: false, error: err?.message || "Cloud telemetry sync failed." };
+  }
+});
 
 // Window controls
 ipcMain.handle("minimize-window", () => mainWindow?.minimize());

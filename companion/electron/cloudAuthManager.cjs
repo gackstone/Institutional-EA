@@ -104,7 +104,7 @@ function createCloudAuthManager(options) {
       process.env.VITE_PUBLIC_SITE_URL ||
       fileEnv.INSTITUTIONAL_EA_WEB_URL ||
       fileEnv.VITE_PUBLIC_SITE_URL ||
-      "http://localhost:5173"
+      "https://arcadefx.live"
     )
       .trim()
       .replace(/\/+$/, "");
@@ -752,6 +752,51 @@ function createCloudAuthManager(options) {
     return { ok: true, url };
   }
 
+  async function mobilePairingAction(action, payload = {}) {
+    const store = loadEncrypted();
+    if (!store?.session?.user?.id) {
+      throw new Error("Sign in to your Institutional EA Cloud account to pair Android devices across networks.");
+    }
+    const token = await ensureFreshToken(store);
+    const companionDeviceId = getDeviceFingerprintHash();
+    const companionName = os.hostname() || "Windows Companion";
+    return supabaseFetch(
+      "/functions/v1/mobile-pairing",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          action,
+          companionDeviceId,
+          companionName,
+          ...(payload && typeof payload === "object" ? payload : {}),
+        }),
+      },
+      token
+    );
+  }
+
+  async function pushMobileSnapshot(snapshot = {}) {
+    const store = loadEncrypted();
+    if (!store?.session?.user?.id) {
+      return { ok: false, skipped: true, reason: "NOT_SIGNED_IN" };
+    }
+    const token = await ensureFreshToken(store);
+    const companionDeviceId = getDeviceFingerprintHash();
+    const companionName = os.hostname() || "Windows Companion";
+    return supabaseFetch(
+      "/functions/v1/mobile-sync",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          companionDeviceId,
+          companionName,
+          ...(snapshot && typeof snapshot === "object" ? snapshot : {}),
+        }),
+      },
+      token
+    );
+  }
+
   return {
     getSanitizedState,
     getDeviceFingerprintHash,
@@ -768,6 +813,8 @@ function createCloudAuthManager(options) {
     getDevices,
     revokeDevice,
     openExternalPortal,
+    mobilePairingAction,
+    pushMobileSnapshot,
   };
 }
 

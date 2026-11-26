@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import {
   AlertCircle,
   CheckCircle,
+  Cloud,
   RefreshCw,
   Shield,
   Smartphone,
@@ -14,11 +15,31 @@ import {
 import { controlClient } from "../services/ipc";
 
 interface MobileDevice {
-  deviceId: string;
-  deviceName: string;
+  deviceId?: string;
+  id?: string;
+  deviceName?: string;
+  device_name?: string;
   platform: string;
-  pairedAt: string;
-  lastSeenAt: string;
+  pairedAt?: string;
+  paired_at?: string;
+  lastSeenAt?: string;
+  last_seen_at?: string;
+}
+
+interface PendingCloudSession {
+  id: string;
+  status: string;
+  pending_android_name?: string | null;
+  pending_android_platform?: string | null;
+  expires_at?: string;
+}
+
+interface CloudPairingState {
+  sessionId: string;
+  code: string;
+  expiresAt: number;
+  companionName: string;
+  qrPayload: Record<string, unknown>;
 }
 
 interface MobileSyncStatus {
@@ -40,37 +61,105 @@ interface MobileSyncModalProps {
   onClose: () => void;
 }
 
+const electronCloud = () => (window as any)?.electronAPI;
+
 export const MobileSyncModal: React.FC<MobileSyncModalProps> = ({ isOpen, onClose }) => {
+  const [tab, setTab] = useState<"cloud" | "lan">("cloud");
+
+  // Cloud cross-network pairing state
+  const [cloudSession, setCloudSession] = useState<CloudPairingState | null>(null);
+  const [cloudQrUrl, setCloudQrUrl] = useState<string | null>(null);
+  const [cloudSecondsLeft, setCloudSecondsLeft] = useState<number>(0);
+  const [pendingApproval, setPendingApproval] = useState<PendingCloudSession | null>(null);
+  const [cloudDevices, setCloudDevices] = useState<MobileDevice[]>([]);
+  const [cloudBusy, setCloudBusy] = useState(false);
+  const [cloudError, setCloudError] = useState<string | null>(null);
+  const [cloudSuccess, setCloudSuccess] = useState<string | null>(null);
+
+  // Optional LAN fallback state
   const [status, setStatus] = useState<MobileSyncStatus | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number>(0);
 
-  const loadStatus = useCallback(async () => {
+  const loadCloudState = useCallback(async () => {
+    const api = electronCloud();
+    if (!api?.cloudMobilePairing) return;
+    try {
+      const [devRes, pendRes] = await Promise.all([
+        api.cloudMobilePairing("list"),
+        api.cloudMobilePairing("pending"),
+      ]);
+      if (devRes?.ok && Array.isArray(devRes.devices)) {
+        setCloudDevices(devRes.devices);
+      }
+      if (pendRes?.ok && Array.isArray(pendRes.sessions)) {
+        const waiting = pendRes.sessions.find(
+          (s: PendingCloudSession) => s.status === "awaiting_approval"
+        );
+        setPendingApproval(waiting || null);
+      }
+    } catch {
+      // Keep quiet on background poll failure
+    }
+  }, []);
+
+  const loadLanStatus = useCallback(async () => {
     try {
       const res = await controlClient.getMobileSyncStatus();
       setStatus(res);
       setError(null);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load Mobile Sync status");
+      setError(e instanceof Error ? e.message : "Failed to load Local Wi-Fi sync status");
     }
   }, []);
 
   useEffect(() => {
     if (!isOpen) return;
-    loadStatus();
-    const timer = setInterval(loadStatus, 5000);
+    loadCloudState();
+    loadLanStatus();
+    const timer = setInterval(() => {
+      loadCloudState();
+      if (tab === "lan") loadLanStatus();
+    }, 3000);
     return () => clearInterval(timer);
-  }, [isOpen, loadStatus]);
+  }, [isOpen, tab, loadCloudState, loadLanStatus]);
+
+  useEffect(() => {
+    if (!cloudSession?.qrPayload) {
+      setCloudQrUrl(null);
+      return;
+    }
+    QRCode.toDataURL(JSON.stringify(cloudSession.qrPayload), {
+      width: 220,
+      margin: 2,
+      color: { dark: "#0D1117", light: "#FFFFFF" },
+    })
+      .then((url) => setCloudQrUrl(url))
+      .catch(() => setCloudQrUrl(null));
+  }, [cloudSession?.qrPayload]);
+
+  useEffect(() => {
+    if (!cloudSession?.expiresAt) {
+      setCloudSecondsLeft(0);
+      return;
+    }
+    const tick = () => {
+      const rem = Math.max(0, cloudSession.expiresAt - Math.floor(Date.now() / 1000));
+      setCloudSecondsLeft(rem);
+    };
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [cloudSession?.expiresAt]);
 
   useEffect(() => {
     if (!status?.qrPayload) {
       setQrDataUrl(null);
       return;
     }
-    const payloadStr = JSON.stringify(status.qrPayload);
-    QRCode.toDataURL(payloadStr, {
+    QRCode.toDataURL(JSON.stringify(status.qrPayload), {
       width: 220,
       margin: 2,
       color: { dark: "#0D1117", light: "#FFFFFF" },
@@ -95,7 +184,90 @@ export const MobileSyncModal: React.FC<MobileSyncModalProps> = ({ isOpen, onClos
 
   if (!isOpen) return null;
 
-  const handleToggle = async () => {
+  const handleStartCloudPairing = async () => {
+    const api = electronCloud();
+    if (!api?.cloudMobilePairing) {
+      setCloudError("Cloud pairing requires the Windows Companion desktop app.");
+      return;
+    }
+    setCloudBusy(true);
+    setCloudError(null);
+    setCloudSuccess(null);
+    try {
+      const res = await api.cloudMobilePairing("create");
+      if (!res?.ok) {
+        setCloudError(res?.error || "Unable to create cloud pairing session. Verify you are signed in.");
+        return;
+      }
+      setCloudSession({
+        sessionId: res.sessionId,
+        code: res.code,
+        expiresAt: res.expiresAt,
+        companionName: res.companionName,
+        qrPayload: res.qrPayload,
+      });
+    } catch (e: unknown) {
+      setCloudError(e instanceof Error ? e.message : "Failed to start cloud pairing");
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+
+  const handleCancelCloudPairing = async () => {
+    const api = electronCloud();
+    if (api?.cloudMobilePairing && cloudSession) {
+      await api.cloudMobilePairing("cancel", { sessionId: cloudSession.sessionId }).catch(() => {});
+    }
+    setCloudSession(null);
+    setPendingApproval(null);
+  };
+
+  const handleApproveAndroid = async (sessionId: string) => {
+    const api = electronCloud();
+    if (!api?.cloudMobilePairing) return;
+    setCloudBusy(true);
+    setCloudError(null);
+    try {
+      const res = await api.cloudMobilePairing("approve", { sessionId });
+      if (!res?.ok) {
+        setCloudError(res?.error || "Approval failed.");
+      } else {
+        setCloudSuccess(`Approved "${res.device?.device_name || "Android Device"}" (Read-Only).`);
+        setPendingApproval(null);
+        setCloudSession(null);
+        await loadCloudState();
+      }
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+
+  const handleRejectAndroid = async (sessionId: string) => {
+    const api = electronCloud();
+    if (!api?.cloudMobilePairing) return;
+    setCloudBusy(true);
+    try {
+      await api.cloudMobilePairing("reject", { sessionId });
+      setPendingApproval(null);
+      await loadCloudState();
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+
+  const handleRevokeCloudDevice = async (deviceId: string) => {
+    const api = electronCloud();
+    if (!api?.cloudMobilePairing) return;
+    setCloudBusy(true);
+    try {
+      await api.cloudMobilePairing("revoke", { deviceId });
+      await loadCloudState();
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+
+  const handleToggleLan = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -104,13 +276,13 @@ export const MobileSyncModal: React.FC<MobileSyncModalProps> = ({ isOpen, onClos
         : await controlClient.enableMobileSync();
       setStatus(res);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to toggle Mobile Sync");
+      setError(e instanceof Error ? e.message : "Failed to toggle Local Wi-Fi sync");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRefreshCode = async () => {
+  const handleRefreshLanCode = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -123,12 +295,12 @@ export const MobileSyncModal: React.FC<MobileSyncModalProps> = ({ isOpen, onClos
     }
   };
 
-  const handleRevoke = async (deviceId: string) => {
+  const handleRevokeLan = async (deviceId: string) => {
     setLoading(true);
     try {
       const res = await controlClient.revokeMobileDevice(deviceId);
       if (res?.status) setStatus(res.status);
-      else await loadStatus();
+      else await loadLanStatus();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to revoke device");
     } finally {
@@ -146,9 +318,9 @@ export const MobileSyncModal: React.FC<MobileSyncModalProps> = ({ isOpen, onClos
               <Smartphone className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-sm">Mobile Sync (Android Read-Only)</h3>
+              <h3 className="font-bold text-sm">Android Read-Only Pairing</h3>
               <p className="text-[11px] text-iea-textSecondary">
-                Opt-in local network monitoring · Strictly read-only
+                Works across Wi-Fi, 4G/5G &amp; different networks · Strictly read-only
               </p>
             </div>
           </div>
@@ -161,163 +333,305 @@ export const MobileSyncModal: React.FC<MobileSyncModalProps> = ({ isOpen, onClos
           </button>
         </div>
 
+        {/* Mode Tabs: Cloud (Primary) vs Optional Local Wi-Fi Fallback */}
+        <div className="px-5 pt-3 flex gap-2 border-b border-iea-borderSubtle pb-3">
+          <button
+            type="button"
+            onClick={() => setTab("cloud")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition ${
+              tab === "cloud"
+                ? "bg-iea-accent text-white"
+                : "bg-iea-inset text-iea-textSecondary hover:text-iea-textPrimary"
+            }`}
+          >
+            <Cloud className="w-3.5 h-3.5" />
+            <span>Cloud Pairing (Recommended)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("lan")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition ${
+              tab === "lan"
+                ? "bg-iea-accent text-white"
+                : "bg-iea-inset text-iea-textSecondary hover:text-iea-textPrimary"
+            }`}
+          >
+            <Wifi className="w-3.5 h-3.5" />
+            <span>Local Wi-Fi Fallback</span>
+          </button>
+        </div>
+
         {/* Body */}
-        <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
-          {/* Opt-in Toggle */}
-          <div className="iea-inset p-3.5 rounded-xl flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              {status?.enabled ? (
-                <Wifi className="w-5 h-5 text-iea-profit" />
-              ) : (
-                <WifiOff className="w-5 h-5 text-iea-textSecondary" />
+        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+          {tab === "cloud" ? (
+            <>
+              {cloudError && (
+                <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-400 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{cloudError}</span>
+                </div>
               )}
-              <div>
-                <div className="text-xs font-bold">
-                  {status?.enabled ? "Mobile Sync Enabled" : "Mobile Sync Disabled (Default)"}
+
+              {cloudSuccess && (
+                <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 shrink-0" />
+                  <span>{cloudSuccess}</span>
                 </div>
-                <div className="text-[11px] text-iea-textSecondary">
-                  {status?.enabled
-                    ? `Listening on ${status.primaryHost}:${status.port} (GET/SSE only)`
-                    : "Enable to pair your Android phone on the same Wi-Fi network."}
-                </div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleToggle}
-              disabled={loading}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
-                status?.enabled
-                  ? "bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25"
-                  : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30"
-              }`}
-            >
-              {loading ? "Working..." : status?.enabled ? "Turn Off" : "Enable"}
-            </button>
-          </div>
-
-          {error && (
-            <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-400 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* QR + 6-Digit Pairing Code */}
-          {status?.enabled && (
-            <div className="iea-inset p-4 rounded-xl space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold">Pair New Phone</span>
-                <button
-                  type="button"
-                  onClick={handleRefreshCode}
-                  disabled={loading}
-                  className="text-[11px] font-semibold text-iea-accent flex items-center gap-1 hover:underline"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  New Code
-                </button>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <div className="bg-white p-2 rounded-lg shrink-0">
-                  {qrDataUrl ? (
-                    <img src={qrDataUrl} alt="Mobile Sync Pairing QR Code" className="w-44 h-44" />
-                  ) : (
-                    <div className="w-44 h-44 flex items-center justify-center text-xs text-gray-500">
-                      Click New Code
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 space-y-2 text-xs">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-wider text-iea-textSecondary">
-                      6-Digit Pairing Code
-                    </div>
-                    <div className="font-mono text-2xl font-bold tracking-[0.25em] text-iea-accent mt-0.5">
-                      {status.pairingCode || "------"}
-                    </div>
-                    <div className="text-[11px] text-iea-textSecondary mt-0.5">
-                      {secondsLeft > 0
-                        ? `Expires in ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`
-                        : "Code expired — click New Code"}
-                    </div>
-                  </div>
-                  <div className="text-[11px] font-mono text-iea-textSecondary">
-                    Host: {status.primaryHost}:{status.port}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-400">
-                    <Shield className="w-3.5 h-3.5" />
-                    <span>Read-only enforced at protocol level</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Paired Devices */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold">
-                Paired Devices ({status?.devices?.length ?? 0})
-              </span>
-              {status?.devices && status.devices.length > 0 && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setLoading(true);
-                    try {
-                      const res = await controlClient.revokeAllMobileDevices();
-                      if (res?.status) setStatus(res.status);
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  className="text-[11px] text-red-400 hover:underline"
-                >
-                  Revoke All
-                </button>
               )}
-            </div>
 
-            {!status?.devices?.length ? (
-              <div className="iea-inset p-3 rounded-lg text-xs text-iea-textSecondary text-center">
-                No paired mobile devices yet.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {status.devices.map((dev) => (
-                  <div
-                    key={dev.deviceId}
-                    className="iea-inset px-3 py-2.5 rounded-lg flex items-center justify-between gap-2 text-xs"
-                  >
-                    <div>
-                      <div className="font-semibold flex items-center gap-1.5">
-                        <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>{dev.deviceName}</span>
-                        <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-iea-accentSoft text-iea-accent">
-                          {dev.platform}
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-iea-textSecondary mt-0.5">
-                        Last seen: {new Date(dev.lastSeenAt).toLocaleString()}
-                      </div>
-                    </div>
+              {/* Incoming Android Device Approval Prompt */}
+              {pendingApproval && (
+                <div
+                  data-testid="cloud-approval-card"
+                  className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 space-y-3"
+                >
+                  <div className="text-xs font-bold text-amber-300">
+                    New Android Device Requesting Read-Only Access
+                  </div>
+                  <div className="text-xs text-iea-textPrimary">
+                    Device: <span className="font-bold">{pendingApproval.pending_android_name || "Android Device"}</span>{" "}
+                    ({pendingApproval.pending_android_platform || "android"})
+                  </div>
+                  <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => handleRevoke(dev.deviceId)}
-                      disabled={loading}
-                      className="p-1.5 rounded-md text-red-400 hover:bg-red-500/15 transition"
-                      title="Revoke device access"
+                      disabled={cloudBusy}
+                      onClick={() => handleApproveAndroid(pendingApproval.id)}
+                      className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:opacity-90 text-white text-xs font-bold"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      Approve Device
+                    </button>
+                    <button
+                      type="button"
+                      disabled={cloudBusy}
+                      onClick={() => handleRejectAndroid(pendingApproval.id)}
+                      className="px-3.5 py-1.5 rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 text-xs font-semibold"
+                    >
+                      Decline
                     </button>
                   </div>
-                ))}
+                </div>
+              )}
+
+              {/* Primary CTA or Active QR / 6-Digit Code */}
+              {!cloudSession ? (
+                <div className="iea-inset p-4 rounded-xl space-y-3 text-center">
+                  <p className="text-xs text-iea-textSecondary">
+                    Pair your Android phone securely over the cloud — no shared Wi-Fi, IP address, or port forwarding required.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={cloudBusy}
+                    onClick={handleStartCloudPairing}
+                    data-testid="modal-pair-new-android-btn"
+                    className="px-4 py-2.5 rounded-xl bg-iea-accent hover:bg-iea-accentHover text-white text-xs font-bold inline-flex items-center gap-2 transition"
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    <span>{cloudBusy ? "Creating Pairing Session..." : "PAIR NEW ANDROID DEVICE"}</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="iea-inset p-4 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold">Scan QR or Enter 6-Digit Code on Android</span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleStartCloudPairing}
+                        disabled={cloudBusy}
+                        className="text-[11px] font-semibold text-iea-accent flex items-center gap-1 hover:underline"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Regenerate
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelCloudPairing}
+                        className="text-[11px] font-semibold text-iea-textSecondary hover:text-iea-danger"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <div className="bg-white p-2 rounded-lg shrink-0">
+                      {cloudQrUrl ? (
+                        <img src={cloudQrUrl} alt="Cloud Pairing QR Code" className="w-44 h-44" />
+                      ) : (
+                        <div className="w-44 h-44 flex items-center justify-center text-xs text-gray-500">
+                          Generating QR...
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 space-y-2 text-xs">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-iea-textSecondary">
+                          One-Time 6-Digit Code
+                        </div>
+                        <div className="font-mono text-2xl font-bold tracking-[0.25em] text-iea-accent mt-0.5">
+                          {cloudSession.code}
+                        </div>
+                        <div className="text-[11px] text-iea-textSecondary mt-0.5">
+                          {cloudSecondsLeft > 0
+                            ? `Expires in ${Math.floor(cloudSecondsLeft / 60)}:${String(cloudSecondsLeft % 60).padStart(2, "0")}`
+                            : "Expired — click Regenerate"}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[11px] text-emerald-400">
+                        <Shield className="w-3.5 h-3.5" />
+                        <span>Read-only enforced server-side &amp; in DB</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Paired Cloud Android Devices */}
+              <div className="space-y-2">
+                <div className="text-xs font-bold">Paired Android Devices ({cloudDevices.length})</div>
+                {cloudDevices.length === 0 ? (
+                  <div className="iea-inset p-3 rounded-xl text-xs text-iea-textSecondary">
+                    No Android devices paired via Cloud yet.
+                  </div>
+                ) : (
+                  cloudDevices.map((d) => {
+                    const id = d.id || d.deviceId || "";
+                    return (
+                      <div
+                        key={id}
+                        className="iea-inset px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div>
+                          <div className="font-bold text-iea-textPrimary">
+                            {d.device_name || d.deviceName || "Android Device"}
+                          </div>
+                          <div className="text-[10px] font-mono text-iea-textSecondary">
+                            {d.platform} · Read-Only · Paired {d.paired_at ? new Date(d.paired_at).toLocaleDateString() : "—"}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRevokeCloudDevice(id)}
+                          disabled={cloudBusy}
+                          className="px-2.5 py-1 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 inline-flex items-center gap-1 text-[11px] font-semibold"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Revoke</span>
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
               </div>
-            )}
-          </div>
+            </>
+          ) : (
+            /* Optional Local Wi-Fi Fallback */
+            <>
+              <div className="iea-inset p-3.5 rounded-xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  {status?.enabled ? (
+                    <Wifi className="w-5 h-5 text-iea-profit" />
+                  ) : (
+                    <WifiOff className="w-5 h-5 text-iea-textSecondary" />
+                  )}
+                  <div>
+                    <div className="text-xs font-bold">
+                      {status?.enabled ? "Local Wi-Fi Sync Enabled" : "Local Wi-Fi Sync Disabled"}
+                    </div>
+                    <div className="text-[11px] text-iea-textSecondary">
+                      {status?.enabled
+                        ? `Listening on ${status.primaryHost}:${status.port} (GET/SSE only)`
+                        : "Optional fallback when both devices share the same local Wi-Fi."}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleLan}
+                  disabled={loading}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                    status?.enabled
+                      ? "bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25"
+                      : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30"
+                  }`}
+                >
+                  {loading ? "Working..." : status?.enabled ? "Turn Off" : "Enable"}
+                </button>
+              </div>
+
+              {error && (
+                <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-400 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {status?.enabled && (
+                <div className="iea-inset p-4 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold">Local Wi-Fi QR &amp; Code</span>
+                    <button
+                      type="button"
+                      onClick={handleRefreshLanCode}
+                      disabled={loading}
+                      className="text-[11px] font-semibold text-iea-accent flex items-center gap-1 hover:underline"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      New Code
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <div className="bg-white p-2 rounded-lg shrink-0">
+                      {qrDataUrl ? (
+                        <img src={qrDataUrl} alt="Local Wi-Fi Pairing QR Code" className="w-40 h-40" />
+                      ) : (
+                        <div className="w-40 h-40 flex items-center justify-center text-xs text-gray-500">
+                          Click New Code
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2 text-xs">
+                      <div className="font-mono text-xl font-bold tracking-[0.2em] text-iea-accent">
+                        {status.pairingCode || "------"}
+                      </div>
+                      <div className="text-[11px] text-iea-textSecondary">
+                        {secondsLeft > 0
+                          ? `Expires in ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`
+                          : "Expired"}
+                      </div>
+                      <div className="text-[11px] font-mono text-iea-textSecondary">
+                        LAN: {status.primaryHost}:{status.port}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {status?.devices && status.devices.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-xs font-bold">Local Wi-Fi Devices ({status.devices.length})</div>
+                  {status.devices.map((d) => (
+                    <div
+                      key={d.deviceId}
+                      className="iea-inset px-3.5 py-2 rounded-xl flex items-center justify-between text-xs"
+                    >
+                      <span>{d.deviceName}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRevokeLan(d.deviceId || "")}
+                        className="text-red-400 hover:underline text-[11px]"
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
