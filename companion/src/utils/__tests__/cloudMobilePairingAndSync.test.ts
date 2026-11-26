@@ -115,3 +115,24 @@ test("supabase/config.toml configures mobile-pairing and mobile-sync and MobileS
   assert.match(modal, /formatFriendlyCloudPairingError/);
   assert.match(modal, /Use Local Wi-Fi Fallback/);
 });
+
+test("Migration 20261126000004 backfills missing profiles with lowest-privilege user role and SECURITY DEFINER trigger", () => {
+  const sql = fs.readFileSync(
+    path.join(REPO_ROOT, "supabase/migrations/20261126000004_profile_backfill_and_trigger.sql"),
+    "utf-8"
+  );
+  assert.match(sql, /INSERT INTO public\.profiles/);
+  assert.match(sql, /'user' AS role/);
+  assert.match(sql, /ON CONFLICT \(id\) DO NOTHING/);
+  assert.match(sql, /SECURITY DEFINER/);
+  assert.match(sql, /SET search_path = public/);
+  assert.match(sql, /ALTER TABLE public\.profiles ENABLE ROW LEVEL SECURITY/);
+  assert.doesNotMatch(sql, /'admin'/i);
+
+  const authTs = fs.readFileSync(
+    path.join(REPO_ROOT, "supabase/functions/_shared/auth.ts"),
+    "utf-8"
+  );
+  assert.match(authTs, /ignoreDuplicates:\s*true/);
+  assert.match(authTs, /role:\s*"user"/);
+});

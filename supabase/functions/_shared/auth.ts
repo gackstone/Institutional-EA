@@ -40,14 +40,54 @@ export async function requireAuthenticatedUser(req: Request) {
     return { user: null, profile: null, error: "Invalid or expired authentication token." };
   }
 
-  const { data: profile, error: profErr } = await service
+  let { data: profile, error: profErr } = await service
     .from("profiles")
     .select("id, full_name, email, role")
     .eq("id", userData.user.id)
-    .single();
+    .maybeSingle();
+
+  // Safety net: if an authenticated auth.users record has no profile row yet,
+  // auto-provision a lowest-privilege 'user' profile (never admin/pro).
+  if (!profile && userData.user.email) {
+    const emailLower = userData.user.email.toLowerCase();
+    const metaName =
+      typeof userData.user.user_metadata?.full_name === "string"
+        ? userData.user.user_metadata.full_name.trim()
+        : "";
+    const fallbackName = metaName || emailLower.split("@")[0] || "Trader";
+
+    const { error: upsertErr } = await service
+      .from("profiles")
+      .upsert(
+        {
+          id: userData.user.id,
+          full_name: fallbackName,
+          email: emailLower,
+          role: "user",
+        },
+        { onConflict: "id", ignoreDuplicates: true }
+      );
+
+    if (upsertErr) {
+      console.error("[auth] Failed to auto-provision missing profile row:", upsertErr.code || "unknown");
+    } else {
+      const refetch = await service
+        .from("profiles")
+        .select("id, full_name, email, role")
+        .eq("id", userData.user.id)
+        .maybeSingle();
+      profile = refetch.data;
+      profErr = refetch.error;
+    }
+  }
 
   if (profErr || !profile) {
-    return { user: userData.user, profile: null, error: "User profile not found." };
+    console.error("[auth] Profile lookup failed for authenticated user:", profErr?.code || "missing_row");
+    return {
+      user: userData.user,
+      profile: null,
+      error: "Your account profile could not be initialized. Please try again in a moment.",
+    };
   }
 
   return { user: userData.user, profile, error: null };
